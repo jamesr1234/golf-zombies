@@ -146,22 +146,40 @@ func close() -> void:
 	_active = false
 	_hosting = false
 	backend = Backend.ENET
+	OS.low_processor_usage_mode = true
 	peers_changed.emit()
 
 
 func start_match() -> void:
 	if not is_host():
 		return
-	_begin_match.rpc(course_seed, int(GameSettings.difficulty), seats)
+	var ids := PackedInt32Array()
+	var seat_list := PackedInt32Array()
+	for peer_id in peer_ids():
+		ids.append(peer_id)
+		seat_list.append(seat_for(peer_id))
+	_begin_match.rpc(course_seed, int(GameSettings.difficulty), ids, seat_list)
 
 
 @rpc("authority", "call_local", "reliable")
-func _begin_match(seed: int, difficulty: int, p_seats: Dictionary) -> void:
+func _begin_match(
+	seed: int, difficulty: int, ids: PackedInt32Array, seat_list: PackedInt32Array
+) -> void:
 	course_seed = seed
-	seats = p_seats.duplicate()
+	seats.clear()
+	for i in ids.size():
+		seats[ids[i]] = seat_list[i] if i < seat_list.size() else i
 	GameSettings.mode = GameSettings.Mode.ONLINE_VS
 	GameSettings.difficulty = difficulty as GameSettings.Kind
 	match_starting.emit()
+	## Changing scenes in this same call drops the outgoing start packet on the
+	## host, so the joiner never leaves the lobby.
+	call_deferred("_enter_match")
+
+
+func _enter_match() -> void:
+	if not _active:
+		return
 	get_tree().change_scene_to_file(MATCH_SCENE)
 
 
@@ -177,6 +195,7 @@ func _bind_peer(peer: MultiplayerPeer, hosting: bool, p_backend: Backend) -> voi
 	_hosting = hosting
 	_active = true
 	backend = p_backend
+	OS.low_processor_usage_mode = false
 	multiplayer.multiplayer_peer = peer
 	multiplayer.peer_connected.connect(_on_peer_connected)
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
