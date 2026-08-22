@@ -72,6 +72,7 @@ const CHEER_FOV := 70.0
 @export var uses_mouse := true
 @export var body_color := Palette.PLAYER_ONE
 @export var sync_pace := 0.0
+@export var sync_gun := 0
 
 var peer_id := 0
 var net_driven := false
@@ -114,7 +115,7 @@ var _place_ok := false
 var _cpu_shot_hold := 0.0
 var _cpu_shot_latched := false
 var buzz := Buzz.new()
-var holding_beer := false
+@export var holding_beer := false
 var _beer: _BeerCan
 var _hit_flash_left := 0.0
 var _flash_material: StandardMaterial3D
@@ -180,6 +181,7 @@ func _physics_process(delta: float) -> void:
 	_tick_hit_flash(delta)
 	_tick_cheer(delta)
 	sync_pace = pace()
+	sync_gun = weapon.index
 	_animate(delta)
 
 
@@ -905,6 +907,8 @@ func _request_melee(origin: Vector3, forward: Vector3, strength: float) -> void:
 ## The gun is stowed for the swing, since the golfer is holding a club, and dropped
 ## when you go down.
 func _animate(delta: float) -> void:
+	if net_driven and not is_multiplayer_authority() and weapon != null:
+		weapon.apply_replicated_index(sync_gun)
 	if health.is_alive() and body != null and body.is_locked_limp():
 		body.stop_limp()
 	var travel := pace()
@@ -1331,6 +1335,8 @@ func _use_beer_cart() -> void:
 
 
 func is_holding_beer() -> bool:
+	if net_driven and not is_multiplayer_authority():
+		return holding_beer
 	var sipping: bool = _beer != null and _beer.is_busy()
 	if holding_beer and buzz.held <= 0 and not sipping:
 		holding_beer = false

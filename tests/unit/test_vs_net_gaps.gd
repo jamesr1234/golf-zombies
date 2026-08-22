@@ -21,6 +21,8 @@ func test_a_pawn_sync_speaks_for_its_owner() -> void:
 	assert_eq(pawn_sync.get_multiplayer_authority(), 7, "a late Sync child must not stay on the host")
 	assert_eq(health_sync.get_multiplayer_authority(), 1, "hp still belongs to the host")
 	assert_true(pawn_sync.replication_config.has_property(NodePath(":aiming")))
+	assert_true(pawn_sync.replication_config.has_property(NodePath(":sync_gun")))
+	assert_true(pawn_sync.replication_config.has_property(NodePath(":holding_beer")))
 
 
 func test_clients_defer_world_shots_to_the_host() -> void:
@@ -85,3 +87,32 @@ func test_a_replicated_loadout_replaces_the_bag() -> void:
 	assert_eq(gun.loadout.size(), 1)
 	assert_eq(gun.stats(), rifle)
 	assert_eq(gun.index, 0)
+
+
+func test_a_replicated_index_selects_that_gun() -> void:
+	var gun := Weapon.new()
+	add_child_autofree(gun)
+	var rifle: WeaponStats = preload("res://resources/weapons/rifle.tres")
+	var idx := gun.loadout.find(rifle)
+	gun.apply_replicated_index(idx)
+	assert_eq(gun.stats(), rifle)
+	assert_eq(gun.index, idx)
+	gun.apply_replicated_index(99)
+	assert_eq(gun.index, gun.loadout.size() - 1)
+
+
+func test_a_remote_pawn_shows_the_synced_gun() -> void:
+	var player: Player = preload("res://scenes/players/player.tscn").instantiate()
+	add_child_autofree(player)
+	player.net_driven = true
+	player.set_multiplayer_authority(99)
+	var rifle: WeaponStats = preload("res://resources/weapons/rifle.tres")
+	player.sync_gun = player.weapon.loadout.find(rifle)
+	player._animate(1.0 / 60.0)
+	assert_eq(player.weapon.stats(), rifle)
+	assert_false(player.raygun.is_net())
+	player.holding_beer = true
+	assert_true(player.is_holding_beer(), "remotes keep the replicated beer flag")
+	player._animate(1.0 / 60.0)
+	assert_true(player._beer.visible)
+	assert_false(player.raygun.visible)

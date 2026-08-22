@@ -36,6 +36,7 @@ static func attach(
 static func attach_pawn(node: Node, authority := 1) -> MultiplayerSynchronizer:
 	return attach(node, PackedStringArray([
 		":position", ":rotation", ":sync_pace", ":aiming",
+		":sync_gun", ":holding_beer",
 	]), PAWN_HZ, authority)
 
 

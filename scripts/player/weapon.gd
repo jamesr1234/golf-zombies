@@ -127,6 +127,12 @@ func has_gun(stats: WeaponStats) -> bool:
 	return loadout.has(stats)
 
 
+func apply_replicated_index(gun_index: int) -> void:
+	if loadout.is_empty():
+		return
+	index = clampi(gun_index, 0, loadout.size() - 1)
+
+
 func apply_replicated_loadout(gun_index: int, paths: PackedStringArray) -> void:
 	if paths.is_empty():
 		return
