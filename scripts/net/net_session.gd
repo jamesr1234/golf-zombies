@@ -14,7 +14,7 @@ const MAX_PLAYERS := 8
 const DEFAULT_PORT := 7777
 const MATCH_SCENE := "res://scenes/net/online_main.tscn"
 const TITLE_SCENE := "res://scenes/ui/main_menu.tscn"
-const JOIN_SECONDS := 8.0
+const JOIN_SECONDS := 25.0
 
 var port := DEFAULT_PORT
 var join_ip := "127.0.0.1"
@@ -85,6 +85,14 @@ func is_steam() -> bool:
 
 
 ## LAN and solo testing. Steam cannot easily run two clients on one machine.
+func _nudge_local_network() -> void:
+	var udp := PacketPeerUDP.new()
+	udp.set_broadcast_enabled(true)
+	udp.set_dest_address("255.255.255.255", port)
+	udp.put_packet("golf-zombies".to_utf8_buffer())
+	udp.close()
+
+
 func lan_addresses() -> PackedStringArray:
 	var found: PackedStringArray = []
 	for address in IP.get_local_addresses():
@@ -99,14 +107,17 @@ func lan_addresses() -> PackedStringArray:
 func host(p_port: int = DEFAULT_PORT) -> Error:
 	close()
 	var peer := ENetMultiplayerPeer.new()
-	peer.set_bind_ip("*")
+	## macOS turns "*" into an IPv6-only socket. Computer 2 joins with
+	## 192.168.4.x (IPv4), so the host has to listen on IPv4.
+	peer.set_bind_ip("0.0.0.0")
 	var err := peer.create_server(p_port, MAX_PLAYERS - 1)
 	if err != OK:
 		return err
 	port = p_port
 	_bind_peer(peer, true, Backend.ENET)
 	_assign_seat(multiplayer.get_unique_id())
-	print("[net] hosting on port %d  join at %s" % [port, "  ".join(lan_addresses())])
+	_nudge_local_network()
+	print("[net] hosting on 0.0.0.0:%d  join at %s" % [port, "  ".join(lan_addresses())])
 	return OK
 
 
@@ -119,6 +130,7 @@ func join(ip: String, p_port: int = DEFAULT_PORT) -> Error:
 	join_ip = ip
 	port = p_port
 	_bind_peer(peer, false, Backend.ENET)
+	_nudge_local_network()
 	print("[net] joining %s:%d" % [join_ip, port])
 	get_tree().create_timer(JOIN_SECONDS).timeout.connect(_on_join_timeout)
 	return OK
@@ -279,9 +291,11 @@ func _on_connected() -> void:
 	peers_changed.emit()
 
 
+## Silence and a refusal mean different things, so they must not read the same.
+## Nothing at all points outside the game: macOS or the router ate the packets.
 func _on_join_timeout() -> void:
 	if _connecting:
-		_on_connect_failed()
+		_fail("No reply from %s.  UDP is being blocked." % join_ip)
 
 
 func _seat_wired_peers() -> void:
@@ -291,9 +305,13 @@ func _seat_wired_peers() -> void:
 
 
 func _on_connect_failed() -> void:
-	print("[net] join failed")
+	_fail("The host refused the connection.")
+
+
+func _fail(reason: String) -> void:
+	print("[net] join failed: %s" % reason)
 	close()
-	disconnected.emit("Could not reach the host.")
+	disconnected.emit(reason)
 
 
 func _on_server_lost() -> void:

@@ -14,7 +14,9 @@ var _steam_btn: Button
 var _invite_btn: Button
 var _start_btn: Button
 var _back_btn: Button
+var _test_btn: Button
 var _diff: OptionButton
+var _probe: LanProbe
 var _busy := false
 ## Holds a failure message so the next _refresh() does not overwrite it.
 var _notice := ""
@@ -24,6 +26,10 @@ func _ready() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_build()
+	_probe = LanProbe.new()
+	_probe.answered.connect(_on_probe_answered)
+	_probe.gave_up.connect(_on_probe_silent)
+	add_child(_probe)
 	NetSession.peers_changed.connect(_refresh)
 	NetSession.disconnected.connect(_on_lost)
 	SteamLobby.invite_accepted.connect(_on_invite)
@@ -52,6 +58,8 @@ func _host() -> void:
 	GameSettings.difficulty = _diff.selected as GameSettings.Kind
 	var err := NetSession.host(_port_value())
 	_busy = false
+	if err == OK:
+		_probe.serve(_port_value())
 	_settle(err, "Could not host on that port.")
 
 
@@ -123,6 +131,25 @@ func _back() -> void:
 	NetSession.quit_to_menu()
 
 
+## Answers "can these two machines pass a UDP packet at all", without ENet in
+## the way. A silent probe means the packets die outside the game.
+func _test_lan() -> void:
+	Sfx.play("ui_confirm", self)
+	var err := _probe.probe(_ip.text.strip_edges(), _port_value())
+	_notice = "" if err == OK else "Could not send a probe."
+	_refresh()
+
+
+func _on_probe_answered(from_ip: String) -> void:
+	_notice = "LAN reaches %s.  UDP is open." % from_ip
+	_refresh()
+
+
+func _on_probe_silent() -> void:
+	_notice = "No probe reply from %s.  UDP is blocked." % _ip.text.strip_edges()
+	_refresh()
+
+
 func _port_value() -> int:
 	return clampi(_port.text.to_int(), 1, 65535)
 
@@ -139,6 +166,7 @@ func _refresh() -> void:
 	var hosting := NetSession.is_host()
 	_host_btn.disabled = not can_act
 	_join_btn.disabled = not can_act
+	_test_btn.disabled = _probe.is_probing()
 	_steam_btn.visible = SteamLobby.can_host()
 	_steam_btn.disabled = not can_act or not SteamLobby.can_host()
 	_invite_btn.visible = SteamLobby.can_host()
@@ -154,6 +182,8 @@ func _refresh() -> void:
 
 
 func _status_copy(active: bool) -> String:
+	if _probe.is_probing():
+		return "Testing %s..." % _ip.text.strip_edges()
 	if NetSession.is_connecting():
 		return "Connecting to %s..." % NetSession.join_ip
 	if not active:
@@ -224,10 +254,10 @@ func _build() -> void:
 	_list.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_list.label_settings = HudStyle.readout(Palette.ICE, 16)
 	root.add_child(_list)
-	_start_btn = _button("Start match")
+	_start_btn = LobbyChrome.button("Start match")
 	_start_btn.pressed.connect(_start)
 	root.add_child(_start_btn)
-	_back_btn = _button("Back")
+	_back_btn = LobbyChrome.button("Back")
 	_back_btn.pressed.connect(_back)
 	root.add_child(_back_btn)
 
@@ -242,12 +272,12 @@ func _fields() -> VBoxContainer:
 		_diff.add_item(label)
 	_diff.selected = int(GameSettings.difficulty)
 	box.add_child(_diff)
-	_steam_btn = _button("Host on Steam")
+	_steam_btn = LobbyChrome.button("Host on Steam")
 	_steam_btn.pressed.connect(_host_steam)
-	_invite_btn = _button("Invite friends")
+	_invite_btn = LobbyChrome.button("Invite friends")
 	_invite_btn.pressed.connect(_invite)
-	box.add_child(_row([_steam_btn, _invite_btn]))
-	box.add_child(_heading("LAN  ·  testing"))
+	box.add_child(LobbyChrome.row([_steam_btn, _invite_btn]))
+	box.add_child(LobbyChrome.heading("LAN  ·  testing"))
 	_ip = LineEdit.new()
 	_ip.placeholder_text = "Host IP"
 	_ip.text = NetSession.join_ip
@@ -260,37 +290,13 @@ func _fields() -> VBoxContainer:
 	_port.custom_minimum_size = Vector2(360.0, 36.0)
 	_port.alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(_port)
-	_host_btn = _button("Host")
+	_host_btn = LobbyChrome.button("Host")
 	_host_btn.pressed.connect(_host)
-	_join_btn = _button("Join")
+	_join_btn = LobbyChrome.button("Join")
 	_join_btn.pressed.connect(_join)
-	box.add_child(_row([_host_btn, _join_btn]))
+	_test_btn = LobbyChrome.button("Test LAN")
+	_test_btn.pressed.connect(_test_lan)
+	box.add_child(LobbyChrome.row([_host_btn, _join_btn, _test_btn]))
 	return box
 
 
-func _row(buttons: Array[Button]) -> HBoxContainer:
-	var row := HBoxContainer.new()
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 12)
-	for button in buttons:
-		row.add_child(button)
-	return row
-
-
-func _heading(copy: String) -> Label:
-	var label := Label.new()
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.label_settings = HudStyle.readout(Palette.VIOLET, 14)
-	label.text = HudStyle.chrome(copy)
-	return label
-
-
-func _button(copy: String) -> Button:
-	var button := Button.new()
-	button.text = HudStyle.chrome(copy)
-	button.focus_mode = Control.FOCUS_NONE
-	button.custom_minimum_size = Vector2(220.0, 44.0)
-	button.add_theme_font_size_override("font_size", 22)
-	button.add_theme_color_override("font_color", Palette.ICE)
-	button.add_theme_color_override("font_hover_color", Palette.MAGENTA)
-	return button
