@@ -115,6 +115,8 @@ func create_lobby(max_players: int) -> int:
 	if not _await_ready():
 		return 0
 	print("[steam] creating friends lobby")
+	## Friends-only so Spacewar's public list does not pick us up. The joiner
+	## pastes this lobby id; they do not need the overlay.
 	Steam.createLobby(Steam.LOBBY_TYPE_FRIENDS_ONLY, maxi(max_players, 2))
 	var id: int = await _settle_wait()
 	if id != 0:
@@ -140,31 +142,60 @@ func leave_lobby() -> void:
 	lobby_id = 0
 
 
-## Overlay is silent in the Godot editor on Forward+, so this also invites
-## whoever is online on the friends list and opens the Steam Friends window.
+## Overlay is silent in the Godot editor on Forward+. Invite the friends
+## Steam can see instead of opening a steam:// page that lands on the store.
 func open_invite_overlay() -> String:
 	if not _started or lobby_id == 0:
 		return "Host on Steam first."
 	Steam.activateGameOverlayInviteDialog(lobby_id)
-	var sent := invite_online_friends()
-	OS.shell_open("steam://friends")
-	if sent > 0:
-		return "Sent %d Steam invite(s).  Accept on the other Mac with the game already at Online." % sent
-	return "Overlay does not open in the editor.  Invite from the Steam Friends list."
+	var invited := invite_online_friends()
+	if not invited.is_empty():
+		return "Invited %s.  Accept on the other Mac with the game already at Online." % ", ".join(invited)
+	if friend_count() == 0:
+		return "This Steam account has no friends.  Friend the other Mac in Steam first."
+	return "No friends are online.  On computer 2, open Steam and set status to Online."
 
 
-func invite_online_friends() -> int:
-	if not _started or lobby_id == 0:
+static func parse_lobby_id(text: String) -> int:
+	var trimmed := text.strip_edges()
+	if not trimmed.is_valid_int():
 		return 0
-	var sent := 0
+	return trimmed.to_int()
+
+
+func friend_count() -> int:
+	if not _started:
+		return 0
+	return Steam.getFriendCount(Steam.FRIEND_FLAG_IMMEDIATE)
+
+
+func online_friend_ids() -> PackedInt64Array:
+	var ids: PackedInt64Array = PackedInt64Array()
+	if not _started:
+		return ids
 	var flags: int = Steam.FRIEND_FLAG_IMMEDIATE
 	for index in Steam.getFriendCount(flags):
 		var friend_id: int = Steam.getFriendByIndex(index, flags)
-		if Steam.getFriendPersonaState(friend_id) == Steam.PERSONA_STATE_OFFLINE:
-			continue
+		if Steam.getFriendPersonaState(friend_id) != Steam.PERSONA_STATE_OFFLINE:
+			ids.append(friend_id)
+	return ids
+
+
+func online_friend_names() -> PackedStringArray:
+	var names := PackedStringArray()
+	for friend_id in online_friend_ids():
+		names.append(Steam.getFriendPersonaName(friend_id))
+	return names
+
+
+func invite_online_friends() -> PackedStringArray:
+	var invited := PackedStringArray()
+	if not _started or lobby_id == 0:
+		return invited
+	for friend_id in online_friend_ids():
 		if Steam.inviteUserToLobby(lobby_id, friend_id):
-			sent += 1
-	return sent
+			invited.append(Steam.getFriendPersonaName(friend_id))
+	return invited
 
 
 func _await_ready() -> bool:

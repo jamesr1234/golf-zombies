@@ -13,6 +13,12 @@ func after_each() -> void:
 	GameSettings.reset()
 
 
+func test_a_lobby_id_is_only_digits() -> void:
+	assert_eq(SteamLobby.parse_lobby_id(""), 0)
+	assert_eq(SteamLobby.parse_lobby_id("192.168.4.85"), 0, "a LAN IP is not a lobby")
+	assert_eq(SteamLobby.parse_lobby_id(" 109775241 "), 109775241)
+
+
 func test_an_invite_survives_until_a_screen_picks_it_up() -> void:
 	assert_eq(SteamLobby.take_pending_invite(), 0, "nothing is waiting by default")
 	SteamLobby.pending_invite = 99
@@ -50,7 +56,9 @@ func test_steam_queries_are_safe_while_offline() -> void:
 	assert_null(SteamLobby.create_client_peer())
 	SteamLobby.leave_lobby()
 	assert_eq(SteamLobby.open_invite_overlay(), "Host on Steam first.")
-	assert_eq(SteamLobby.invite_online_friends(), 0)
+	assert_eq(SteamLobby.invite_online_friends().size(), 0)
+	assert_eq(SteamLobby.online_friend_names().size(), 0)
+	assert_eq(SteamLobby.friend_count(), 0)
 	assert_eq(SteamLobby.lobby_id, 0)
 
 

@@ -24,6 +24,15 @@ static func row(buttons: Array[Button]) -> HBoxContainer:
 	return box
 
 
+static func field(placeholder: String, text := "") -> LineEdit:
+	var edit := LineEdit.new()
+	edit.placeholder_text = placeholder
+	edit.text = text
+	edit.custom_minimum_size = Vector2(360.0, 36.0)
+	edit.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	return edit
+
+
 static func heading(copy: String) -> Label:
 	var label := Label.new()
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

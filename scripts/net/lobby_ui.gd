@@ -6,11 +6,13 @@ const _Music := preload("res://scripts/fx/music.gd")
 
 var _ip: LineEdit
 var _port: LineEdit
+var _lobby_id: LineEdit
 var _status: Label
 var _list: Label
 var _host_btn: Button
 var _join_btn: Button
 var _steam_btn: Button
+var _steam_join_btn: Button
 var _invite_btn: Button
 var _start_btn: Button
 var _back_btn: Button
@@ -83,6 +85,13 @@ func _host_steam() -> void:
 	_refresh()
 	var err: Error = await NetSession.host_steam()
 	_busy = false
+	if err == OK and SteamLobby.lobby_id != 0:
+		DisplayServer.clipboard_set(str(SteamLobby.lobby_id))
+		_lobby_id.text = str(SteamLobby.lobby_id)
+		_notice = "Lobby %d copied.  Paste that number on computer 2 and click Join Steam." % SteamLobby.lobby_id
+		Sfx.play("ui_confirm", self)
+		_refresh()
+		return
 	_settle(err, "Steam would not open a lobby.")
 
 
@@ -105,6 +114,24 @@ func _consume_invite() -> void:
 	var err: Error = await NetSession.join_steam(lobby_id)
 	_busy = false
 	_settle(err, "Could not join that lobby.")
+
+
+func _join_steam() -> void:
+	if _busy:
+		return
+	var lobby_id := SteamLobby.parse_lobby_id(_lobby_id.text)
+	if lobby_id == 0:
+		_notice = "Paste the host's Steam lobby ID in the box."
+		Sfx.play("ui_deny", self)
+		_refresh()
+		return
+	_busy = true
+	GameSettings.mode = GameSettings.Mode.ONLINE_VS
+	_status.text = HudStyle.chrome("Joining Steam lobby %d..." % lobby_id)
+	_refresh()
+	var err: Error = await NetSession.join_steam(lobby_id)
+	_busy = false
+	_settle(err, "Could not join that Steam lobby.")
 
 
 func _invite() -> void:
@@ -170,10 +197,13 @@ func _refresh() -> void:
 	_test_btn.disabled = _probe.is_probing()
 	_steam_btn.visible = SteamLobby.can_host()
 	_steam_btn.disabled = not can_act or not SteamLobby.can_host()
+	_steam_join_btn.visible = SteamLobby.can_host()
+	_steam_join_btn.disabled = not can_act or not SteamLobby.can_host()
 	_invite_btn.visible = SteamLobby.can_host()
 	_invite_btn.disabled = not (hosting and NetSession.is_steam())
 	_ip.editable = can_act
 	_port.editable = can_act
+	_lobby_id.editable = can_act
 	_diff.disabled = active and not hosting
 	_start_btn.visible = hosting
 	_start_btn.disabled = not hosting
@@ -189,7 +219,7 @@ func _status_copy(active: bool) -> String:
 		return "Connecting to %s..." % NetSession.join_ip
 	if not active:
 		if SteamLobby.can_host():
-			return "Host on Steam and invite friends, or play over LAN.  Leave Steam open."
+			return "Host on Steam, or paste the lobby ID below and Join Steam."
 		return "Host or join over LAN.  Type the host IP below."
 	if not NetSession.is_host():
 		return "Connected. Waiting for the host to start."
@@ -199,7 +229,7 @@ func _status_copy(active: bool) -> String:
 	if wired != seated:
 		count += "   wire %d" % wired
 	if NetSession.is_steam():
-		return "Hosting on Steam.  %s   Invite Friends, or invite from the Steam Friends list." % count
+		return "Hosting on Steam.  Lobby %d.  %s" % [SteamLobby.lobby_id, count]
 	var ips := "  ".join(NetSession.lan_addresses())
 	if ips == "":
 		ips = "this Mac"
@@ -214,6 +244,12 @@ func _roster() -> String:
 		if peer_id == 1:
 			tag += "  host"
 		lines.append("%s   %s" % [_seat_name(seat), tag])
+	if NetSession.is_steam() and NetSession.is_host():
+		var friends := SteamLobby.online_friend_names()
+		if friends.is_empty():
+			lines.append("No Steam friends online")
+		else:
+			lines.append("Friends online: %s" % ", ".join(friends))
 	return "\n".join(lines)
 
 
@@ -273,23 +309,20 @@ func _fields() -> VBoxContainer:
 		_diff.add_item(label)
 	_diff.selected = int(GameSettings.difficulty)
 	box.add_child(_diff)
+	box.add_child(LobbyChrome.heading("Steam"))
+	_lobby_id = LobbyChrome.field("Steam lobby ID")
+	box.add_child(_lobby_id)
 	_steam_btn = LobbyChrome.button("Host on Steam")
 	_steam_btn.pressed.connect(_host_steam)
+	_steam_join_btn = LobbyChrome.button("Join Steam")
+	_steam_join_btn.pressed.connect(_join_steam)
 	_invite_btn = LobbyChrome.button("Invite friends")
 	_invite_btn.pressed.connect(_invite)
-	box.add_child(LobbyChrome.row([_steam_btn, _invite_btn]))
+	box.add_child(LobbyChrome.row([_steam_btn, _steam_join_btn, _invite_btn]))
 	box.add_child(LobbyChrome.heading("LAN  ·  testing"))
-	_ip = LineEdit.new()
-	_ip.placeholder_text = "Host IP"
-	_ip.text = NetSession.join_ip
-	_ip.custom_minimum_size = Vector2(360.0, 36.0)
-	_ip.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_ip = LobbyChrome.field("Host IP", NetSession.join_ip)
 	box.add_child(_ip)
-	_port = LineEdit.new()
-	_port.placeholder_text = "Port"
-	_port.text = str(NetSession.DEFAULT_PORT)
-	_port.custom_minimum_size = Vector2(360.0, 36.0)
-	_port.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_port = LobbyChrome.field("Port", str(NetSession.DEFAULT_PORT))
 	box.add_child(_port)
 	_host_btn = LobbyChrome.button("Host")
 	_host_btn.pressed.connect(_host)
