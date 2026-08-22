@@ -134,8 +134,9 @@ func _on_lost(reason: String) -> void:
 
 func _refresh() -> void:
 	var active := NetSession.is_active()
+	var connecting := NetSession.is_connecting()
 	var steam_here := SteamLobby.is_available()
-	var can_act := not active and not _busy
+	var can_act := not active and not connecting and not _busy
 	var hosting := NetSession.is_host()
 	_host_btn.disabled = not can_act
 	_join_btn.disabled = not can_act
@@ -154,6 +155,8 @@ func _refresh() -> void:
 
 
 func _status_copy(active: bool) -> String:
+	if NetSession.is_connecting():
+		return "Connecting to %s..." % NetSession.join_ip
 	if not active:
 		if not SteamLobby.is_available():
 			return "Host or join on your local network."
@@ -162,13 +165,14 @@ func _status_copy(active: bool) -> String:
 		return "Host on Steam and invite friends, or play over LAN."
 	if not NetSession.is_host():
 		return "Connected. Waiting for the host to start."
+	var seated := NetSession.player_count()
+	var wired := NetSession.wire_count()
+	var count := "%d / %d" % [seated, NetSession.MAX_PLAYERS]
+	if wired != seated:
+		count += "   wire %d" % wired
 	if NetSession.is_steam():
-		return "Hosting on Steam.  %d / %d   Invite friends to fill seats." % [
-			NetSession.player_count(), NetSession.MAX_PLAYERS
-		]
-	return "Hosting on port %d.  %d / %d" % [
-		NetSession.port, NetSession.player_count(), NetSession.MAX_PLAYERS
-	]
+		return "Hosting on Steam.  %s   Invite friends to fill seats." % count
+	return "Hosting on port %d.  %s" % [NetSession.port, count]
 
 
 func _roster() -> String:

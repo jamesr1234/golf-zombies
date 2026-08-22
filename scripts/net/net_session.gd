@@ -14,6 +14,7 @@ const MAX_PLAYERS := 8
 const DEFAULT_PORT := 7777
 const MATCH_SCENE := "res://scenes/net/online_main.tscn"
 const TITLE_SCENE := "res://scenes/ui/main_menu.tscn"
+const JOIN_SECONDS := 8.0
 
 var port := DEFAULT_PORT
 var join_ip := "127.0.0.1"
@@ -23,10 +24,23 @@ var backend := Backend.ENET
 var seats: Dictionary = {}
 var _active := false
 var _hosting := false
+var _connecting := false
 
 
 func is_active() -> bool:
 	return _active
+
+
+func is_connecting() -> bool:
+	return _connecting
+
+
+func wire_count() -> int:
+	if multiplayer.multiplayer_peer == null:
+		return 0
+	if is_host():
+		return 1 + multiplayer.get_peers().size()
+	return 1 if _active else 0
 
 
 func is_host() -> bool:
@@ -80,6 +94,7 @@ func host(p_port: int = DEFAULT_PORT) -> Error:
 	port = p_port
 	_bind_peer(peer, true, Backend.ENET)
 	_assign_seat(multiplayer.get_unique_id())
+	print("[net] hosting on port %d" % port)
 	return OK
 
 
@@ -92,6 +107,8 @@ func join(ip: String, p_port: int = DEFAULT_PORT) -> Error:
 	join_ip = ip
 	port = p_port
 	_bind_peer(peer, false, Backend.ENET)
+	print("[net] joining %s:%d" % [join_ip, port])
+	get_tree().create_timer(JOIN_SECONDS).timeout.connect(_on_join_timeout)
 	return OK
 
 
@@ -145,6 +162,7 @@ func close() -> void:
 	seats.clear()
 	_active = false
 	_hosting = false
+	_connecting = false
 	backend = Backend.ENET
 	OS.low_processor_usage_mode = true
 	peers_changed.emit()
@@ -153,12 +171,20 @@ func close() -> void:
 func start_match() -> void:
 	if not is_host():
 		return
+	_seat_wired_peers()
+	print("[net] start_match seats=%d wire=%d remotes=%s" % [
+		seats.size(), wire_count(), multiplayer.get_peers()
+	])
 	var ids := PackedInt32Array()
 	var seat_list := PackedInt32Array()
 	for peer_id in peer_ids():
 		ids.append(peer_id)
 		seat_list.append(seat_for(peer_id))
-	_begin_match.rpc(course_seed, int(GameSettings.difficulty), ids, seat_list)
+	## Send each remote a packet, then run locally. Broadcast+call_local can
+	## still lose the start if the host is the only one on the wire.
+	for peer_id in multiplayer.get_peers():
+		_begin_match.rpc_id(peer_id, course_seed, int(GameSettings.difficulty), ids, seat_list)
+	_begin_match(course_seed, int(GameSettings.difficulty), ids, seat_list)
 
 
 @rpc("authority", "call_local", "reliable")
@@ -193,19 +219,23 @@ func quit_to_menu() -> void:
 
 func _bind_peer(peer: MultiplayerPeer, hosting: bool, p_backend: Backend) -> void:
 	_hosting = hosting
-	_active = true
+	_active = hosting
+	_connecting = not hosting
 	backend = p_backend
 	OS.low_processor_usage_mode = false
-	multiplayer.multiplayer_peer = peer
+	get_tree().get_multiplayer().multiplayer_peer = peer
 	multiplayer.peer_connected.connect(_on_peer_connected)
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 	if not hosting:
 		multiplayer.connected_to_server.connect(_on_connected)
 		multiplayer.connection_failed.connect(_on_connect_failed)
 		multiplayer.server_disconnected.connect(_on_server_lost)
+		if peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED:
+			_on_connected()
 
 
 func _on_peer_connected(id: int) -> void:
+	print("[net] peer %d connected  seats=%d wire=%d" % [id, seats.size(), wire_count()])
 	if is_host():
 		if seats.size() >= MAX_PLAYERS:
 			multiplayer.multiplayer_peer.disconnect_peer(id)
@@ -223,11 +253,25 @@ func _on_peer_disconnected(id: int) -> void:
 
 
 func _on_connected() -> void:
+	_connecting = false
 	_active = true
+	print("[net] connected to host as peer %d" % multiplayer.get_unique_id())
 	peers_changed.emit()
 
 
+func _on_join_timeout() -> void:
+	if _connecting:
+		_on_connect_failed()
+
+
+func _seat_wired_peers() -> void:
+	_assign_seat(multiplayer.get_unique_id())
+	for peer_id in multiplayer.get_peers():
+		_assign_seat(peer_id)
+
+
 func _on_connect_failed() -> void:
+	print("[net] join failed")
 	close()
 	disconnected.emit("Could not reach the host.")
 

@@ -78,6 +78,17 @@ func test_a_lan_host_keeps_the_enet_backend() -> void:
 	assert_true(NetSession.is_host())
 	assert_false(NetSession.is_steam())
 	assert_eq(NetSession.seat_for(multiplayer.get_unique_id()), 0, "the host takes seat 0")
+	assert_eq(NetSession.wire_count(), 1, "a host with no remotes is only on the wire alone")
+
+
+func test_a_join_is_not_connected_until_the_handshake() -> void:
+	var err := NetSession.join("127.0.0.1", FREE_PORT + 1)
+	assert_eq(err, OK)
+	assert_true(NetSession.is_connecting(), "create_client is not a finished join")
+	assert_false(NetSession.is_active())
+	assert_false(NetSession.is_host())
+	NetSession.close()
+	assert_false(NetSession.is_connecting())
 
 
 ## The handoff contract: Steam stays behind one door so the gameplay phase can
