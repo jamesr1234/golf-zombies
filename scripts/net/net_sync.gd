@@ -9,10 +9,12 @@ const CART_HZ := 0.05
 
 
 static func attach(
-	node: Node, paths: PackedStringArray, interval := PAWN_HZ
+	node: Node, paths: PackedStringArray, interval := PAWN_HZ, authority := -1
 ) -> MultiplayerSynchronizer:
 	var existing := node.get_node_or_null("Sync") as MultiplayerSynchronizer
 	if existing != null:
+		if authority >= 0:
+			existing.set_multiplayer_authority(authority)
 		return existing
 	var sync := MultiplayerSynchronizer.new()
 	sync.name = "Sync"
@@ -26,19 +28,21 @@ static func attach(
 	sync.replication_config = cfg
 	sync.replication_interval = interval
 	node.add_child(sync)
+	if authority >= 0:
+		sync.set_multiplayer_authority(authority)
 	return sync
 
 
-static func attach_pawn(node: Node) -> MultiplayerSynchronizer:
+static func attach_pawn(node: Node, authority := 1) -> MultiplayerSynchronizer:
 	return attach(node, PackedStringArray([
-		":position", ":rotation", ":sync_pace",
-	]), PAWN_HZ)
+		":position", ":rotation", ":sync_pace", ":aiming",
+	]), PAWN_HZ, authority)
 
 
 static func attach_health(node: Node) -> MultiplayerSynchronizer:
 	return attach(node, PackedStringArray([
 		":hp", ":state",
-	]), 0.1)
+	]), 0.1, 1)
 
 
 static func attach_ball(node: Node) -> MultiplayerSynchronizer:

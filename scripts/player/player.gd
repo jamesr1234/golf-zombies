@@ -85,7 +85,7 @@ var cart: GolfCart
 var flow
 var partner: Player
 var state: State = State.NORMAL
-var aiming := false
+@export var aiming := false
 var brain: CpuBuddy
 var shopping := false
 var shop_choice := 0

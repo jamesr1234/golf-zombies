@@ -70,7 +70,7 @@ func _spawn_player(data: Variant) -> Node:
 	if health != null:
 		health.set_multiplayer_authority(1)
 		NetSync.attach_health(health)
-	NetSync.attach_pawn(player)
+	NetSync.attach_pawn(player, peer_id)
 	if info.has("at"):
 		player.spawn_at(info["at"] as Vector3, float(info.get("yaw", 0.0)))
 	return player

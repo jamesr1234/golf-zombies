@@ -8,6 +8,21 @@ func after_each() -> void:
 	GameSettings.reset()
 
 
+func test_a_pawn_sync_speaks_for_its_owner() -> void:
+	var pawn := Node3D.new()
+	add_child_autofree(pawn)
+	var health := Node.new()
+	health.name = "Health"
+	pawn.add_child(health)
+	pawn.set_multiplayer_authority(7)
+	health.set_multiplayer_authority(1)
+	var health_sync := NetSync.attach_health(health)
+	var pawn_sync := NetSync.attach_pawn(pawn, 7)
+	assert_eq(pawn_sync.get_multiplayer_authority(), 7, "a late Sync child must not stay on the host")
+	assert_eq(health_sync.get_multiplayer_authority(), 1, "hp still belongs to the host")
+	assert_true(pawn_sync.replication_config.has_property(NodePath(":aiming")))
+
+
 func test_clients_defer_world_shots_to_the_host() -> void:
 	assert_false(NetSession.should_defer_world(false, true), "offline play is local")
 	assert_false(NetSession.should_defer_world(true, true), "the host still simulates")

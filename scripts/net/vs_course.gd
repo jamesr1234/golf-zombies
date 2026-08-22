@@ -42,6 +42,8 @@ func along_hole() -> Vector3:
 func place_players(players: Array[Player]) -> void:
 	var n := maxi(1, players.size())
 	for player in players:
+		if NetSession.is_active() and not player.is_multiplayer_authority():
+			continue
 		place_player(player, n)
 
 

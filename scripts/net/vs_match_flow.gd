@@ -817,7 +817,7 @@ func _on_pawn_entered(node: Node) -> void:
 	if not _players.has(player):
 		_players.append(player)
 		_wire_players()
-	if hole != null:
+	if hole != null and player.is_multiplayer_authority():
 		course.place_player(player, maxi(1, _players.size()))
 
 
