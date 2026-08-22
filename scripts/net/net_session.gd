@@ -85,16 +85,28 @@ func is_steam() -> bool:
 
 
 ## LAN and solo testing. Steam cannot easily run two clients on one machine.
+func lan_addresses() -> PackedStringArray:
+	var found: PackedStringArray = []
+	for address in IP.get_local_addresses():
+		if address.contains(":"):
+			continue
+		if address.begins_with("127.") or address.begins_with("169.254."):
+			continue
+		found.append(address)
+	return found
+
+
 func host(p_port: int = DEFAULT_PORT) -> Error:
 	close()
 	var peer := ENetMultiplayerPeer.new()
+	peer.set_bind_ip("*")
 	var err := peer.create_server(p_port, MAX_PLAYERS - 1)
 	if err != OK:
 		return err
 	port = p_port
 	_bind_peer(peer, true, Backend.ENET)
 	_assign_seat(multiplayer.get_unique_id())
-	print("[net] hosting on port %d" % port)
+	print("[net] hosting on port %d  join at %s" % [port, "  ".join(lan_addresses())])
 	return OK
 
 
@@ -116,6 +128,10 @@ func join(ip: String, p_port: int = DEFAULT_PORT) -> Error:
 ## must await this. The lobby owner is always Godot peer 1.
 func host_steam() -> Error:
 	close()
+	if not SteamLobby.can_host():
+		return ERR_UNAVAILABLE
+	if not SteamLobby.start_up():
+		return ERR_UNAVAILABLE
 	if not SteamLobby.is_online():
 		return ERR_UNAVAILABLE
 	if await SteamLobby.create_lobby(MAX_PLAYERS) == 0:
@@ -132,6 +148,10 @@ func host_steam() -> Error:
 ## Joins someone else's Steam lobby and connects to its owner. Must be awaited.
 func join_steam(lobby_id: int) -> Error:
 	close()
+	if not SteamLobby.can_host():
+		return ERR_UNAVAILABLE
+	if not SteamLobby.start_up():
+		return ERR_UNAVAILABLE
 	if not SteamLobby.is_online():
 		return ERR_UNAVAILABLE
 	if await SteamLobby.join_lobby(lobby_id) == 0:

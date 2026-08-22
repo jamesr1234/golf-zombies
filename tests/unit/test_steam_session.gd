@@ -72,6 +72,22 @@ func test_joining_on_steam_refuses_when_steam_is_down() -> void:
 	assert_false(NetSession.is_active())
 
 
+func test_steam_hosting_stays_off_on_macos() -> void:
+	if OS.get_name() != "macOS":
+		pass_test("Steam hosting is only blocked on macOS.")
+		return
+	assert_false(SteamLobby.can_host())
+	assert_eq(await NetSession.host_steam(), ERR_UNAVAILABLE)
+	assert_false(NetSession.is_active())
+	assert_false(SteamLobby.is_online(), "Play must not init Steam on a Mac")
+
+
+func test_lan_addresses_skip_loopback() -> void:
+	for address in NetSession.lan_addresses():
+		assert_false(address.begins_with("127."), address)
+		assert_false(address.contains(":"), address)
+
+
 func test_a_lan_host_keeps_the_enet_backend() -> void:
 	var err := NetSession.host(FREE_PORT)
 	assert_eq(err, OK, "the LAN path still works alongside Steam")

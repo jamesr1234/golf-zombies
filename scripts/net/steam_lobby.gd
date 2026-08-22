@@ -20,15 +20,19 @@ var app_id := DEV_APP_ID
 var pending_invite := 0
 var _started := false
 var _pending := false
+var _callbacks_hooked := false
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	if not is_available():
 		return
-	start_up()
-	_connect_callbacks()
+	## Do not init Steam on boot. App 480 makes the Mac Steam client exit as
+	## soon as it finishes login. Invites still start Steam because they cannot
+	## work without it.
 	_join_from_command_line()
+	if pending_invite != 0:
+		start_up()
 
 
 func _process(_delta: float) -> void:
@@ -46,17 +50,32 @@ func is_online() -> bool:
 	return _started
 
 
+## Spacewar (480) cannot launch on modern macOS, and steamInit as 480 takes the
+## Steam client down with it. LAN stays available.
+func can_host() -> bool:
+	return is_available() and OS.get_name() != "macOS"
+
+
 func start_up(p_app_id: int = DEV_APP_ID) -> bool:
 	if _started:
 		return true
 	if not is_available():
 		return false
 	app_id = p_app_id
-	var result: Dictionary = Steam.steamInitEx(app_id, false)
+	OS.set_environment("SteamAppId", str(app_id))
+	OS.set_environment("SteamGameId", str(app_id))
+	if Steam.has_method("isSteamRunning") and not Steam.isSteamRunning():
+		push_warning("Steam init skipped: the Steam client is not running.")
+		return false
+	## Do not pass the app id into steamInitEx — some builds call
+	## RestartAppIfNecessary, which closes Steam when Spacewar cannot launch.
+	var result: Dictionary = Steam.steamInitEx()
 	if int(result.get("status", -1)) != Steam.STEAM_API_INIT_RESULT_OK:
 		push_warning("Steam init failed: %s" % result.get("verbal", "unknown"))
 		return false
 	_started = true
+	_connect_callbacks()
+	print("[steam] ready as %s (%d)" % [Steam.getPersonaName(), Steam.getSteamID()])
 	return true
 
 
@@ -90,10 +109,12 @@ func members() -> PackedInt64Array:
 func create_lobby(max_players: int) -> int:
 	if not _await_ready():
 		return 0
+	print("[steam] creating friends lobby")
 	Steam.createLobby(Steam.LOBBY_TYPE_FRIENDS_ONLY, maxi(max_players, 2))
 	var id: int = await _settle_wait()
 	if id != 0:
 		Steam.setLobbyData(id, SEAT_KEY, "1")
+		print("[steam] lobby %d open" % id)
 	return id
 
 
@@ -152,6 +173,9 @@ func _on_settle_timeout() -> void:
 
 
 func _connect_callbacks() -> void:
+	if _callbacks_hooked or not is_available():
+		return
+	_callbacks_hooked = true
 	Steam.lobby_created.connect(_on_lobby_created)
 	Steam.lobby_joined.connect(_on_lobby_joined)
 	Steam.lobby_chat_update.connect(_on_lobby_chat_update)
@@ -211,8 +235,10 @@ func take_pending_invite() -> int:
 func create_host_peer() -> MultiplayerPeer:
 	if not _started or lobby_id == 0:
 		return null
+	print("[steam] opening host peer")
 	var peer := SteamMultiplayerPeer.new()
 	if peer.create_host(0) != OK:
+		push_warning("Steam host peer failed")
 		return null
 	peer.server_relay = true
 	return peer
