@@ -17,6 +17,22 @@ func test_eight_seat_colours_are_distinct() -> void:
 	assert_eq(Palette.seat_color(8), Palette.SEATS[0], "seats wrap")
 
 
+func test_tee_spread_follows_seat_not_spawn_order() -> void:
+	assert_almost_eq(VsCourse.tee_offset(0, 2), -1.1, 0.01)
+	assert_almost_eq(VsCourse.tee_offset(1, 2), 1.1, 0.01)
+	assert_eq(VsCourse.tee_offset(0, 1), 0.0, "a solo host stands on the line")
+
+
+func test_a_player_pose_sits_on_the_height_field() -> void:
+	var course := VsCourse.new()
+	course.hole = HoleGenerator.generate(0, 20260816)
+	var pose := course.player_pose(1, 2)
+	var at: Vector3 = pose["at"]
+	assert_true(pose.has("yaw"))
+	assert_almost_eq(at.y, course.hole.lift(at).y + 0.2, 0.05)
+	course.free()
+
+
 func test_a_tinted_ball_matches_its_seat() -> void:
 	var ball: GolfBall = preload("res://scenes/golf/ball.tscn").instantiate()
 	add_child_autofree(ball)

@@ -43,8 +43,12 @@ func _ready() -> void:
 	spawner_ai.zombie_killed.connect(_on_zombie_killed)
 	if not multiplayer.peer_disconnected.is_connected(_on_peer_left):
 		multiplayer.peer_disconnected.connect(_on_peer_left)
+	var pawns := $"../Players"
+	if not pawns.child_entered_tree.is_connected(_on_pawn_entered):
+		pawns.child_entered_tree.connect(_on_pawn_entered)
 	if multiplayer.is_server():
 		await get_tree().process_frame
+		course.rebuild(0, course_seed)
 		vs_spawner.spawn_match(self)
 		begin()
 		return
@@ -87,8 +91,10 @@ func start_hole(index: int) -> void:
 	_sync_local_score()
 	if multiplayer.is_server():
 		course.place_carts(_carts)
-		course.place_players(_players)
 		course.place_balls(_balls)
+	## Each pawn is owned by its peer, so the host's spawn_at is overwritten by
+	## the joiner's default origin unless that joiner plants itself too.
+	course.place_players(_players)
 	course.place_cart_girl()
 	course.aim_practice(_sessions())
 	_reset_clock()
@@ -804,10 +810,28 @@ func _broadcast_scores() -> void:
 	_apply_scores.rpc(payload, hole_time_left, int(phase))
 
 
+func _on_pawn_entered(node: Node) -> void:
+	var player := node as Player
+	if player == null:
+		return
+	if not _players.has(player):
+		_players.append(player)
+		_wire_players()
+	if hole != null:
+		course.place_player(player, maxi(1, _players.size()))
+
+
 func _wait_for_pawns() -> void:
-	var needed := maxi(1, NetSession.player_count())
-	for _i in 40:
-		if $"../Players".get_child_count() >= needed:
+	var needed := NetSession.peer_ids()
+	if needed.is_empty():
+		needed = PackedInt32Array([multiplayer.get_unique_id()])
+	for _i in 80:
+		var ready := true
+		for peer_id in needed:
+			if $"../Players".get_node_or_null("P%d" % peer_id) == null:
+				ready = false
+				break
+		if ready:
 			return
 		await get_tree().create_timer(0.05).timeout
 

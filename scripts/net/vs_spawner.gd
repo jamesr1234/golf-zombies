@@ -30,9 +30,14 @@ func spawn_match(flow: VsMatchFlow) -> void:
 	player_spawner.spawn_path = player_spawner.get_path_to(players_root)
 	ball_spawner.spawn_path = ball_spawner.get_path_to(balls_root)
 	zombie_spawner.spawn_path = zombie_spawner.get_path_to(zombies_root)
+	var count := maxi(1, NetSession.player_count())
 	for peer_id in NetSession.peer_ids():
-		player_spawner.spawn({"peer_id": peer_id, "seat": NetSession.seat_for(peer_id)})
-		ball_spawner.spawn({"peer_id": peer_id, "seat": NetSession.seat_for(peer_id)})
+		var seat := NetSession.seat_for(peer_id)
+		var payload := {"peer_id": peer_id, "seat": seat}
+		if flow != null and flow.course != null and flow.course.hole != null:
+			payload.merge(flow.course.player_pose(seat, count))
+		player_spawner.spawn(payload)
+		ball_spawner.spawn({"peer_id": peer_id, "seat": seat})
 	for cart in carts_root.get_children():
 		if cart is GolfCart:
 			cart.set_multiplayer_authority(1)
@@ -66,6 +71,8 @@ func _spawn_player(data: Variant) -> Node:
 		health.set_multiplayer_authority(1)
 		NetSync.attach_health(health)
 	NetSync.attach_pawn(player)
+	if info.has("at"):
+		player.spawn_at(info["at"] as Vector3, float(info.get("yaw", 0.0)))
 	return player
 
 

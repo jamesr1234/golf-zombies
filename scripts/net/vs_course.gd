@@ -40,14 +40,32 @@ func along_hole() -> Vector3:
 
 
 func place_players(players: Array[Player]) -> void:
+	var n := maxi(1, players.size())
+	for player in players:
+		place_player(player, n)
+
+
+func place_player(player: Player, count: int) -> void:
+	if hole == null or player == null:
+		return
+	var seat := NetSession.seat_for(player.peer_id)
+	if seat < 0:
+		seat = 0
+	var pose := player_pose(seat, count)
+	player.spawn_at(pose["at"], pose["yaw"])
+
+
+func player_pose(seat: int, count: int) -> Dictionary:
+	var n := maxi(1, count)
 	var forward := along_hole()
 	var lateral := forward.cross(Vector3.UP).normalized()
 	var yaw := rad_to_deg(atan2(-forward.x, -forward.z))
-	var n := maxi(1, players.size())
-	for i in players.size():
-		var side := (float(i) - float(n - 1) * 0.5) * PLAYER_SPREAD
-		var spot := hole.practice_tee + forward * 1.8 + lateral * side
-		players[i].spawn_at(hole.lift(spot) + Vector3.UP * 1.2, yaw)
+	var spot := hole.practice_tee + forward * 1.8 + lateral * tee_offset(seat, n)
+	return {"at": hole.lift(spot) + Vector3.UP * 0.2, "yaw": yaw}
+
+
+static func tee_offset(seat: int, count: int) -> float:
+	return (float(seat) - float(maxi(1, count) - 1) * 0.5) * PLAYER_SPREAD
 
 
 func place_balls(balls: Array[GolfBall]) -> void:
