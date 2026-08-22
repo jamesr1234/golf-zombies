@@ -109,7 +109,8 @@ func _consume_invite() -> void:
 
 func _invite() -> void:
 	Sfx.play("ui_confirm", self)
-	SteamLobby.open_invite_overlay()
+	_notice = SteamLobby.open_invite_overlay()
+	_refresh()
 
 
 func _settle(err: Error, complaint: String) -> void:
@@ -198,7 +199,7 @@ func _status_copy(active: bool) -> String:
 	if wired != seated:
 		count += "   wire %d" % wired
 	if NetSession.is_steam():
-		return "Hosting on Steam.  %s   Invite friends to fill seats." % count
+		return "Hosting on Steam.  %s   Invite Friends, or invite from the Steam Friends list." % count
 	var ips := "  ".join(NetSession.lan_addresses())
 	if ips == "":
 		ips = "this Mac"

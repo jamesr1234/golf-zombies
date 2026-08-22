@@ -49,7 +49,8 @@ func test_steam_queries_are_safe_while_offline() -> void:
 	assert_null(SteamLobby.create_host_peer())
 	assert_null(SteamLobby.create_client_peer())
 	SteamLobby.leave_lobby()
-	SteamLobby.open_invite_overlay()
+	assert_eq(SteamLobby.open_invite_overlay(), "Host on Steam first.")
+	assert_eq(SteamLobby.invite_online_friends(), 0)
 	assert_eq(SteamLobby.lobby_id, 0)
 
 

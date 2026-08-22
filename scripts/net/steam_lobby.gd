@@ -140,9 +140,31 @@ func leave_lobby() -> void:
 	lobby_id = 0
 
 
-func open_invite_overlay() -> void:
-	if _started and lobby_id != 0:
-		Steam.activateGameOverlayInviteDialog(lobby_id)
+## Overlay is silent in the Godot editor on Forward+, so this also invites
+## whoever is online on the friends list and opens the Steam Friends window.
+func open_invite_overlay() -> String:
+	if not _started or lobby_id == 0:
+		return "Host on Steam first."
+	Steam.activateGameOverlayInviteDialog(lobby_id)
+	var sent := invite_online_friends()
+	OS.shell_open("steam://friends")
+	if sent > 0:
+		return "Sent %d Steam invite(s).  Accept on the other Mac with the game already at Online." % sent
+	return "Overlay does not open in the editor.  Invite from the Steam Friends list."
+
+
+func invite_online_friends() -> int:
+	if not _started or lobby_id == 0:
+		return 0
+	var sent := 0
+	var flags: int = Steam.FRIEND_FLAG_IMMEDIATE
+	for index in Steam.getFriendCount(flags):
+		var friend_id: int = Steam.getFriendByIndex(index, flags)
+		if Steam.getFriendPersonaState(friend_id) == Steam.PERSONA_STATE_OFFLINE:
+			continue
+		if Steam.inviteUserToLobby(lobby_id, friend_id):
+			sent += 1
+	return sent
 
 
 func _await_ready() -> bool:
