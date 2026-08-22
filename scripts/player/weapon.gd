@@ -127,6 +127,29 @@ func has_gun(stats: WeaponStats) -> bool:
 	return loadout.has(stats)
 
 
+func apply_replicated_loadout(gun_index: int, paths: PackedStringArray) -> void:
+	if paths.is_empty():
+		return
+	loadout.clear()
+	mags.clear()
+	reserves.clear()
+	for path in paths:
+		if not ResourceLoader.exists(path):
+			continue
+		var next: WeaponStats = load(path)
+		loadout.append(next)
+		mags.append(next.mag_size)
+		reserves.append(next.reserve_start)
+	if loadout.is_empty():
+		return
+	index = clampi(gun_index, 0, loadout.size() - 1)
+	_reload_left = 0.0
+	_pair_shots = 0
+	_pair_idle = 0.0
+	zoom_step = -1
+	ammo_changed.emit()
+
+
 func add_gun(stats: WeaponStats) -> bool:
 	if stats == null or has_gun(stats):
 		return false
@@ -167,6 +190,16 @@ func tick(delta: float, view: Transform3D, trigger_held: bool, trigger_pulled: b
 	_fire(view, ads)
 
 
+func host_fire(view: Transform3D, ads: bool, gun_index: int) -> bool:
+	if gun_index < 0 or gun_index >= loadout.size():
+		return false
+	if mags[gun_index] <= 0 or _cooldown > 0.0 or is_reloading():
+		return false
+	index = gun_index
+	_commit_fire(view, ads)
+	return true
+
+
 func _finish_reload() -> void:
 	_reload_left = 0.0
 	_pair_shots = 0
@@ -180,16 +213,37 @@ func _finish_reload() -> void:
 
 
 func _fire(view: Transform3D, ads: bool) -> void:
+	if NetSession.defers_world():
+		_spend_round(view)
+		var owner := get_parent() as Player
+		if owner != null:
+			owner.request_host_fire(view, ads, index)
+		if stats().is_net() or stats().is_explosive():
+			return
+		var spread := deg_to_rad(stats().ads_spread_deg if ads else stats().spread_deg)
+		for _pellet in stats().pellets:
+			_trace(view, spread, stats())
+		return
+	_commit_fire(view, ads)
+
+
+func _spend_round(view: Transform3D) -> WeaponStats:
 	var current := stats()
 	mags[index] -= 1
 	_cooldown = cooldown_after_shot(current, _pair_shots)
 	_pair_shots = pair_shots_after(current, _pair_shots)
 	_pair_idle = 0.0
 	_flash_time = 0.04
-	_flash.global_position = view.origin - view.basis.z * 0.6
+	if _flash != null:
+		_flash.global_position = view.origin - view.basis.z * 0.6
 	ammo_changed.emit()
 	fired.emit()
 	Sfx.play(Sfx.fire_cue(current.visual), self)
+	return current
+
+
+func _commit_fire(view: Transform3D, ads: bool) -> void:
+	var current := _spend_round(view)
 	if current.is_net():
 		_launch_net(view, current)
 		return

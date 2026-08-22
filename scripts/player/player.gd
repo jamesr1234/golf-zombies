@@ -690,14 +690,33 @@ func _cancel_place() -> void:
 func _confirm_place() -> void:
 	if not _place_ok or not _has_barrier_charges():
 		return
+	if NetSession.defers_world():
+		_request_place.rpc_id(1, _place_at, _yaw)
+		_cancel_place()
+		return
+	_host_place(_place_at, _yaw)
+
+
+func _host_place(at: Vector3, yaw_deg: float) -> void:
+	if not _has_barrier_charges():
+		return
 	if not wallet().try_place_barrier():
 		_cancel_place()
 		return
 	var parent: Node = flow.hole_node() if flow.has_method("hole_node") else null
 	if parent == null:
 		parent = get_parent()
-	_HexBarrier.spawn(parent, _place_at, _yaw)
+	_HexBarrier.spawn(parent, at, yaw_deg)
 	_cancel_place()
+
+
+@rpc("any_peer", "reliable")
+func _request_place(at: Vector3, yaw_deg: float) -> void:
+	if not multiplayer.is_server():
+		return
+	if multiplayer.get_remote_sender_id() != peer_id:
+		return
+	_host_place(at, yaw_deg)
 
 
 func _tick_place() -> void:
@@ -839,6 +858,23 @@ func _fight(delta: float) -> void:
 		_try_melee()
 
 
+func request_host_fire(view: Transform3D, ads: bool, gun_index: int) -> void:
+	_request_fire.rpc_id(
+		1, view.origin, view.basis.x, view.basis.y, view.basis.z, ads, gun_index
+	)
+
+
+@rpc("any_peer", "reliable")
+func _request_fire(
+	origin: Vector3, bx: Vector3, by: Vector3, bz: Vector3, ads: bool, gun_index: int
+) -> void:
+	if not multiplayer.is_server():
+		return
+	if multiplayer.get_remote_sender_id() != peer_id:
+		return
+	weapon.host_fire(Transform3D(Basis(bx, by, bz), origin), ads, gun_index)
+
+
 func _try_melee() -> void:
 	var origin := head.global_position
 	var forward := -head.global_transform.basis.z
@@ -934,8 +970,11 @@ func _interact(delta: float) -> void:
 	if partner == null:
 		return
 	if health.is_alive() and _partner_needs_revive() and input.pressed("revive"):
-		partner.health.add_revive_progress(delta)
-	elif partner.health.revive_progress > 0.0:
+		if NetSession.defers_world():
+			_request_revive.rpc_id(1, partner.peer_id)
+		else:
+			partner.health.add_revive_progress(delta)
+	elif partner.health.revive_progress > 0.0 and not NetSession.is_active():
 		partner.health.reset_revive_progress()
 
 
@@ -1085,12 +1124,36 @@ func incoming_damage(amount: float) -> float:
 
 
 func apply_hit(amount: float, from: Vector3, hit_at := Vector3.INF) -> void:
+	if NetSession.defers_world():
+		return
 	var was_alive := health.is_alive()
 	health.take_damage(incoming_damage(amount))
 	if not was_alive:
 		return
 	_knock_from(from)
 	_flop_from(from, hit_at, amount, health.is_downed())
+
+
+@rpc("any_peer", "reliable")
+func _request_revive(target_id: int) -> void:
+	if not multiplayer.is_server():
+		return
+	if multiplayer.get_remote_sender_id() != peer_id:
+		return
+	var target := _player_with_peer(target_id)
+	if target == null:
+		return
+	if global_position.distance_to(target.global_position) > REVIVE_RANGE:
+		return
+	target.health.add_revive_progress(get_physics_process_delta_time())
+
+
+func _player_with_peer(id: int) -> Player:
+	for node in get_tree().get_nodes_in_group("players"):
+		var other := node as Player
+		if other != null and other.peer_id == id:
+			return other
+	return null
 
 
 func call_for_cover() -> void:
@@ -1307,11 +1370,27 @@ func throw_beer() -> bool:
 	var view := get_view_transform()
 	var fly := -view.basis.z
 	var muzzle := view.origin + fly * 0.7
+	if NetSession.defers_world():
+		_request_throw_beer.rpc_id(1, muzzle, fly)
+		return true
+	_spawn_thrown_beer(muzzle, fly)
+	return true
+
+
+func _spawn_thrown_beer(muzzle: Vector3, fly: Vector3) -> void:
 	var root := get_tree().get_first_node_in_group("fx_root")
 	if root == null:
 		root = get_tree().current_scene
 	_ThrownBeer.spawn(root, muzzle, fly)
-	return true
+
+
+@rpc("any_peer", "reliable")
+func _request_throw_beer(muzzle: Vector3, fly: Vector3) -> void:
+	if not multiplayer.is_server():
+		return
+	if multiplayer.get_remote_sender_id() != peer_id:
+		return
+	_spawn_thrown_beer(muzzle, fly)
 
 
 func chug() -> bool:

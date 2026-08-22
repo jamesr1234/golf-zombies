@@ -39,6 +39,15 @@ func should_simulate(node: Node) -> bool:
 	return node.is_multiplayer_authority()
 
 
+## World effects (damage, projectiles, the hole clock) run on the host.
+func defers_world() -> bool:
+	return should_defer_world(_active, multiplayer.is_server())
+
+
+static func should_defer_world(active: bool, is_server: bool) -> bool:
+	return active and not is_server
+
+
 func peer_ids() -> PackedInt32Array:
 	var ids: PackedInt32Array = PackedInt32Array(seats.keys())
 	ids.sort()

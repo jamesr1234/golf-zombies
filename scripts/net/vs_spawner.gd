@@ -61,6 +61,10 @@ func _spawn_player(data: Variant) -> Node:
 	player.uses_mouse = true
 	player.body_color = Palette.seat_color(seat)
 	player.set_multiplayer_authority(peer_id)
+	var health := player.get_node_or_null("Health") as Health
+	if health != null:
+		health.set_multiplayer_authority(1)
+		NetSync.attach_health(health)
 	NetSync.attach_pawn(player)
 	return player
 

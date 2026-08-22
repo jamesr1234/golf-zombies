@@ -35,6 +35,8 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	if NetSession.defers_world():
+		return
 	tick(delta)
 
 

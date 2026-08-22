@@ -35,6 +35,12 @@ static func attach_pawn(node: Node) -> MultiplayerSynchronizer:
 	]), PAWN_HZ)
 
 
+static func attach_health(node: Node) -> MultiplayerSynchronizer:
+	return attach(node, PackedStringArray([
+		":hp", ":state",
+	]), 0.1)
+
+
 static func attach_ball(node: Node) -> MultiplayerSynchronizer:
 	return attach(node, PackedStringArray([
 		":position", ":rotation", ":linear_velocity",

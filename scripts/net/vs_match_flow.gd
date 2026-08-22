@@ -28,6 +28,7 @@ var _balls: Array[GolfBall] = []
 var _carts: Array[GolfCart] = []
 var _scores: Dictionary = {}
 var _banner := 0
+var _clock_broadcast := 0.0
 
 @onready var course: VsCourse = $"../VsCourse"
 @onready var spawner_ai: SpawnDirector = $"../SpawnDirector"
@@ -40,6 +41,8 @@ func _ready() -> void:
 	spawner_ai.container = zombies
 	spawner_ai.net_factory = vs_spawner
 	spawner_ai.zombie_killed.connect(_on_zombie_killed)
+	if not multiplayer.peer_disconnected.is_connected(_on_peer_left):
+		multiplayer.peer_disconnected.connect(_on_peer_left)
 	if multiplayer.is_server():
 		await get_tree().process_frame
 		vs_spawner.spawn_match(self)
@@ -143,6 +146,46 @@ func score_for(player: Player) -> PlayerScore:
 	if player == null:
 		return score
 	return _scores.get(player.peer_id, score) as PlayerScore
+
+
+func mark_peer_gone(peer_id: int) -> void:
+	var card := _scores.get(peer_id) as PlayerScore
+	if card != null and not card.done_this_hole:
+		card.settle_pickup()
+
+
+func settle_disconnected(peer_id: int) -> void:
+	mark_peer_gone(peer_id)
+	var player := _player_for(peer_id)
+	if player != null:
+		_players.erase(player)
+		player.queue_free()
+	var owned := _ball_for(peer_id)
+	if owned != null:
+		_balls.erase(owned)
+		owned.queue_free()
+	var players_root := get_node_or_null("../Players")
+	var balls_root := get_node_or_null("../Balls")
+	if players_root != null:
+		var pawn := players_root.get_node_or_null("P%d" % peer_id)
+		if pawn != null and pawn != player:
+			pawn.queue_free()
+	if balls_root != null:
+		var ball_node := balls_root.get_node_or_null("Ball%d" % peer_id)
+		if ball_node != null and ball_node != owned:
+			ball_node.queue_free()
+	_sync_local_score()
+	scorecard_changed.emit()
+	if multiplayer.is_server():
+		_broadcast_scores()
+		if _all_done():
+			_complete_hole()
+
+
+func _on_peer_left(peer_id: int) -> void:
+	if not multiplayer.is_server():
+		return
+	settle_disconnected(peer_id)
 
 
 func cart_for(who: Node3D) -> GolfCart:
@@ -263,10 +306,12 @@ func buy_shop_item(item_id: String, buyer: Player = null) -> bool:
 		return true
 	var card := score_for(buyer)
 	var ok := course.shop.buy(item_id, card, _guns(buyer), buyer, cart_for(buyer))
-	if ok and buyer.golf != null:
-		buyer.golf.club_kit = card.club_kit()
+	if ok:
+		if buyer.golf != null:
+			buyer.golf.club_kit = card.club_kit()
 		scorecard_changed.emit()
 		_broadcast_scores()
+		_broadcast_loadout(buyer)
 	return ok
 
 
@@ -303,12 +348,22 @@ func scoreboard_text() -> String:
 func _process(delta: float) -> void:
 	if not started or finished or is_between_holes():
 		return
+	if not owns_clock():
+		return
 	if freeze_left > 0.0:
 		freeze_left = maxf(0.0, freeze_left - delta)
 		return
 	hole_time_left = maxf(0.0, hole_time_left - delta)
-	if hole_time_left <= 0.0 and multiplayer.is_server():
+	_clock_broadcast += delta
+	if _clock_broadcast >= 1.0:
+		_clock_broadcast = 0.0
+		_broadcast_scores()
+	if hole_time_left <= 0.0:
 		_timeout_hole()
+
+
+func owns_clock() -> bool:
+	return not NetSession.defers_world()
 
 
 func _physics_process(delta: float) -> void:
@@ -397,6 +452,7 @@ func _riding_cart(who: Node3D) -> GolfCart:
 func _reset_clock() -> void:
 	hole_time_left = GameSettings.hole_seconds()
 	freeze_left = 0.0
+	_clock_broadcast = 0.0
 	for card in _scores.values():
 		hole_time_left += (card as PlayerScore).take_bonus_seconds()
 		freeze_left += (card as PlayerScore).take_freeze_seconds()
@@ -687,6 +743,24 @@ func _replicate_end(reason: String) -> void:
 	run_ended.emit(true)
 
 
+func _broadcast_loadout(buyer: Player) -> void:
+	if not multiplayer.is_server() or buyer == null or buyer.weapon == null:
+		return
+	var paths: PackedStringArray = []
+	for stats in buyer.weapon.loadout:
+		if stats != null and stats.resource_path != "":
+			paths.append(stats.resource_path)
+	_apply_loadout.rpc(buyer.peer_id, buyer.weapon.index, paths)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _apply_loadout(peer_id: int, gun_index: int, paths: PackedStringArray) -> void:
+	var player := _player_for(peer_id)
+	if player == null or player.weapon == null:
+		return
+	player.weapon.apply_replicated_loadout(gun_index, paths)
+
+
 @rpc("authority", "call_remote", "reliable")
 func _apply_scores(payload: Dictionary, clock: float, phase_value: int) -> void:
 	hole_time_left = clock
@@ -703,6 +777,7 @@ func _apply_scores(payload: Dictionary, clock: float, phase_value: int) -> void:
 		card.hole_index = int(row.get("hole_index", 0))
 		card.done_this_hole = bool(row.get("done", false))
 		card.club_id = String(row.get("club_id", ClubKit.STARTER_ID))
+		card.barrier_charges = int(row.get("barrier", card.barrier_charges))
 		var packed: PackedInt32Array = row.get("results", PackedInt32Array())
 		if packed.size() == card.results.size():
 			card.results = packed
@@ -724,6 +799,7 @@ func _broadcast_scores() -> void:
 			"club_id": card.club_id,
 			"results": card.results,
 			"seat": card.seat,
+			"barrier": card.barrier_charges,
 		}
 	_apply_scores.rpc(payload, hole_time_left, int(phase))
 
