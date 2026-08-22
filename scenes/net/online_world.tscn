@@ -1,0 +1,105 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" uid="uid://bnqn68l42mqx5" path="res://scripts/zombies/spawn_director.gd" id="4_spawn"]
+[ext_resource type="Shader" uid="uid://dyrdnchxjmkin" path="res://assets/shaders/neon_sky.gdshader" id="6_sky"]
+[ext_resource type="Script" path="res://scripts/net/vs_match_flow.gd" id="8_flow"]
+[ext_resource type="Script" path="res://scripts/net/vs_course.gd" id="9_course"]
+[ext_resource type="Script" path="res://scripts/net/vs_spawner.gd" id="10_spawn"]
+[ext_resource type="PackedScene" path="res://scenes/players/player.tscn" id="11_player"]
+[ext_resource type="PackedScene" path="res://scenes/golf/ball.tscn" id="12_ball"]
+[ext_resource type="PackedScene" path="res://scenes/zombies/zombie.tscn" id="13_zombie"]
+[ext_resource type="PackedScene" path="res://scenes/vehicles/golf_cart.tscn" id="14_cart"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_sky"]
+shader = ExtResource("6_sky")
+shader_parameter/horizon_color = Color(0.34, 0.03, 0.35, 1)
+shader_parameter/zenith_color = Color(0.015, 0.01, 0.07, 1)
+shader_parameter/ground_color = Color(0.01, 0.01, 0.03, 1)
+shader_parameter/star_threshold = 0.9987
+shader_parameter/star_energy = 2.5
+shader_parameter/horizon_falloff = 4.0
+
+[sub_resource type="Sky" id="Sky_1"]
+sky_material = SubResource("ShaderMaterial_sky")
+
+[sub_resource type="Environment" id="Environment_1"]
+background_mode = 2
+sky = SubResource("Sky_1")
+ambient_light_source = 2
+ambient_light_color = Color(0.19, 0.14, 0.34, 1)
+ambient_light_energy = 0.9
+tonemap_mode = 3
+tonemap_white = 4.0
+glow_enabled = true
+glow_levels/2 = 0.6
+glow_levels/3 = 1.0
+glow_levels/4 = 1.0
+glow_levels/5 = 0.6
+glow_normalized = true
+glow_intensity = 1.1
+glow_strength = 1.05
+glow_bloom = 0.15
+glow_hdr_threshold = 0.85
+fog_enabled = true
+fog_light_color = Color(0.3, 0.08, 0.42, 1)
+fog_light_energy = 1.2
+fog_density = 0.0035
+fog_sky_affect = 0.15
+adjustment_enabled = true
+adjustment_brightness = 1.05
+adjustment_contrast = 1.08
+adjustment_saturation = 1.35
+
+[node name="World" type="Node3D" groups=["fx_root"]]
+
+[node name="Environment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_1")
+
+[node name="Moon" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.8192, 0, -0.5736, -0.4393, 0.6428, -0.6275, 0.3688, 0.766, 0.5266, 0, 40, 0)
+light_color = Color(0.52, 0.62, 1, 1)
+light_energy = 0.5
+shadow_enabled = true
+directional_shadow_max_distance = 120.0
+
+[node name="HoleRoot" type="Node3D" parent="."]
+
+[node name="Players" type="Node3D" parent="."]
+
+[node name="Balls" type="Node3D" parent="."]
+
+[node name="Carts" type="Node3D" parent="."]
+
+[node name="Cart0" parent="Carts" instance=ExtResource("14_cart")]
+
+[node name="Cart1" parent="Carts" instance=ExtResource("14_cart")]
+
+[node name="Cart2" parent="Carts" instance=ExtResource("14_cart")]
+
+[node name="Cart3" parent="Carts" instance=ExtResource("14_cart")]
+
+[node name="Zombies" type="Node3D" parent="."]
+
+[node name="PlayerSpawner" type="MultiplayerSpawner" parent="."]
+_spawnable_scenes = PackedStringArray("res://scenes/players/player.tscn")
+spawn_path = NodePath("../Players")
+
+[node name="BallSpawner" type="MultiplayerSpawner" parent="."]
+_spawnable_scenes = PackedStringArray("res://scenes/golf/ball.tscn")
+spawn_path = NodePath("../Balls")
+
+[node name="ZombieSpawner" type="MultiplayerSpawner" parent="."]
+_spawnable_scenes = PackedStringArray("res://scenes/zombies/zombie.tscn")
+spawn_path = NodePath("../Zombies")
+
+[node name="SpawnDirector" type="Node" parent="."]
+script = ExtResource("4_spawn")
+
+[node name="VsCourse" type="Node" parent="."]
+script = ExtResource("9_course")
+
+[node name="VsSpawner" type="Node" parent="."]
+script = ExtResource("10_spawn")
+
+[node name="VsMatchFlow" type="Node" parent="."]
+script = ExtResource("8_flow")

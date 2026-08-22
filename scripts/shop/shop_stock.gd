@@ -1,0 +1,111 @@
+class_name ShopStock
+extends Object
+## Department shelves. Shop owns buy/listing; this file is just what is for sale.
+
+const ROCKET: WeaponStats = preload("res://resources/weapons/rocket.tres")
+
+
+static func wear_by_id(item_id: String) -> Dictionary:
+	for item in apparel():
+		if String(item["id"]) == item_id:
+			return item
+	return {}
+
+
+static func apparel() -> Array[Dictionary]:
+	return [
+		_wear("band_cyan", "Cyan Headband", 25, "headband", "", Palette.CYAN),
+		_wear("band_lime", "Lime Headband", 25, "headband", "", Palette.LIME),
+		_wear("shorts_amber", "Amber Shorts", 35, "bottom", "shorts", Palette.AMBER),
+		_wear("shorts_pink", "Hot Pink Shorts", 35, "bottom", "shorts", Palette.HOT_PINK),
+		_wear("shirt_cyan", "Cyan Shirt", 40, "shirt", "", Palette.CYAN),
+		_wear("shirt_violet", "Violet Shirt", 40, "shirt", "", Palette.VIOLET),
+		_wear("pants_ice", "Ice Pants", 45, "bottom", "pants", Palette.ICE),
+		_wear("pants_magenta", "Magenta Pants", 45, "bottom", "pants", Palette.MAGENTA),
+	]
+
+
+static func clubs() -> Array[Dictionary]:
+	var items: Array[Dictionary] = []
+	for kit_id in ClubKit.shop_ids():
+		var kit := ClubKit.by_id(kit_id)
+		items.append({
+			"id": kit.id,
+			"name": kit.display_name,
+			"price": kit.price,
+			"kind": "club",
+		})
+	return items
+
+
+static func weapons() -> Array[Dictionary]:
+	return [
+		{
+			"id": "rocket",
+			"name": "Rocket Launcher",
+			"price": 400,
+			"kind": "weapon",
+			"stats": ROCKET,
+			"info": "A slow single shot that explodes in a six-metre blast. One in the bag is enough.",
+		}
+	]
+
+
+static func items() -> Array[Dictionary]:
+	return [
+		{
+			"id": "ammo", "name": "Ammo Crate", "price": Shop.AMMO_PRICE, "kind": "ammo",
+			"info": "Forty rounds for every gun you and your partner carry.",
+		},
+		{
+			"id": "barrier", "name": "Hex Barrier", "price": Shop.BARRIER_PRICE, "kind": "fort",
+			"info": "Two hex forts you drop with gear. Charges stack across holes.",
+		},
+		{
+			"id": "medkit", "name": "Medkit", "price": 50, "kind": "medkit",
+			"info": "Heals you to full. Does nothing if you are already there.",
+		},
+		{
+			"id": "revive", "name": "Revive Kit", "price": 90, "kind": "revive",
+			"info": "Next time you drop, you stand up on your own. If your partner is down here, it gets them up now.",
+		},
+		{
+			"id": "time_bonus", "name": "+30 Seconds", "price": 70, "kind": "time_bonus",
+			"info": "Adds thirty seconds to the next hole's clock.",
+		},
+		{
+			"id": "time_freeze", "name": "Clock Freeze", "price": 80, "kind": "time_freeze",
+			"info": "Freezes the next hole's clock for fifteen seconds.",
+		},
+	]
+
+
+static func cart() -> Array[Dictionary]:
+	return [
+		{
+			"id": "cart_turbo", "name": "Cart Turbo", "price": 100, "kind": "cart_turbo",
+			"info": "Raises top speed and boost. Stays on the cart for the rest of the round.",
+		},
+		{
+			"id": "cart_ram", "name": "Ram Plate", "price": 110, "kind": "cart_ram",
+			"info": "Hits harder when you run them down. Stays on the cart.",
+		},
+		{
+			"id": "cart_armor", "name": "Cart Armor", "price": 90, "kind": "cart_armor",
+			"info": "Halves damage while you are riding. Stays on the cart.",
+		},
+	]
+
+
+static func _wear(
+	id: String, name: String, price: int, slot: String, style: String, color: Color
+) -> Dictionary:
+	return {
+		"id": id,
+		"name": name,
+		"price": price,
+		"kind": "apparel",
+		"slot": slot,
+		"style": style,
+		"color": color,
+	}

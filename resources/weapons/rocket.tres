@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="WeaponStats" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/player/weapon_stats.gd" id="1_stats"]
+
+[resource]
+script = ExtResource("1_stats")
+display_name = "Rocket"
+visual = "rocket"
+damage = 110.0
+pellets = 1
+rounds_per_minute = 48.0
+automatic = false
+mag_size = 1
+reserve_start = 6
+reserve_max = 16
+spread_deg = 0.4
+ads_spread_deg = 0.1
+range_m = 90.0
+reload_time = 2.4
+pickup_amount = 2
+burst = 1
+kick = 1.15
+blast_radius = 6.5

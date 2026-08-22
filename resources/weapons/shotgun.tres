@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="WeaponStats" format=3 uid="uid://ciup10j70ymvd"]
+
+[ext_resource type="Script" uid="uid://cqmqfpgtp5cqa" path="res://scripts/player/weapon_stats.gd" id="1_stats"]
+
+[resource]
+script = ExtResource("1_stats")
+display_name = "Shotgun"
+visual = "shotgun"
+damage = 17.0
+pellets = 8
+rounds_per_minute = 75.0
+automatic = false
+mag_size = 6
+reserve_start = 36
+reserve_max = 90
+spread_deg = 6.5
+ads_spread_deg = 3.5
+range_m = 40.0
+reload_time = 2.6
+pickup_amount = 8
+burst = 2
+kick = 1.0

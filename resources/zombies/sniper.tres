@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="ZombieStats" format=3]
+
+[ext_resource type="Script" path="res://scripts/zombies/zombie_stats.gd" id="1_stats"]
+
+[resource]
+script = ExtResource("1_stats")
+display_name = "Sniper"
+max_hp = 40.0
+speed = 0.0
+damage = 38.0
+attack_cooldown = 2.8
+attack_range = 220.0
+body_color = Color(0.72, 0.92, 1.0, 1)
+height = 1.85
+radius = 0.38
+stagger_resistance = 2.4
+ammo_drop_chance = 0.55
+ammo_drop_amount = 8
+spawn_weight = 0.0
+unlock_hole = 0
+bounty = 40
+ranged = true
+preferred_range = 120.0
+projectile_speed = 400.0
+stationary = true
+headshot_only = true
+first_shot_delay = 2.2

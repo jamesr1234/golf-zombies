@@ -1,0 +1,239 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/hud.gd" id="1_hud"]
+[ext_resource type="Script" path="res://scripts/ui/swing_meter_ui.gd" id="2_meter"]
+[ext_resource type="Script" path="res://scripts/ui/hole_map.gd" id="3_map"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bg"]
+bg_color = Color(0.04, 0.02, 0.09, 0.78)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.15, 0.95, 1, 0.55)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_health"]
+bg_color = Color(1, 0.14, 0.72, 0.95)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_status"]
+bg_color = Color(0.15, 0.95, 1, 0.95)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
+content_margin_left = 24.0
+content_margin_top = 18.0
+content_margin_right = 24.0
+content_margin_bottom = 18.0
+bg_color = Color(0.04, 0.02, 0.09, 0.88)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 0.14, 0.72, 0.8)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[node name="Hud" type="CanvasLayer"]
+script = ExtResource("1_hud")
+
+[node name="Root" type="Control" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="Vignette" type="ColorRect" parent="Root"]
+visible = false
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(0.5, 0, 0.3, 0.22)
+
+[node name="Score" type="Label" parent="Root"]
+anchor_right = 1.0
+offset_top = 6.0
+offset_bottom = 34.0
+mouse_filter = 2
+text = "HOLE 1   PAR 4"
+horizontal_alignment = 1
+
+[node name="Timer" type="Label" parent="Root"]
+offset_left = 18.0
+offset_top = 6.0
+offset_right = 200.0
+offset_bottom = 34.0
+mouse_filter = 2
+text = "2:00"
+
+[node name="Money" type="Label" parent="Root"]
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -200.0
+offset_top = 6.0
+offset_right = -18.0
+offset_bottom = 34.0
+mouse_filter = 2
+text = "$0"
+horizontal_alignment = 2
+
+[node name="Crosshair" type="Control" parent="Root"]
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -8.0
+offset_top = -8.0
+offset_right = 8.0
+offset_bottom = 8.0
+mouse_filter = 2
+
+[node name="Horizontal" type="ColorRect" parent="Root/Crosshair"]
+offset_top = 7.0
+offset_right = 16.0
+offset_bottom = 9.0
+mouse_filter = 2
+color = Color(0.15, 0.95, 1, 0.9)
+
+[node name="Vertical" type="ColorRect" parent="Root/Crosshair"]
+offset_left = 7.0
+offset_right = 9.0
+offset_bottom = 16.0
+mouse_filter = 2
+color = Color(0.15, 0.95, 1, 0.9)
+
+[node name="HealthBar" type="ProgressBar" parent="Root"]
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 18.0
+offset_top = -48.0
+offset_right = 258.0
+offset_bottom = -26.0
+mouse_filter = 2
+theme_override_styles/background = SubResource("StyleBoxFlat_bg")
+theme_override_styles/fill = SubResource("StyleBoxFlat_health")
+value = 100.0
+show_percentage = false
+
+[node name="StatusBar" type="ProgressBar" parent="Root"]
+visible = false
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 18.0
+offset_top = -74.0
+offset_right = 258.0
+offset_bottom = -56.0
+mouse_filter = 2
+theme_override_styles/background = SubResource("StyleBoxFlat_bg")
+theme_override_styles/fill = SubResource("StyleBoxFlat_status")
+value = 100.0
+show_percentage = false
+
+[node name="Ammo" type="Label" parent="Root"]
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -270.0
+offset_top = -52.0
+offset_right = -18.0
+offset_bottom = -24.0
+mouse_filter = 2
+text = "RIFLE   30 / 150"
+horizontal_alignment = 2
+
+[node name="Prompt" type="Label" parent="Root"]
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -100.0
+offset_bottom = -72.0
+mouse_filter = 2
+horizontal_alignment = 1
+
+[node name="SwingMeter" type="Control" parent="Root"]
+visible = false
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -108.0
+offset_top = -110.0
+offset_right = -64.0
+offset_bottom = 110.0
+mouse_filter = 2
+script = ExtResource("2_meter")
+
+[node name="Message" type="Control" parent="Root"]
+visible = false
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="Panel" type="PanelContainer" parent="Root/Message"]
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -320.0
+offset_top = -74.0
+offset_right = 320.0
+offset_bottom = 74.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
+
+[node name="Lines" type="VBoxContainer" parent="Root/Message/Panel"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Title" type="Label" parent="Root/Message/Panel/Lines"]
+layout_mode = 2
+text = "HOLE 1"
+horizontal_alignment = 1
+
+[node name="Body" type="Label" parent="Root/Message/Panel/Lines"]
+layout_mode = 2
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="Shop" type="Control" parent="Root"]
+visible = false
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="Panel" type="PanelContainer" parent="Root/Shop"]
+anchor_left = 0.0
+anchor_top = 0.5
+anchor_right = 0.0
+anchor_bottom = 0.5
+offset_left = 18.0
+offset_top = -170.0
+offset_right = 392.0
+offset_bottom = 170.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
+
+[node name="Lines" type="VBoxContainer" parent="Root/Shop/Panel"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Title" type="Label" parent="Root/Shop/Panel/Lines"]
+layout_mode = 2
+text = "CLUBHOUSE"
+horizontal_alignment = 0
+
+[node name="Body" type="Label" parent="Root/Shop/Panel/Lines"]
+layout_mode = 2
+horizontal_alignment = 0
+autowrap_mode = 3
+
+[node name="HoleMap" type="Control" parent="Root"]
+visible = false
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = 38.0
+offset_right = -16.0
+offset_bottom = -108.0
+mouse_filter = 2
+script = ExtResource("3_map")

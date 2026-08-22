@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="ZombieStats" format=3 uid="uid://0esodg3n2d65"]
+
+[ext_resource type="Script" uid="uid://c0v50igtn7ako" path="res://scripts/zombies/zombie_stats.gd" id="1_stats"]
+
+[resource]
+script = ExtResource("1_stats")
+display_name = "Runner"
+max_hp = 48.0
+speed = 5.7
+damage = 8.0
+attack_cooldown = 0.75
+attack_range = 1.9
+body_color = Color(1, 0.24, 0.5, 1)
+height = 1.7
+radius = 0.36
+stagger_resistance = 0.7
+ammo_drop_chance = 0.3
+ammo_drop_amount = 18
+spawn_weight = 3.5
+unlock_hole = 1
+bounty = 20

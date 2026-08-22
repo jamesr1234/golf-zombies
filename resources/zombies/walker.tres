@@ -1,0 +1,7 @@
+[gd_resource type="Resource" script_class="ZombieStats" format=3 uid="uid://b0uemjeckh8r5"]
+
+[ext_resource type="Script" uid="uid://c0v50igtn7ako" path="res://scripts/zombies/zombie_stats.gd" id="1_stats"]
+
+[resource]
+script = ExtResource("1_stats")
+max_hp = 95.0

@@ -1,0 +1,37 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://scripts/player/player.gd" id="1_player"]
+[ext_resource type="Script" path="res://scripts/player/health.gd" id="2_health"]
+[ext_resource type="Script" path="res://scripts/player/weapon.gd" id="3_weapon"]
+[ext_resource type="Script" path="res://scripts/player/melee.gd" id="4_melee"]
+[ext_resource type="Script" path="res://scripts/player/player_body.gd" id="5_body"]
+[ext_resource type="Script" path="res://scripts/player/raygun.gd" id="6_raygun"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
+radius = 0.4
+height = 1.8
+
+[node name="Player" type="CharacterBody3D"]
+script = ExtResource("1_player")
+
+[node name="Shape" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+shape = SubResource("CapsuleShape3D_1")
+
+[node name="Body" type="Node3D" parent="."]
+script = ExtResource("5_body")
+
+[node name="Head" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.55, -0.3)
+
+[node name="Raygun" type="Node3D" parent="Head"]
+script = ExtResource("6_raygun")
+
+[node name="Health" type="Node" parent="."]
+script = ExtResource("2_health")
+
+[node name="Weapon" type="Node3D" parent="."]
+script = ExtResource("3_weapon")
+
+[node name="Melee" type="Node" parent="."]
+script = ExtResource("4_melee")

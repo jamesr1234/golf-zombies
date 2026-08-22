@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="WeaponStats" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/player/weapon_stats.gd" id="1_stats"]
+
+[resource]
+script = ExtResource("1_stats")
+display_name = "Rifle"
+damage = 26.0
+pellets = 1
+rounds_per_minute = 620.0
+automatic = true
+mag_size = 30
+reserve_start = 150
+reserve_max = 300
+spread_deg = 1.4
+ads_spread_deg = 0.35
+range_m = 150.0
+reload_time = 2.0
+pickup_amount = 30

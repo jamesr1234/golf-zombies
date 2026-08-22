@@ -1,0 +1,51 @@
+---
+description: Online VS networking contract - who owns Steam, peers, and authority
+globs: scripts/**/*.gd
+alwaysApply: false
+---
+
+# Online VS networking contract
+
+Online VS is a **listen server**. The host is Godot peer `1`, simulates the
+match, and owns every node unless authority was reassigned. Clients send input.
+
+## File ownership
+
+- `scripts/net/steam_lobby.gd` is the **only** file that may reference the
+  `Steam` singleton or `SteamMultiplayerPeer`. It also builds both Steam peers.
+- `scripts/net/net_session.gd` is the **only** file that may assign
+  `multiplayer.multiplayer_peer`, and it owns seats and session state.
+- Every other file uses `rpc()`, `MultiplayerSpawner`, `MultiplayerSynchronizer`,
+  and the `NetSession` helpers below.
+
+## Use these, do not reinvent them
+
+- `NetSession.is_active()` - an online session exists
+- `NetSession.should_simulate(node)` - run physics/AI for this node
+- `NetSession.is_host()` / `NetSession.is_steam()`
+- `NetSession.seat_for(peer_id)` / `color_for(peer_id)` - seats 0..7
+- `NetSync.attach_pawn/ball/zombie/cart(node)` - build a synchronizer
+
+## Do not
+
+- Do not call `SteamMultiplayerPeer.new()`, `create_host`, `create_client`, or
+  `Steam.*` outside `steam_lobby.gd`.
+- Do not add a second ENet path. ENet already exists for LAN and solo testing.
+- Do not add a dedicated-server mode. GodotSteam server builds have no
+  MultiplayerPeer support.
+- Do not add host migration. If the host leaves, the match ends.
+
+## Authority
+
+Host validates; clients request. Follow the existing shape:
+
+```gdscript
+func try_toggle(player: Node) -> void:
+	if NetSession.is_active() and not multiplayer.is_server():
+		_request_toggle.rpc_id(1)
+		return
+	super.try_toggle(player)
+```
+
+Guard simulation on owned nodes with `NetSession.should_simulate(self)` or
+`is_multiplayer_authority()`, never with a peer id comparison.

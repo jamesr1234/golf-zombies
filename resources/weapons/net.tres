@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="WeaponStats" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/player/weapon_stats.gd" id="1_stats"]
+
+[resource]
+script = ExtResource("1_stats")
+display_name = "Net"
+visual = "net"
+damage = 0.0
+pellets = 1
+rounds_per_minute = 52.0
+automatic = false
+mag_size = 2
+reserve_start = 8
+reserve_max = 16
+spread_deg = 0.3
+ads_spread_deg = 0.1
+range_m = 80.0
+reload_time = 2.2
+pickup_amount = 2
+burst = 1
+kick = 0.7
+blast_radius = 0.0
+trap_radius = 20.0
+trap_duration = 10.0
