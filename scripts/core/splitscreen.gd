@@ -1,4 +1,4 @@
- class_name Splitscreen
+class_name Splitscreen
 extends Node
 ## Root of the game: one shared 3D world, either a single full-screen seat or
 ## stacked split-screen. Owns pause, restart, and the quit back to the title.
