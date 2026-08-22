@@ -54,7 +54,7 @@ func test_steam_queries_are_safe_while_offline() -> void:
 
 
 func test_hosting_on_steam_refuses_when_steam_is_down() -> void:
-	if SteamLobby.is_online():
+	if SteamLobby.is_online() or SteamLobby.is_client_running():
 		pass_test("Steam is running, so hosting is expected to work.")
 		return
 	var err: Error = await NetSession.host_steam()
@@ -64,7 +64,7 @@ func test_hosting_on_steam_refuses_when_steam_is_down() -> void:
 
 
 func test_joining_on_steam_refuses_when_steam_is_down() -> void:
-	if SteamLobby.is_online():
+	if SteamLobby.is_online() or SteamLobby.is_client_running():
 		pass_test("Steam is running, so joining is expected to work.")
 		return
 	var err: Error = await NetSession.join_steam(12345)
@@ -72,14 +72,9 @@ func test_joining_on_steam_refuses_when_steam_is_down() -> void:
 	assert_false(NetSession.is_active())
 
 
-func test_steam_hosting_stays_off_on_macos() -> void:
-	if OS.get_name() != "macOS":
-		pass_test("Steam hosting is only blocked on macOS.")
-		return
-	assert_false(SteamLobby.can_host())
-	assert_eq(await NetSession.host_steam(), ERR_UNAVAILABLE)
-	assert_false(NetSession.is_active())
-	assert_false(SteamLobby.is_online(), "Play must not init Steam on a Mac")
+func test_play_does_not_init_steam() -> void:
+	assert_false(SteamLobby.is_online(), "Play must not init Steam on boot")
+	assert_eq(SteamLobby.can_host(), SteamLobby.is_available())
 
 
 func test_lan_addresses_skip_loopback() -> void:

@@ -50,10 +50,15 @@ func is_online() -> bool:
 	return _started
 
 
-## Spacewar (480) cannot launch on modern macOS, and steamInit as 480 takes the
-## Steam client down with it. LAN stays available.
+## Spacewar (480) can still bounce the Mac Steam client. We still offer Steam
+## hosting so two machines can try invites; LAN stays the fallback.
 func can_host() -> bool:
-	return is_available() and OS.get_name() != "macOS"
+	return is_available()
+
+
+## True when the Steam process is up. Used so tests never call steamInit.
+func is_client_running() -> bool:
+	return is_available() and Steam.has_method("isSteamRunning") and Steam.isSteamRunning()
 
 
 func start_up(p_app_id: int = DEV_APP_ID) -> bool:

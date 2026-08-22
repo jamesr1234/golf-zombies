@@ -188,7 +188,7 @@ func _status_copy(active: bool) -> String:
 		return "Connecting to %s..." % NetSession.join_ip
 	if not active:
 		if SteamLobby.can_host():
-			return "Host on Steam and invite friends, or play over LAN."
+			return "Host on Steam and invite friends, or play over LAN.  Leave Steam open."
 		return "Host or join over LAN.  Type the host IP below."
 	if not NetSession.is_host():
 		return "Connected. Waiting for the host to start."
