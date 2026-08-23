@@ -31,6 +31,7 @@ const FLOOR_MAX_DEG := 60.0
 const SAFE_MARGIN := 0.04
 const _ZombieShot := preload("res://scripts/zombies/zombie_shot.gd")
 const _BeerCan := preload("res://scripts/player/beer_can.gd")
+const _WorldFx := preload("res://scripts/net/world_fx.gd")
 const DRINK_TIME := 1.8
 
 @export var stats: ZombieStats
@@ -445,7 +446,10 @@ func _explode() -> void:
 	Fireworks.spawn(root, global_position + Vector3.UP * stats.height * 0.45, stats.body_color)
 	Sfx.play("zombie_explode", self)
 	if randf() < stats.ammo_drop_chance:
-		AmmoPickup.spawn(get_parent(), global_position + Vector3.UP * 0.4, stats.ammo_drop_amount)
+		var at := global_position + Vector3.UP * 0.4
+		var drop_id := _WorldFx.take_ammo_id(self)
+		AmmoPickup.spawn(get_parent(), at, stats.ammo_drop_amount, drop_id)
+		_WorldFx.announce_ammo(self, drop_id, at, stats.ammo_drop_amount)
 	queue_free()
 
 

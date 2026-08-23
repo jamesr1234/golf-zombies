@@ -11,6 +11,7 @@ var blast_radius := 6.5
 var max_range := 90.0
 var direction := Vector3.FORWARD
 
+var visual_only := false
 var _travelled := 0.0
 var _dead := false
 
@@ -18,13 +19,25 @@ var _dead := false
 static func spawn(
 	root: Node, origin: Vector3, fly: Vector3, stats: WeaponStats
 ) -> Rocket:
+	if stats == null:
+		return null
+	return spawn_flight(
+		root, origin, fly, stats.damage, stats.blast_radius, stats.range_m
+	)
+
+
+static func spawn_flight(
+	root: Node, origin: Vector3, fly: Vector3, damage: float, radius: float, range_m: float,
+	p_visual_only := false
+) -> Rocket:
 	if root == null:
 		return null
 	var rocket := Rocket.new()
-	rocket.damage = stats.damage
-	rocket.blast_radius = stats.blast_radius
-	rocket.max_range = stats.range_m
+	rocket.damage = damage
+	rocket.blast_radius = radius
+	rocket.max_range = range_m
 	rocket.direction = fly.normalized()
+	rocket.visual_only = p_visual_only
 	rocket.add_to_group("rockets")
 	root.add_child(rocket)
 	rocket.global_position = origin
@@ -105,5 +118,9 @@ func _explode(at: Vector3) -> void:
 		return
 	_dead = true
 	var root := get_tree().get_first_node_in_group("fx_root")
-	detonate(get_tree(), at, damage, blast_radius, root)
+	if visual_only:
+		HitFx.blast(root, at, blast_radius, COLOR)
+		Sfx.play("rocket_explode")
+	else:
+		detonate(get_tree(), at, damage, blast_radius, root)
 	queue_free()

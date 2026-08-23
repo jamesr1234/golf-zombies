@@ -12,16 +12,20 @@ const _BeerCan := preload("res://scripts/player/beer_can.gd")
 
 
 var velocity := Vector3.ZERO
+var visual_only := false
 var _age := 0.0
 var _dead := false
 
 
-static func spawn(root: Node, origin: Vector3, fly: Vector3) -> ThrownBeer:
+static func spawn(
+	root: Node, origin: Vector3, fly: Vector3, p_visual_only := false
+) -> ThrownBeer:
 	if root == null:
 		return null
 	var can := ThrownBeer.new()
 	var facing := fly.normalized() if fly.length_squared() > 0.0001 else Vector3.FORWARD
 	can.velocity = facing * SPEED + Vector3.UP * (SPEED * LIFT)
+	can.visual_only = p_visual_only
 	can.add_to_group("thrown_beers")
 	root.add_child(can)
 	can.global_position = origin
@@ -76,7 +80,7 @@ func _arrive(at: Vector3, collider: Object) -> void:
 	var zombie := collider as Zombie
 	if zombie == null:
 		zombie = catcher_near(get_tree(), at)
-	if zombie != null:
+	if zombie != null and not visual_only:
 		zombie.catch_beer()
 	_die()
 

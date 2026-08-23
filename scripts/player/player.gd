@@ -60,6 +60,7 @@ const _BeerCan := preload("res://scripts/player/beer_can.gd")
 const _ThrownBeer := preload("res://scripts/player/thrown_beer.gd")
 const _Boost := preload("res://scripts/course/cart_path_boost.gd")
 const _ShopInspect := preload("res://scripts/shop/shop_inspect.gd")
+const _WorldFx := preload("res://scripts/net/world_fx.gd")
 const PLACE_WATER := 0.3
 const CPU_SHOT_HOLD := 0.45
 const CHEER_CAM_BACK := 3.6
@@ -709,6 +710,7 @@ func _host_place(at: Vector3, yaw_deg: float) -> void:
 	if parent == null:
 		parent = get_parent()
 	_HexBarrier.spawn(parent, at, yaw_deg)
+	_WorldFx.announce_barrier(self, at, yaw_deg)
 	_cancel_place()
 
 
@@ -1388,6 +1390,7 @@ func _spawn_thrown_beer(muzzle: Vector3, fly: Vector3) -> void:
 	if root == null:
 		root = get_tree().current_scene
 	_ThrownBeer.spawn(root, muzzle, fly)
+	_WorldFx.announce_beer(self, muzzle, fly)
 
 
 @rpc("any_peer", "reliable")

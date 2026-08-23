@@ -5,6 +5,7 @@
 [ext_resource type="Script" path="res://scripts/net/vs_match_flow.gd" id="8_flow"]
 [ext_resource type="Script" path="res://scripts/net/vs_course.gd" id="9_course"]
 [ext_resource type="Script" path="res://scripts/net/vs_spawner.gd" id="10_spawn"]
+[ext_resource type="Script" path="res://scripts/net/world_fx.gd" id="15_fx"]
 [ext_resource type="PackedScene" path="res://scenes/players/player.tscn" id="11_player"]
 [ext_resource type="PackedScene" path="res://scenes/golf/ball.tscn" id="12_ball"]
 [ext_resource type="PackedScene" path="res://scenes/zombies/zombie.tscn" id="13_zombie"]
@@ -103,3 +104,6 @@ script = ExtResource("10_spawn")
 
 [node name="VsMatchFlow" type="Node" parent="."]
 script = ExtResource("8_flow")
+
+[node name="WorldFx" type="Node" parent="."]
+script = ExtResource("15_fx")

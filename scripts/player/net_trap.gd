@@ -8,23 +8,28 @@ const SPOKES := 10
 
 var radius := 20.0
 var duration := 10.0
+var visual_only := false
 var _caught: Array[Zombie] = []
 var _left := 0.0
 var _dead := false
 
 
-static func deploy(root: Node, at: Vector3, span: float, hold: float) -> NetTrap:
+static func deploy(
+	root: Node, at: Vector3, span: float, hold: float, p_visual_only := false
+) -> NetTrap:
 	if root == null:
 		return null
 	var trap := NetTrap.new()
 	trap.radius = span
 	trap.duration = hold
 	trap._left = hold
+	trap.visual_only = p_visual_only
 	trap.add_to_group("net_traps")
 	root.add_child(trap)
 	trap.global_position = at
 	trap._build()
-	trap.scoop()
+	if not p_visual_only:
+		trap.scoop()
 	HitFx.blast(root, at, minf(span, 8.0), COLOR)
 	Sfx.play("net_catch")
 	return trap
@@ -83,6 +88,10 @@ func trapped_count() -> int:
 func burst() -> int:
 	if _dead:
 		return 0
+	if visual_only:
+		_dead = true
+		queue_free()
+		return 0
 	_dead = true
 	var killed := 0
 	var held := _caught.duplicate()
@@ -107,7 +116,8 @@ func _physics_process(delta: float) -> void:
 	if _dead:
 		return
 	_left = maxf(0.0, _left - delta)
-	scoop()
+	if not visual_only:
+		scoop()
 	if _left <= 0.0:
 		_expire()
 

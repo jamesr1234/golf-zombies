@@ -9,6 +9,7 @@ signal fired()
 const TRACER_COLOR := Palette.TRACER
 const BLOOD_COLOR := Palette.HIT_ZOMBIE
 const DUST_COLOR := Palette.HIT_WORLD
+const _WorldFx := preload("res://scripts/net/world_fx.gd")
 
 ## Net and rocket lead the bag so hole one can test the trap combo.
 var loadout: Array[WeaponStats] = [
@@ -263,12 +264,22 @@ func _commit_fire(view: Transform3D, ads: bool) -> void:
 
 func _launch_rocket(view: Transform3D, current: WeaponStats) -> void:
 	var direction := -view.basis.z
-	Rocket.spawn(_fx_root(), view.origin + direction * 0.9, direction, current)
+	var origin := view.origin + direction * 0.9
+	var rocket := Rocket.spawn(_fx_root(), origin, direction, current)
+	if rocket != null:
+		_WorldFx.announce_rocket(
+			self, origin, direction, rocket.damage, rocket.blast_radius, rocket.max_range
+		)
 
 
 func _launch_net(view: Transform3D, current: WeaponStats) -> void:
 	var direction := -view.basis.z
-	NetShot.spawn(_fx_root(), view.origin + direction * 0.9, direction, current)
+	var origin := view.origin + direction * 0.9
+	var shot := NetShot.spawn(_fx_root(), origin, direction, current)
+	if shot != null:
+		_WorldFx.announce_net(
+			self, origin, direction, shot.radius, shot.duration, shot.max_range
+		)
 
 
 func _fx_root() -> Node:

@@ -5,12 +5,14 @@ extends Node3D
 
 const SPEED := 36.0
 const COLOR: Color = Palette.NET
+const _WorldFx := preload("res://scripts/net/world_fx.gd")
 
 var radius := 20.0
 var duration := 10.0
 var max_range := 80.0
 var direction := Vector3.FORWARD
 
+var visual_only := false
 var _travelled := 0.0
 var _dead := false
 
@@ -18,13 +20,25 @@ var _dead := false
 static func spawn(
 	root: Node, origin: Vector3, fly: Vector3, stats: WeaponStats
 ) -> NetShot:
+	if stats == null:
+		return null
+	return spawn_flight(
+		root, origin, fly, stats.trap_radius, stats.trap_duration, stats.range_m
+	)
+
+
+static func spawn_flight(
+	root: Node, origin: Vector3, fly: Vector3, span: float, hold: float, range_m: float,
+	p_visual_only := false
+) -> NetShot:
 	if root == null:
 		return null
 	var shot := NetShot.new()
-	shot.radius = stats.trap_radius
-	shot.duration = stats.trap_duration
-	shot.max_range = stats.range_m
+	shot.radius = span
+	shot.duration = hold
+	shot.max_range = range_m
 	shot.direction = fly.normalized()
+	shot.visual_only = p_visual_only
 	shot.add_to_group("net_shots")
 	root.add_child(shot)
 	shot.global_position = origin
@@ -69,8 +83,10 @@ func _land(at: Vector3) -> void:
 	if _dead:
 		return
 	_dead = true
-	var root := get_tree().get_first_node_in_group("fx_root")
-	if root == null:
-		root = get_parent()
-	NetTrap.deploy(root, at, radius, duration)
+	if not visual_only:
+		var root := get_tree().get_first_node_in_group("fx_root")
+		if root == null:
+			root = get_parent()
+		NetTrap.deploy(root, at, radius, duration)
+		_WorldFx.announce_trap(self, at, radius, duration)
 	queue_free()
