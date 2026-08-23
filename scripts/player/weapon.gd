@@ -382,6 +382,10 @@ func _trace(view: Transform3D, spread: float, current: WeaponStats) -> void:
 		HitFx.spawn(root, muzzle, end, color)
 	_WorldFx.announce_hitscan(self, muzzle, end, kind, color, _shooter_peer())
 	if NetSession.is_active() and not multiplayer.is_server():
+		if is_zombie:
+			var zombie := collider as Zombie
+			if zombie != null:
+				zombie.show_hit(direction, end, current.damage * power_mult)
 		return
 	if is_zombie:
 		if collider.has_method("is_allied") and collider.is_allied():

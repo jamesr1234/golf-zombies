@@ -412,6 +412,27 @@ func test_a_replicated_hit_lights_up_and_flops() -> void:
 	assert_true(zombie.visual.is_limp())
 
 
+func test_a_shooter_does_not_replay_its_own_hit_look() -> void:
+	var world := _world_fx()
+	var zombie := _zombie(Vector3.ZERO)
+	var skipped := world.apply_zombie_hit(
+		zombie.get_path(), int(Ragdoll.Region.TORSO), Vector3.FORWARD, 1.2,
+		false, true, multiplayer.get_unique_id()
+	)
+	assert_null(skipped, "the peer that already drew the flop must not draw it again")
+	assert_false(zombie.is_flashing())
+	assert_false(zombie.visual.is_limp())
+
+
+func test_a_client_trace_can_flop_without_scoring() -> void:
+	var zombie := _zombie(Vector3.ZERO)
+	var hp := zombie.hp
+	zombie.show_hit(Vector3.FORWARD, zombie.global_position + Vector3.UP, 40.0)
+	assert_eq(zombie.hp, hp, "the host still owns the damage")
+	assert_true(zombie.is_flashing())
+	assert_true(zombie.visual.is_limp())
+
+
 func test_a_watched_zombie_ticks_a_hit_look() -> void:
 	var zombie := _zombie(Vector3.ZERO)
 	zombie.apply_hit_look(Ragdoll.Region.TORSO, Vector3.FORWARD, 1.2)

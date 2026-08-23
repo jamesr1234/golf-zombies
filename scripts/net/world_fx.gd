@@ -2,6 +2,12 @@ class_name WorldFx
 extends Node
 ## Host copies short-lived world objects onto clients: walls, shots, cans, ammo,
 ## hitscan, hit flops, fireworks, and the one-shot looks that NetSync does not carry.
+##
+## Looks (tracers, flops, bangs, bursts) ride unreliable. They fire on every
+## pellet, and a reliable queue of those is what parked Computer 2: the ordered
+## channel backed up until clock and puppet traffic sat behind it. A dropped
+## spark is invisible; a jammed link is a freeze. Things that must exist
+## (walls, rockets, ammo, the cart girl) stay reliable.
 
 var _ammo_seq := 0
 var _ammo: Dictionary = {}
@@ -93,11 +99,13 @@ static func announce_sfx(from: Node, cue: String, skip_peer := 0) -> void:
 
 static func announce_zombie_hit(
 	from: Node, region: int, direction: Vector3, strength: float, locked := false,
-	planted := true
+	planted := true, skip_peer := 0
 ) -> void:
 	var fx := _broadcaster(from)
 	if fx != null:
-		fx._replicate_zombie_hit.rpc(from.get_path(), region, direction, strength, locked, planted)
+		fx._replicate_zombie_hit.rpc(
+			from.get_path(), region, direction, strength, locked, planted, skip_peer
+		)
 
 
 static func announce_fireworks(from: Node, at: Vector3, color: Color) -> void:
@@ -172,8 +180,10 @@ func apply_sfx(cue: String, skip_peer := 0) -> void:
 
 func apply_zombie_hit(
 	zombie_path: NodePath, region: int, direction: Vector3, strength: float,
-	locked := false, planted := true
+	locked := false, planted := true, skip_peer := 0
 ) -> Zombie:
+	if _skip(skip_peer):
+		return null
 	var zombie := get_tree().root.get_node_or_null(zombie_path) as Zombie
 	if zombie == null:
 		return null
@@ -232,27 +242,27 @@ func _replicate_ammo_gone(drop_id: int) -> void:
 	remove_ammo(drop_id)
 
 
-@rpc("authority", "call_remote", "reliable")
+@rpc("authority", "call_remote", "unreliable")
 func _replicate_hitscan(
 	muzzle: Vector3, end: Vector3, kind: String, color: Color, skip_peer: int
 ) -> void:
 	apply_hitscan(muzzle, end, kind, color, skip_peer)
 
 
-@rpc("authority", "call_remote", "reliable")
+@rpc("authority", "call_remote", "unreliable")
 func _replicate_sfx(cue: String, skip_peer: int) -> void:
 	apply_sfx(cue, skip_peer)
 
 
-@rpc("authority", "call_remote", "reliable")
+@rpc("authority", "call_remote", "unreliable")
 func _replicate_zombie_hit(
 	zombie_path: NodePath, region: int, direction: Vector3, strength: float, locked: bool,
-	planted: bool
+	planted: bool, skip_peer: int
 ) -> void:
-	apply_zombie_hit(zombie_path, region, direction, strength, locked, planted)
+	apply_zombie_hit(zombie_path, region, direction, strength, locked, planted, skip_peer)
 
 
-@rpc("authority", "call_remote", "reliable")
+@rpc("authority", "call_remote", "unreliable")
 func _replicate_fireworks(at: Vector3, color: Color) -> void:
 	apply_fireworks(at, color)
 

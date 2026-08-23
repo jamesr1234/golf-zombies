@@ -5,6 +5,9 @@ extends Node3D
 ## primitives everything else is built from, turned up loud.
 
 const LIFE := 1.7
+## Each burst is dozens of meshes and a fat light. A kill streak that keeps
+## every one alive is what buried Computer 2 late in a hole.
+const MAX_LIVE := 3
 const SPARK_COUNT := 28
 const STREAK_COUNT := 22
 const CRACKLE_COUNT := 16
@@ -27,11 +30,27 @@ static func spawn(root: Node, at: Vector3, tint: Color) -> Fireworks:
 	var host := root
 	if host == null or not host.is_inside_tree():
 		return null
+	cull_oldest(host.get_tree(), MAX_LIVE - 1)
 	var burst := Fireworks.new()
 	host.add_child(burst)
 	burst.global_position = at
 	burst._build(tint)
 	return burst
+
+
+static func cull_oldest(tree: SceneTree, keep: int) -> int:
+	if tree == null:
+		return 0
+	var live := tree.get_nodes_in_group("fireworks")
+	var dropped := 0
+	for i in maxi(0, live.size() - keep):
+		var burst := live[i] as Node
+		if burst == null:
+			continue
+		burst.remove_from_group("fireworks")
+		burst.queue_free()
+		dropped += 1
+	return dropped
 
 
 ## Evenly spaced directions around a sphere, with a slight upward bias so the

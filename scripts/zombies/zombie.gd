@@ -403,12 +403,23 @@ func apply_hit_look(
 	_flop(region, direction, strength, locked, planted)
 
 
+## The look without the HP change. Computer 2 draws this from its own trace so
+## the host does not have to echo the flop back down the same shot.
+func show_hit(direction: Vector3, hit_at: Vector3, amount: float) -> void:
+	if stats == null:
+		return
+	apply_hit_look(
+		_hit_region(hit_at), direction, Ragdoll.strength_for(amount, stats.stagger_resistance)
+	)
+
+
 func _hit_look(
 	region: Ragdoll.Region, direction: Vector3, strength: float, locked := false,
 	planted := true
 ) -> void:
 	apply_hit_look(region, direction, strength, locked, planted)
-	_WorldFx.announce_zombie_hit(self, int(region), direction, strength, locked, planted)
+	var skip := last_hit_by.peer_id if last_hit_by != null else 0
+	_WorldFx.announce_zombie_hit(self, int(region), direction, strength, locked, planted, skip)
 
 
 func _tick_flash(delta: float) -> void:
