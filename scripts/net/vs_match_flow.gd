@@ -474,6 +474,7 @@ func _do_start_play() -> void:
 	if phase != Phase.PREP or finished:
 		return
 	phase = Phase.PLAYING
+	course.close_shop(_players)
 	course.aim_play(_sessions())
 	spawner_ai.begin_hole(score.hole_index if score else 0, hole.spawn_points)
 	spawner_ai.place_snipers(hole.sniper_perches())
@@ -599,10 +600,10 @@ func _complete_hole() -> void:
 	phase = Phase.TRANSIT
 	_rally_to_carts()
 	course.begin_transit(_carts, _players)
+	_replicate_event.rpc("transit")
 	spawner_ai.begin_transit(score.hole_index, course.cart_path.spawn_points)
 	scorecard_changed.emit()
 	_flash_message("Next tee", "Eight carts. Steal the wheel. Follow the arrows.")
-	_replicate_event.rpc("transit")
 	_broadcast_scores()
 	_Music.play_level()
 
@@ -729,6 +730,7 @@ func _replicate_event(kind: String) -> void:
 	match kind:
 		"play":
 			phase = Phase.PLAYING
+			course.close_shop(_players)
 			course.aim_play(_sessions())
 			_Music.play_level()
 		"transit":

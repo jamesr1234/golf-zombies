@@ -195,7 +195,8 @@ func aim_play(sessions: Array) -> void:
 
 func begin_transit(carts: Array[GolfCart], players: Array[Player] = []) -> CartPath:
 	var spread := _Forest.should_spread(NetSession.is_active())
-	var cheap := NetSession.defers_world()
+	var cheap := _Forest.should_cheap(NetSession.is_active())
+	_discard_clubhouse()
 	var forward := along_hole()
 	cart_path = CartPath.build(
 		hole.cup, forward, hole.bounds, hole.height, hole_node, hole.green_radius,
@@ -219,8 +220,7 @@ func _process(delta: float) -> void:
 	if _clubhouse_wait > 0.0:
 		return
 	_clubhouse_wait = -1.0
-	if clubhouse == null:
-		_open_clubhouse()
+	_open_clubhouse()
 
 
 func _park_carts_for_transit(carts: Array[GolfCart]) -> void:
@@ -300,7 +300,16 @@ func transit_player_pose(seat: int, carts: Array[GolfCart]) -> Dictionary:
 	return {"at": at + Vector3.UP * 1.2, "yaw": rad_to_deg(cart.rotation.y)}
 
 
+func _discard_clubhouse() -> void:
+	_clubhouse_wait = -1.0
+	if clubhouse != null and is_instance_valid(clubhouse):
+		clubhouse.queue_free()
+	clubhouse = null
+	shop = null
+
+
 func _open_clubhouse() -> void:
+	_discard_clubhouse()
 	shop = Shop.new()
 	var forward := along_hole()
 	if cart_path != null:
@@ -363,10 +372,7 @@ func _restore_in_clubhouse(players: Array[Player], snaps: Array[Dictionary]) -> 
 
 
 func close_shop(players: Array[Player]) -> void:
-	shop = null
-	if clubhouse != null and is_instance_valid(clubhouse):
-		clubhouse.queue_free()
-	clubhouse = null
+	_discard_clubhouse()
 	for player in players:
 		player.close_shop()
 		player.stop_talk()

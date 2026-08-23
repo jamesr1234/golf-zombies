@@ -22,8 +22,8 @@ static func should_spread(active: bool) -> bool:
 	return active
 
 
-static func should_cheap(active: bool, is_server: bool) -> bool:
-	return active and not is_server
+static func should_cheap(active: bool, _is_server := false) -> bool:
+	return active
 
 
 static func dress(path: Node3D, keep_out: Rect2) -> void:

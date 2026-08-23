@@ -53,3 +53,6 @@ func test_transit_packs_the_road_tighter_than_a_hole() -> void:
 	assert_true(director.is_transit())
 	assert_eq(director.cap(), SpawnDirector.TRANSIT_CAP)
 	assert_almost_eq(director.interval(), SpawnDirector.TRANSIT_INTERVAL, 0.001)
+	assert_eq(director.live_count(), 0, "the burst does not land on the hole-out frame")
+	assert_eq(director._burst_left, SpawnDirector.TRANSIT_BURST)
+	assert_lt(SpawnDirector.BURST_PER_FRAME, SpawnDirector.TRANSIT_BURST)

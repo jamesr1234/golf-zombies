@@ -51,13 +51,20 @@ static func should_bake(defers_world: bool) -> bool:
 	return not defers_world
 
 
+## Threaded bake finishes whenever it finishes, then the main thread stops to
+## apply the mesh. That is what lands mid-hole. Bake on this frame instead,
+## while the shop cover is already up.
+static func bakes_on_thread() -> bool:
+	return false
+
+
 static func bake_navigation(root: Node3D) -> void:
 	if root == null or not should_bake(NetSession.defers_world()):
 		return
 	for child in root.get_children():
 		var region := child as NavigationRegion3D
 		if region != null:
-			region.bake_navigation_mesh()
+			region.bake_navigation_mesh(bakes_on_thread())
 			return
 
 

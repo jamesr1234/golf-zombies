@@ -17,6 +17,7 @@ const TRANSIT_CAP := 28
 const TRANSIT_INTERVAL := 0.65
 const TRANSIT_MIN_DISTANCE := 8.0
 const TRANSIT_BURST := 20
+const BURST_PER_FRAME := 3
 
 const ZOMBIE_SCENE := preload("res://scenes/zombies/zombie.tscn")
 const SNIPER := preload("res://resources/zombies/sniper.tres")
@@ -38,10 +39,12 @@ var _hole_index := 0
 var _timer := 0.0
 var _running := false
 var _transit := false
+var _burst_left := 0
 
 
 func begin_hole(hole_index: int, spawn_points: Array[Vector3]) -> void:
 	_transit = false
+	_burst_left = 0
 	_hole_index = hole_index
 	_points = spawn_points
 	_timer = FIRST_SPAWN_DELAY
@@ -62,14 +65,12 @@ func begin_transit(hole_index: int, spawn_points: Array[Vector3]) -> void:
 	_points = spawn_points
 	_timer = TRANSIT_INTERVAL
 	_running = true
-	for _i in TRANSIT_BURST:
-		if live_count() >= cap():
-			break
-		_spawn()
+	_burst_left = TRANSIT_BURST
 
 
 func stop() -> void:
 	_running = false
+	_burst_left = 0
 
 
 func clear_zombies() -> void:
@@ -102,6 +103,9 @@ func is_transit() -> bool:
 func _process(delta: float) -> void:
 	if not _running or _points.is_empty() or container == null:
 		return
+	if _burst_left > 0:
+		_spawn_burst()
+		return
 	_timer -= delta
 	if _timer > 0.0:
 		return
@@ -109,6 +113,17 @@ func _process(delta: float) -> void:
 	if live_count() >= cap():
 		return
 	_spawn()
+
+
+func _spawn_burst() -> void:
+	var n := 0
+	while n < BURST_PER_FRAME and _burst_left > 0:
+		if live_count() >= cap():
+			_burst_left = 0
+			return
+		_spawn()
+		_burst_left -= 1
+		n += 1
 
 
 func _spawn() -> void:
