@@ -28,7 +28,11 @@ var bounds := Rect2(-500.0, -500.0, 1000.0, 1000.0)
 var last_safe_position := Vector3.ZERO
 ## 0 means anyone can play it (local co-op). Online VS sets the owning peer.
 var owner_peer := 0
-@export var sync_xform := Transform3D.IDENTITY
+@export var sync_xform := Transform3D.IDENTITY:
+	set(value):
+		sync_xform = value
+		if is_inside_tree() and not NetSession.should_simulate(self):
+			_net_interp.arrive(value, global_transform)
 var _net_interp := NetInterp.new()
 
 ## Multiset of overlapping Surface.Type patches; the highest priority is the lie.

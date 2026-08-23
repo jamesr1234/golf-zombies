@@ -2,10 +2,12 @@ class_name NetSync
 extends Object
 ## Builds a MultiplayerSynchronizer with a modest send rate.
 
-const PAWN_HZ := 0.05
+## Seconds between sends. At 60 Hz physics the synchronizer rounds these up to
+## whole ticks, so 0.034 is every second tick and 0.05 is every third.
+const PAWN_HZ := 0.034
 const BALL_HZ := 0.04
 const ZOMBIE_HZ := 0.05
-const CART_HZ := 0.05
+const CART_HZ := 0.034
 
 
 static func attach(

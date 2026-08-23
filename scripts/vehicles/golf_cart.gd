@@ -64,7 +64,11 @@ var drive_speed := 0.0
 @export var turbo := false
 @export var ram_plate := false
 @export var armored := false
-@export var sync_xform := Transform3D.IDENTITY
+@export var sync_xform := Transform3D.IDENTITY:
+	set(value):
+		sync_xform = value
+		if is_inside_tree() and not NetSession.should_simulate(self):
+			_net_interp.arrive(value, global_transform)
 var _net_interp := NetInterp.new()
 ## 1 while drifting, then falls to 0 over DRIFT_RECOVER after you let go.
 var _drift := 0.0

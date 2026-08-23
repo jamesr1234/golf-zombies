@@ -31,7 +31,11 @@ const GIRL_COLOR := Palette.HOT_PINK
 var drive_speed := 0.0
 @export var visit := Visit.WAITING
 @export var tending := false
-@export var sync_xform := Transform3D.IDENTITY
+@export var sync_xform := Transform3D.IDENTITY:
+	set(value):
+		sync_xform = value
+		if is_inside_tree() and not NetSession.should_simulate(self):
+			_net_interp.arrive(value, global_transform)
 var _net_interp := NetInterp.new()
 
 var _lid: Node3D

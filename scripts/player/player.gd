@@ -73,6 +73,9 @@ const CHEER_FOV := 70.0
 const FLOOR_SNAP := 0.45
 const FLOOR_MAX_DEG := 60.0
 const SAFE_MARGIN := 0.04
+## How fast a puppet's pace and pitch chase the values that arrive with each
+## snapshot. Same shape as the zombie turn easing.
+const REMOTE_POSE_EASE := 18.0
 
 @export var input_prefix := "p1"
 @export var uses_mouse := true
@@ -85,11 +88,19 @@ const SAFE_MARGIN := 0.04
 @export var sync_reload := 0.0
 @export var sync_scoped := false
 @export var sync_pitch := 0.0
-@export var sync_xform := Transform3D.IDENTITY
+@export var sync_xform := Transform3D.IDENTITY:
+	set(value):
+		sync_xform = value
+		if is_inside_tree() and not NetSession.should_simulate(self):
+			_net_interp.arrive(value, global_transform)
 
 var peer_id := 0
 var net_driven := false
 var _net_interp := NetInterp.new()
+## Remotes get pace and pitch at the send rate. Easing them keeps the run cycle
+## and the head off the same staircase the body used to move on.
+var _remote_pace := 0.0
+var _remote_pitch := 0.0
 var score
 
 var input: PlayerInput
@@ -182,7 +193,6 @@ func _physics_process(delta: float) -> void:
 	):
 		_drop_from_lost_ride()
 	if net_driven and not is_multiplayer_authority():
-		_animate(delta)
 		return
 	if brain != null:
 		brain.tick(delta)
@@ -215,9 +225,11 @@ func _physics_process(delta: float) -> void:
 	_animate(delta)
 
 
+## Puppets move and pose on the rendered frame so the two never disagree.
 func _process(delta: float) -> void:
 	if not NetSession.should_simulate(self):
 		_net_interp.follow(self, sync_xform, delta, NetSync.PAWN_HZ)
+		_animate(delta)
 
 
 func is_golfing() -> bool:
@@ -308,7 +320,7 @@ func bind_seat(p_prefix: String, p_uses_mouse: bool) -> void:
 ## the gun bob key off this, so they always agree with each other.
 func pace() -> float:
 	if net_driven and not is_multiplayer_authority():
-		return sync_pace
+		return _remote_pace
 	return clampf(Vector2(velocity.x, velocity.z).length() / SPRINT_SPEED, 0.0, 1.0)
 
 
@@ -970,7 +982,7 @@ func _replicate_melee() -> void:
 		raygun.start_melee()
 
 
-func _apply_replicated_pose() -> void:
+func _apply_replicated_pose(delta: float) -> void:
 	state = sync_state as State
 	_underwater = sync_dive
 	if weapon != null:
@@ -978,9 +990,12 @@ func _apply_replicated_pose() -> void:
 		weapon.apply_replicated_pose(sync_firing, sync_reload, sync_scoped)
 	if _shield != null:
 		_shield.set_raised(state == State.SHIELDING)
-	_pitch = sync_pitch
+	var ease := clampf(REMOTE_POSE_EASE * delta, 0.0, 1.0)
+	_remote_pace = lerpf(_remote_pace, sync_pace, ease)
+	_remote_pitch = lerpf(_remote_pitch, sync_pitch, ease)
+	_pitch = _remote_pitch
 	if head != null:
-		head.rotation.x = deg_to_rad(clampf(sync_pitch, -PITCH_LIMIT, PITCH_LIMIT))
+		head.rotation.x = deg_to_rad(clampf(_remote_pitch, -PITCH_LIMIT, PITCH_LIMIT))
 	if health != null and health.is_downed():
 		head.position.y = DOWNED_HEAD_HEIGHT
 	elif is_riding():
@@ -993,7 +1008,7 @@ func _apply_replicated_pose() -> void:
 ## when you go down.
 func _animate(delta: float) -> void:
 	if net_driven and not is_multiplayer_authority():
-		_apply_replicated_pose()
+		_apply_replicated_pose(delta)
 	if health.is_alive() and body != null and body.is_locked_limp():
 		body.stop_limp()
 	var travel := pace()
@@ -1018,7 +1033,7 @@ func _animate(delta: float) -> void:
 		body.tick_melee(delta)
 	if net_driven and not is_multiplayer_authority() and body != null and body.head != null:
 		if not body.is_limp() and not is_celebrating():
-			body.head.rotation.x = deg_to_rad(clampf(sync_pitch, -PITCH_LIMIT, PITCH_LIMIT))
+			body.head.rotation.x = deg_to_rad(clampf(_remote_pitch, -PITCH_LIMIT, PITCH_LIMIT))
 	body.hide_cabin_from_driver(cabin_layer(), _hides_own_cabin())
 	var show_gun := (
 		health.is_alive() and state != State.GOLFING and not is_driving()

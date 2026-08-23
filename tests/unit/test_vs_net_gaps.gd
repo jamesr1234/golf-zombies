@@ -47,7 +47,7 @@ func test_zombie_and_cart_sync_carry_the_look_flags() -> void:
 	var zombie := Node3D.new()
 	add_child_autofree(zombie)
 	var zombie_sync := NetSync.attach_zombie(zombie)
-	assert_eq(zombie_sync.replication_interval, NetSync.PAWN_HZ)
+	assert_eq(zombie_sync.replication_interval, NetSync.ZOMBIE_HZ)
 	assert_true(zombie_sync.replication_config.has_property(NodePath(":sync_xform")))
 	assert_false(zombie_sync.replication_config.has_property(NodePath(":position")))
 	assert_false(zombie_sync.replication_config.has_property(NodePath(":rotation")))
@@ -176,15 +176,25 @@ func test_a_remote_pawn_shows_the_synced_gun() -> void:
 	assert_false(player.raygun.visible)
 
 
+## Pitch eases toward the replicated angle instead of snapping to it, so the
+## head does not step at the send rate. It still has to get there.
 func test_a_remote_pawn_looks_up_and_down() -> void:
 	var player := _remote_pawn()
 	player.sync_pitch = 40.0
 	player._animate(1.0 / 60.0)
+	assert_gt(player.head.rotation.x, 0.0, "the head starts on its way up")
+	assert_lt(player.head.rotation.x, deg_to_rad(40.0), "without jumping straight there")
+	_settle(player)
 	assert_almost_eq(player.head.rotation.x, deg_to_rad(40.0), 0.001)
 	assert_almost_eq(player.body.head.rotation.x, deg_to_rad(40.0), 0.001)
 	player.sync_pitch = -25.0
-	player._animate(1.0 / 60.0)
+	_settle(player)
 	assert_almost_eq(player.head.rotation.x, deg_to_rad(-25.0), 0.001)
+
+
+func _settle(player: Player) -> void:
+	for i in 120:
+		player._animate(1.0 / 60.0)
 
 
 func test_a_replicated_pose_picks_shield_swim_and_scope() -> void:

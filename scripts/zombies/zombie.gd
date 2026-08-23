@@ -43,7 +43,11 @@ var move_speed := 3.4
 @export var sync_drink := 0.0
 @export var sync_dying := false
 @export var sync_yaw := 0.0
-@export var sync_xform := Transform3D.IDENTITY
+@export var sync_xform := Transform3D.IDENTITY:
+	set(value):
+		sync_xform = value
+		if is_inside_tree() and not NetSession.should_simulate(self):
+			_net_interp.arrive(value, global_transform)
 var last_hit_by: Player
 var _net_interp := NetInterp.new()
 
