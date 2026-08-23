@@ -146,6 +146,51 @@ func test_host_fire_rejects_an_empty_mag() -> void:
 	assert_eq(gun.mag(), 0)
 
 
+func test_host_fire_waits_out_the_clock() -> void:
+	var gun := _rifle()
+	assert_true(gun.host_fire(Transform3D.IDENTITY, false, gun.index))
+	assert_false(gun.host_fire(Transform3D.IDENTITY, false, gun.index), "cooldown still running")
+	gun.tick_timers(gun.stats().shot_interval())
+	assert_true(gun.host_fire(Transform3D.IDENTITY, false, gun.index))
+
+
+func test_host_fire_works_again_after_a_reload() -> void:
+	var gun := _rifle()
+	gun.mags[gun.index] = 0
+	assert_false(gun.host_fire(Transform3D.IDENTITY, false, gun.index))
+	assert_true(gun.host_reload(gun.index))
+	assert_true(gun.is_reloading())
+	gun.tick_timers(gun.stats().reload_time)
+	assert_false(gun.is_reloading())
+	assert_eq(gun.mag(), gun.stats().mag_size)
+	assert_true(gun.host_fire(Transform3D.IDENTITY, false, gun.index))
+
+
+func test_the_host_keeps_its_own_reload_clock() -> void:
+	NetSession._active = true
+	var gun := _rifle()
+	gun.mags[gun.index] = 0
+	assert_true(gun.host_reload(gun.index))
+	assert_true(gun.is_reloading())
+	assert_almost_eq(gun.reload_fraction(), 0.0, 0.001)
+	gun.apply_replicated_pose(false, 0.9, false)
+	assert_true(gun.is_reloading())
+	assert_almost_eq(gun.reload_fraction(), 0.0, 0.001)
+
+
+func test_a_watched_pawn_ticks_combat_clocks() -> void:
+	var player := _remote_pawn()
+	var rifle: WeaponStats = preload("res://resources/weapons/rifle.tres")
+	player.weapon.index = player.weapon.loadout.find(rifle)
+	assert_true(player.weapon.host_fire(Transform3D.IDENTITY, false, player.weapon.index))
+	assert_false(player.weapon.host_fire(Transform3D.IDENTITY, false, player.weapon.index))
+	assert_true(player.melee.shove(Vector3.ZERO, Vector3.FORWARD))
+	assert_false(player.melee.is_ready())
+	player._tick_watched_combat(maxf(rifle.shot_interval(), Melee.COOLDOWN))
+	assert_true(player.weapon.host_fire(Transform3D.IDENTITY, false, player.weapon.index))
+	assert_true(player.melee.is_ready())
+
+
 func test_a_replicated_loadout_replaces_the_bag() -> void:
 	var gun := Weapon.new()
 	add_child_autofree(gun)
@@ -458,6 +503,14 @@ func _zombie(at: Vector3) -> Zombie:
 	add_child_autofree(zombie)
 	zombie.global_position = at
 	return zombie
+
+
+func _rifle() -> Weapon:
+	var gun := Weapon.new()
+	add_child_autofree(gun)
+	var rifle: WeaponStats = preload("res://resources/weapons/rifle.tres")
+	gun.index = gun.loadout.find(rifle)
+	return gun
 
 
 func _remote_pawn() -> Player:

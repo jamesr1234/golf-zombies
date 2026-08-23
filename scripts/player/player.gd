@@ -210,6 +210,7 @@ func _physics_process(delta: float) -> void:
 	):
 		_drop_from_lost_ride()
 	if net_driven and not is_multiplayer_authority():
+		_tick_watched_combat(delta)
 		_walk_as_watched(delta)
 		return
 	if brain != null:
@@ -272,6 +273,13 @@ func predicts_locally() -> bool:
 		and not is_celebrating()
 		and _fling_left <= 0.0
 	)
+
+
+func _tick_watched_combat(delta: float) -> void:
+	if melee != null:
+		melee.tick(delta)
+	if weapon != null:
+		weapon.tick_timers(delta)
 
 
 ## The stick is in the pawn's own frame, so the walk only goes the right way if
@@ -1033,6 +1041,19 @@ func _request_fire(
 	if multiplayer.get_remote_sender_id() != peer_id:
 		return
 	weapon.host_fire(Transform3D(Basis(bx, by, bz), origin), ads, gun_index)
+
+
+func request_host_reload(gun_index: int) -> void:
+	_request_reload.rpc_id(1, gun_index)
+
+
+@rpc("any_peer", "reliable")
+func _request_reload(gun_index: int) -> void:
+	if not multiplayer.is_server():
+		return
+	if multiplayer.get_remote_sender_id() != peer_id:
+		return
+	weapon.host_reload(gun_index)
 
 
 func _try_melee() -> void:

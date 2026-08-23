@@ -115,6 +115,10 @@ func start_reload() -> void:
 		return
 	_reload_left = stats().reload_time
 	Sfx.play("reload", self)
+	if NetSession.defers_world():
+		var owner := get_parent() as Player
+		if owner != null:
+			owner.request_host_reload(index)
 
 
 func add_ammo(amount: int) -> void:
@@ -141,6 +145,10 @@ func apply_replicated_pose(firing: bool, reload: float, scoped: bool) -> void:
 			zoom_step = 0
 	else:
 		zoom_step = -1
+	# The host owns reload for scoring; a copied fraction would wipe the mag
+	# fill when the clock runs out.
+	if NetSession.is_active() and multiplayer.is_server():
+		return
 	if reload <= 0.0:
 		_reload_left = 0.0
 	else:
@@ -185,18 +193,24 @@ func add_gun(stats: WeaponStats) -> bool:
 	return true
 
 
-func tick(delta: float, view: Transform3D, trigger_held: bool, trigger_pulled: bool, ads: bool) -> void:
+func tick_timers(delta: float) -> void:
 	_cooldown = maxf(0.0, _cooldown - delta)
 	_pair_idle += delta
 	if pair_expired(stats(), _pair_shots, _pair_idle):
 		_pair_shots = 0
 	_flash_time = maxf(0.0, _flash_time - delta)
-	_flash.light_energy = 6.0 if _flash_time > 0.0 else 0.0
+	if _flash != null:
+		_flash.light_energy = 6.0 if _flash_time > 0.0 else 0.0
 	if is_reloading():
-		_firing = false
 		_reload_left -= delta
 		if _reload_left <= 0.0:
 			_finish_reload()
+
+
+func tick(delta: float, view: Transform3D, trigger_held: bool, trigger_pulled: bool, ads: bool) -> void:
+	tick_timers(delta)
+	if is_reloading():
+		_firing = false
 		return
 	_firing = trigger_held and mags[index] > 0
 	var wants_shot := trigger_held if stats().automatic else trigger_pulled
@@ -218,6 +232,16 @@ func host_fire(view: Transform3D, ads: bool, gun_index: int) -> bool:
 	index = gun_index
 	_commit_fire(view, ads)
 	return true
+
+
+func host_reload(gun_index: int) -> bool:
+	if gun_index < 0 or gun_index >= loadout.size():
+		return false
+	index = gun_index
+	if is_reloading() or mags[index] >= stats().mag_size or reserves[index] <= 0:
+		return false
+	start_reload()
+	return is_reloading()
 
 
 func _finish_reload() -> void:
