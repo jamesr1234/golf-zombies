@@ -319,27 +319,7 @@ func test_chase_camera_orbits_when_the_cart_turns() -> void:
 	assert_gt(view.origin.x, 6.0, "yaw 90 faces -X, so the camera is on +X")
 
 
-## A driver predicting their own cart is always ahead of the host's account of
-## it, because that account crossed the network to get here. Reading that head
-## start as error would drag the cart backwards every time a snapshot landed.
-func test_a_driver_ahead_of_the_hosts_account_has_not_drifted() -> void:
-	var driven: PackedVector3Array = []
-	for i in 40:
-		driven.append(Vector3(float(i) * 0.25, 0.0, 0.0))
-	var behind := Vector3(4.0, 0.0, 0.0)
-	assert_almost_eq(
-		GolfCart.nearest_pose(driven, behind).distance_to(behind), 0.0, 0.001,
-		"the host is describing a place the cart really did drive through"
-	)
-
-
-func test_a_cart_shoved_off_its_line_reports_the_whole_gap() -> void:
-	var driven: PackedVector3Array = []
-	for i in 40:
-		driven.append(Vector3(float(i) * 0.25, 0.0, 0.0))
-	var shoved := Vector3(4.0, 0.0, 6.0)
-	assert_almost_eq(
-		GolfCart.nearest_pose(driven, shoved).distance_to(shoved), 6.0, 0.001,
-		"nowhere on the drive went near there, so it is a real disagreement"
-	)
-	assert_gt(6.0, GolfCart.PREDICT_SNAP, "and far enough to hand the cart back to the host")
+func test_a_forward_stick_reads_as_forward_throttle() -> void:
+	assert_almost_eq(GolfCart.stick_drive(Vector2(0.0, -1.0)).y, 1.0, 0.001, "up the screen")
+	assert_almost_eq(GolfCart.stick_drive(Vector2(0.0, 1.0)).y, -1.0, 0.001, "and back is reverse")
+	assert_almost_eq(GolfCart.stick_drive(Vector2(0.5, 0.0)).x, 0.5, 0.001, "steer rides as given")

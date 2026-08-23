@@ -83,9 +83,3 @@ func test_an_empty_cart_is_only_ever_watched() -> void:
 	assert_false(cart.predicts_locally(), "with no one at the wheel there is no stick to read")
 
 
-## The wire carries one stick whether the host or a joiner is at the wheel, so
-## the two of them have to agree on which way forward points.
-func test_a_forward_stick_reads_as_forward_throttle() -> void:
-	assert_almost_eq(GolfCart.stick_drive(Vector2(0.0, -1.0)).y, 1.0, 0.001, "up the screen")
-	assert_almost_eq(GolfCart.stick_drive(Vector2(0.0, 1.0)).y, -1.0, 0.001, "and back is reverse")
-	assert_almost_eq(GolfCart.stick_drive(Vector2(0.5, 0.0)).x, 0.5, 0.001, "steer rides as given")

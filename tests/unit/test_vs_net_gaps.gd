@@ -41,6 +41,11 @@ func test_a_pawn_sync_speaks_for_its_owner() -> void:
 	assert_true(pawn_sync.replication_config.has_property(NodePath(":sync_reload")))
 	assert_true(pawn_sync.replication_config.has_property(NodePath(":sync_scoped")))
 	assert_true(pawn_sync.replication_config.has_property(NodePath(":sync_pitch")))
+	# Without the stick a watcher can only replay poses, and replaying poses is
+	# what puts every uneven arrival on screen.
+	assert_true(pawn_sync.replication_config.has_property(NodePath(":sync_stick")))
+	assert_true(pawn_sync.replication_config.has_property(NodePath(":sync_sprint")))
+	assert_true(pawn_sync.replication_config.has_property(NodePath(":sync_jumps")))
 
 
 func test_zombie_and_cart_sync_carry_the_look_flags() -> void:
@@ -461,3 +466,32 @@ func _remote_pawn() -> Player:
 	player.net_driven = true
 	player.set_multiplayer_authority(99)
 	return player
+
+
+## Walking is the case the stick describes in full, so it is the only one walked
+## from the stick. Everything else carries state the stick says nothing about and
+## stays on the glide, where the host's account is taken literally.
+func test_a_walking_pawn_is_walked_and_not_replayed() -> void:
+	var pawn := _remote_pawn()
+	await wait_frames(1)
+	assert_true(pawn.predicts_locally(), "on its feet and moving is the whole point")
+
+
+func test_a_pawn_doing_anything_but_walking_stays_on_the_glide() -> void:
+	var pawn := _remote_pawn()
+	await wait_frames(1)
+	for busy in [Player.State.SWIMMING, Player.State.GOLFING, Player.State.RIDING]:
+		pawn.state = busy
+		assert_false(pawn.predicts_locally(), "state %d is not a walk" % busy)
+	pawn.state = Player.State.NORMAL
+	pawn.health.state = Health.State.DOWNED
+	assert_false(pawn.predicts_locally(), "and going down is something you watch land")
+
+
+## A pawn this peer drives already moves at the physics rate off its own
+## controller. Walking it from the wire would be running it twice.
+func test_the_pawn_you_control_is_never_walked_from_the_wire() -> void:
+	var mine: Player = PLAYER.instantiate()
+	add_child_autofree(mine)
+	await wait_frames(1)
+	assert_false(mine.predicts_locally(), "solo play owns every pawn it draws")

@@ -47,22 +47,6 @@ const CRUSH_PUSH := 9.0
 const TURBO_MULT := 1.18
 const RAM_MULT := 1.45
 const ARMOR_SCALE := 0.5
-## How far the prediction may stray from the host's account before it is treated
-## as a different story rather than the same one told late. Both sides run the
-## same drive code from the same stick, so honest disagreement is inches, and
-## this much apart means something the driver could not foresee: a windmill, a
-## hijack, a shunt from a cart they never saw.
-const PREDICT_SNAP := 3.0
-## Disagreement below this is left alone. Nudging on every snapshot would fight
-## the driver's own steering for nothing anyone can see.
-const PREDICT_SLACK := 0.05
-## Share of the remaining disagreement closed per second, slow enough to read as
-## the cart settling rather than as something pulling it.
-const PREDICT_PULL := 3.0
-## How much of the recent drive to keep. It has to outlast the round trip, since
-## that is how old the host's account of it is.
-const TRACK_SECONDS := 0.6
-
 ## Zoomed-out chase cam: far enough to read the whole cart and the path ahead.
 const CHASE_DISTANCE := 9.5
 const CHASE_HEIGHT := 4.8
@@ -100,10 +84,7 @@ var _drift := 0.0
 var _boost_count := 0
 var _fling_left := 0.0
 var _predicting := false
-## Where the prediction has lately been. The host's snapshot describes a moment
-## about one trip ago, so the question worth asking of it is not whether it
-## matches where the cart is now but whether the cart came through there.
-var _track: PackedVector3Array = []
+var _predict := NetPredict.new()
 
 @onready var seats: Array[Node3D] = [$DriverSeat, $PassengerSeat]
 @onready var crush_area: Area3D = $Crush
@@ -300,14 +281,14 @@ func _physics_process(delta: float) -> void:
 	var predicting := not owned and predicts_locally()
 	if predicting != _predicting:
 		_predicting = predicting
-		_track.clear()
+		_predict.clear()
 	if not owned and not predicting:
 		return
 	_drive(delta)
 	_bleed_speed_on_impact(delta)
 	_seat_riders()
 	if predicting:
-		_remember_pose()
+		_predict.remember(global_position)
 		return
 	_run_over()
 	sync_xform = global_transform
@@ -320,7 +301,7 @@ func _process(delta: float) -> void:
 	if NetSession.should_simulate(self):
 		return
 	if _predicting:
-		_reconcile(delta)
+		_predict.correct(self, sync_xform, delta)
 	else:
 		_net_interp.follow(self, sync_xform, delta, NetSync.CART_HZ, NetSync.WATCH_DELAY)
 	_seat_riders()
@@ -343,42 +324,6 @@ func net_interp() -> NetInterp:
 ## where the cart really is or what it hit.
 func predicts_locally() -> bool:
 	return driver != null and not NetSession.should_simulate(self)
-
-
-func _remember_pose() -> void:
-	_track.append(global_position)
-	var keep := int(TRACK_SECONDS * Engine.physics_ticks_per_second)
-	while _track.size() > keep:
-		_track.remove_at(0)
-
-
-## Lateness is not error. A driver on the same line as the host is simply further
-## along it, so the disagreement worth correcting is between the host's pose and
-## the nearest place the cart actually was, not where it is now. Measuring it that
-## way leaves the round trip alone and catches only what genuinely differs.
-func _reconcile(delta: float) -> void:
-	if _track.is_empty():
-		return
-	var drift := sync_xform.origin - nearest_pose(_track, sync_xform.origin)
-	var apart := drift.length()
-	if apart > PREDICT_SNAP:
-		global_transform = sync_xform
-		_track.clear()
-		return
-	if apart <= PREDICT_SLACK:
-		return
-	global_position += drift * clampf(PREDICT_PULL * delta, 0.0, 1.0)
-
-
-static func nearest_pose(track: PackedVector3Array, to: Vector3) -> Vector3:
-	var best := track[0]
-	var best_sq := best.distance_squared_to(to)
-	for point in track:
-		var away := point.distance_squared_to(to)
-		if away < best_sq:
-			best_sq = away
-			best = point
-	return best
 
 
 func fling(direction: Vector3, speed: float, lift := 14.0, lock := 1.0) -> void:

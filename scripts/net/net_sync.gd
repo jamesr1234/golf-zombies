@@ -50,9 +50,12 @@ static func attach(
 	return sync
 
 
+## The stick rides along with the pose, for the same reason the cart's does:
+## watchers walk the pawn from it and use the pose only to correct.
 static func attach_pawn(node: Node, authority := 1) -> MultiplayerSynchronizer:
 	return attach(node, PackedStringArray([
-		":sync_xform", ":sync_pace", ":aiming",
+		":sync_xform", ":sync_stick", ":sync_sprint", ":sync_jumps",
+		":sync_pace", ":aiming",
 		":sync_gun", ":holding_beer",
 		":sync_state", ":sync_dive", ":sync_firing", ":sync_reload", ":sync_scoped",
 		":sync_pitch",

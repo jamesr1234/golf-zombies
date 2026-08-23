@@ -88,15 +88,32 @@ const REMOTE_POSE_EASE := 18.0
 @export var sync_reload := 0.0
 @export var sync_scoped := false
 @export var sync_pitch := 0.0
+## The owner's stick, and whether they are holding sprint. Replicated so a peer
+## watching this pawn can walk it rather than replay the poses it sent.
+##
+## A pose is a sample and a stick is a cause. Rebuilding a walk out of samples
+## puts every uneven arrival on screen; running it from the stick generates the
+## motion locally at the physics rate, and a late packet only holds the last
+## input for a few milliseconds.
+@export var sync_stick := Vector2.ZERO
+@export var sync_sprint := false
+## A jump is an instant rather than a state, so it crosses as a tally. Any change
+## is one jump that has not been taken here yet.
+@export var sync_jumps := 0
 @export var sync_xform := Transform3D.IDENTITY:
 	set(value):
 		sync_xform = value
-		if is_inside_tree() and not NetSession.should_simulate(self) and not carried_by_cart():
+		if (
+			is_inside_tree() and not NetSession.should_simulate(self)
+			and not carried_by_cart() and not predicts_locally()
+		):
 			_net_interp.arrive(value)
 
 var peer_id := 0
 var net_driven := false
 var _net_interp := NetInterp.new()
+var _predict := NetPredict.new()
+var _seen_jumps := 0
 ## Remotes get pace and pitch at the send rate. Easing them keeps the run cycle
 ## and the head off the same staircase the body used to move on.
 var _remote_pace := 0.0
@@ -193,6 +210,7 @@ func _physics_process(delta: float) -> void:
 	):
 		_drop_from_lost_ride()
 	if net_driven and not is_multiplayer_authority():
+		_walk_as_watched(delta)
 		return
 	if brain != null:
 		brain.tick(delta)
@@ -221,16 +239,53 @@ func _physics_process(delta: float) -> void:
 	sync_reload = weapon.reload_fraction()
 	sync_scoped = weapon.is_scoped()
 	sync_pitch = _pitch
+	sync_stick = input.move_vector()
+	sync_sprint = input.pressed("sprint")
 	sync_xform = global_transform
 	_animate(delta)
 
 
-## Puppets move and pose on the rendered frame so the two never disagree.
+## Puppets move and pose on the rendered frame so the two never disagree. A
+## walked one has already moved itself in physics and is only corrected here.
 func _process(delta: float) -> void:
 	if not NetSession.should_simulate(self):
-		if not carried_by_cart():
+		if predicts_locally():
+			_predict.correct(self, sync_xform, delta)
+		elif not carried_by_cart():
 			_net_interp.follow(self, sync_xform, delta, NetSync.PAWN_HZ, NetSync.WATCH_DELAY)
 		_animate(delta)
+
+
+## A watched pawn is walked from its owner's stick instead of being glided
+## through the poses they sent, for the same reason a driven cart is.
+##
+## Plain walking only. Swimming, riding, a swing, going down and a fling all
+## carry state the stick says nothing about, and they are things you are meant to
+## watch land rather than motion you follow, so they stay on the glide where the
+## host's account is taken literally.
+func predicts_locally() -> bool:
+	return (
+		net_driven and not is_multiplayer_authority()
+		and health != null and health.is_alive()
+		and state == State.NORMAL
+		and not carried_by_cart()
+		and not is_celebrating()
+		and _fling_left <= 0.0
+	)
+
+
+## The stick is in the pawn's own frame, so the walk only goes the right way if
+## the facing does. It comes across in the pose, which is late and arrives in
+## steps, so it is eased rather than taken raw.
+func _walk_as_watched(delta: float) -> void:
+	if not predicts_locally():
+		_predict.clear()
+		return
+	rotation.y = lerp_angle(
+		rotation.y, sync_xform.basis.get_euler().y, clampf(REMOTE_POSE_EASE * delta, 0.0, 1.0)
+	)
+	_move(delta)
+	_predict.remember(global_position)
 
 
 ## A rider is placed by the cart it sits in, on every peer, so its own replicated
@@ -850,14 +905,14 @@ func _move(delta: float) -> void:
 	)
 	var wish := Vector3.ZERO
 	if mobile:
-		var stick := input.move_vector()
+		var stick := _walk_stick()
 		wish = (transform.basis * Vector3(stick.x, 0.0, stick.y))
 		wish.y = 0.0
 		wish = wish.normalized() * minf(1.0, stick.length())
-		if input.just_pressed("jump") and is_on_floor():
+		if _jumped() and is_on_floor():
 			velocity.y = JUMP_VELOCITY
 			Sfx.play("jump", self)
-	var speed := SPRINT_SPEED if mobile and input.pressed("sprint") else WALK_SPEED
+	var speed := SPRINT_SPEED if mobile and _sprinting() else WALK_SPEED
 	if wading > WADE_DRAG_DEPTH:
 		speed *= WADE_SPEED_SCALE
 	var target := wish * speed
@@ -866,6 +921,32 @@ func _move(delta: float) -> void:
 	if _boost_count > 0:
 		velocity = _Boost.player_velocity(velocity, _boost_along, delta)
 	move_and_slide()
+
+
+## A watched pawn runs the same walk as its owner, off the stick that came with
+## the pose rather than off a controller it does not have.
+func _walks_from_wire() -> bool:
+	return net_driven and not is_multiplayer_authority()
+
+
+func _walk_stick() -> Vector2:
+	return sync_stick if _walks_from_wire() else input.move_vector()
+
+
+func _sprinting() -> bool:
+	return sync_sprint if _walks_from_wire() else input.pressed("sprint")
+
+
+## Consumed on read, the same way a press is, so one jump is taken once.
+func _jumped() -> bool:
+	if _walks_from_wire():
+		var fresh := sync_jumps != _seen_jumps
+		_seen_jumps = sync_jumps
+		return fresh
+	if not input.just_pressed("jump"):
+		return false
+	sync_jumps += 1
+	return true
 
 
 func _fight(delta: float) -> void:
