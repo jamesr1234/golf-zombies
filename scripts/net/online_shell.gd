@@ -1,13 +1,20 @@
 class_name OnlineShell
 extends Node
-## Single-viewport VS match. Pause is local; the round keeps running.
+## One-seat VS match. Pause is local; the round keeps running.
+##
+## The world renders into a SubViewport at the design resolution, the same way
+## split-screen does, rather than straight into the window. Drawing into the
+## window means the full native resolution, which on a retina display is several
+## times the pixels, and the project's multisampling on top of that. The neon
+## look leans on glow and fog, so the cost scales with pixels rather than with
+## what is on screen, and the difference is the whole frame budget on a laptop.
 
 const TITLE := "res://scenes/ui/main_menu.tscn"
 const _Music := preload("res://scripts/fx/music.gd")
 
-@onready var camera: PlayerCamera = $ViewportLayer/Camera
-@onready var hud: Hud = $ViewportLayer/Hud
-@onready var world: Node3D = $World
+@onready var camera: PlayerCamera = $Screen/Viewport/Camera
+@onready var hud: Hud = $Screen/Viewport/Hud
+@onready var world: Node3D = $Screen/Viewport/World
 @onready var overlay: Label = $PauseLayer/Message
 
 var _local: Player

@@ -9,6 +9,10 @@ extends Label
 ## Reading it: if WORST climbs well past 16 ms when you see the hitch, the client
 ## is dropping frames. If frame time holds and a puppet's STALL climbs instead,
 ## the frames are fine and the snapshots are late.
+##
+## When frames are slow, PROCESS and PHYSICS say whether gdscript is to blame.
+## A large REST means the time is going to the gpu or the driver instead, and the
+## fix is resolution or shaders rather than code.
 
 ## A frame this long is a visible hitch at 60 Hz.
 const SPIKE_MS := 30.0
@@ -96,13 +100,27 @@ func _track_frame(delta: float) -> bool:
 
 
 func report(delta: float) -> String:
+	var script := Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0
+	var physics := Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0
+	var view := get_viewport().get_visible_rect().size
 	var lines: PackedStringArray = [
 		"fps %d   frame %.1f ms   worst %.1f ms   spikes %d" % [
 			Engine.get_frames_per_second(), delta * 1000.0, _worst_ms, _spikes
 		],
-		"draw %d   objects %d" % [
+		## Script time against the whole frame. If these two are small while frame
+		## is large, the time is going to the gpu or the driver, not to gdscript.
+		"process %.1f ms   physics %.1f ms   rest %.1f ms" % [
+			script, physics, maxf(0.0, delta * 1000.0 - script - physics)
+		],
+		"draw %d   objects %d   view %dx%d" % [
 			int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)),
 			int(Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME)),
+			int(view.x), int(view.y),
+		],
+		"nodes %d   bodies %d   pairs %d" % [
+			int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT)),
+			int(Performance.get_monitor(Performance.PHYSICS_3D_ACTIVE_OBJECTS)),
+			int(Performance.get_monitor(Performance.PHYSICS_3D_COLLISION_PAIRS)),
 		],
 	]
 	var remote := puppets()
