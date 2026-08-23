@@ -17,6 +17,26 @@ func test_a_long_frame_counts_as_a_spike() -> void:
 	assert_true(body.contains("spikes 1"), body)
 
 
+## A hitch on a steady beat is the signature of something on a timer, so the
+## readout has to say how long the beat is rather than only that it happened.
+func test_the_overlay_times_the_gap_between_two_hitches() -> void:
+	var debug := _overlay()
+	debug._track_frame(0.05)
+	for _i in 30:
+		debug._track_frame(1.0 / 60.0)
+	debug._track_frame(0.05)
+	assert_almost_eq(debug._spike_period, 0.55, 0.01, "half a second of good frames, then a hitch")
+	assert_true(debug.report(0.016).contains("hitch every 0.55 s"), debug.report(0.016))
+
+
+func test_a_hitch_reports_the_nodes_that_arrived_on_it() -> void:
+	var debug := _overlay()
+	debug._nodes_seen = NetDebug.node_count() - 40
+	debug._track_frame(0.05)
+	assert_eq(debug._spike_grew, 40, "the spawn that caused the hitch shows up as nodes")
+	assert_true(debug.report(0.016).contains("+40 nodes"), debug.report(0.016))
+
+
 func test_dump_prints_the_same_lines_as_the_overlay() -> void:
 	var debug := _overlay()
 	debug._track_frame(0.05)

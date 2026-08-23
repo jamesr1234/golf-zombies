@@ -13,6 +13,10 @@ extends Label
 ## When frames are slow, PROCESS and PHYSICS say whether gdscript is to blame.
 ## A large REST means the time is going to the gpu or the driver instead, and the
 ## fix is resolution or shaders rather than code.
+##
+## A hitch on a steady beat is something on a timer, so HITCH reports the gap
+## between the last two and how far the node count moved across the bad frame.
+## Nodes arriving on the beat means the cost is building whatever spawned.
 
 ## A frame this long is a visible hitch at 60 Hz.
 const SPIKE_MS := 30.0
@@ -33,12 +37,17 @@ var _worst_left := 0.0
 var _spikes := 0
 var _since_log := 0.0
 var _last_delta := 1.0 / 60.0
+var _nodes_seen := 0
+var _since_spike := 0.0
+var _spike_period := 0.0
+var _spike_grew := 0
 
 
 func _ready() -> void:
 	label_settings = HudStyle.readout(Palette.LIME, 13)
 	position = Vector2(24.0, 24.0)
 	visible = false
+	_nodes_seen = node_count()
 
 
 func _process(delta: float) -> void:
@@ -77,8 +86,16 @@ func reset() -> void:
 	_worst_left = 0.0
 	_spikes = 0
 	_since_log = 0.0
+	_since_spike = 0.0
+	_spike_period = 0.0
+	_spike_grew = 0
+	_nodes_seen = node_count()
 	for interp in puppets().values():
 		interp.reset_stats()
+
+
+static func node_count() -> int:
+	return int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT))
 
 
 func dump(delta: float) -> String:
@@ -90,8 +107,15 @@ func dump(delta: float) -> String:
 func _track_frame(delta: float) -> bool:
 	var ms := delta * 1000.0
 	var spiked := ms >= SPIKE_MS
+	var nodes := node_count()
+	var grew := nodes - _nodes_seen
+	_nodes_seen = nodes
+	_since_spike += delta
 	if spiked:
 		_spikes += 1
+		_spike_period = _since_spike
+		_spike_grew = grew
+		_since_spike = 0.0
 	_worst_left = maxf(0.0, _worst_left - delta)
 	if ms > _worst_ms or _worst_left <= 0.0:
 		_worst_ms = ms
@@ -118,10 +142,11 @@ func report(delta: float) -> String:
 			int(view.x), int(view.y),
 		],
 		"nodes %d   bodies %d   pairs %d" % [
-			int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT)),
+			_nodes_seen,
 			int(Performance.get_monitor(Performance.PHYSICS_3D_ACTIVE_OBJECTS)),
 			int(Performance.get_monitor(Performance.PHYSICS_3D_COLLISION_PAIRS)),
 		],
+		"hitch every %.2f s   %+d nodes on it" % [_spike_period, _spike_grew],
 	]
 	var remote := puppets()
 	if remote.is_empty():
