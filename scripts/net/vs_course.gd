@@ -1,13 +1,15 @@
 class_name VsCourse
 extends Node
-## Builds the shared hole and parks players, balls, and the four carts.
+## Builds the shared hole and parks players, balls, and the eight carts.
 
 const PLAYER_SPREAD := 2.2
 const BALL_SPREAD := 1.2
 const CART_BACK := 2.0
 const CART_SIDE := 8.0
 const CART_GAP := 5.5
-const CART_COUNT := 4
+const CART_ROW := 6.0
+const CART_COUNT := 8
+const TRANSIT_STAND := 2.4
 const _Music := preload("res://scripts/fx/music.gd")
 
 var hole: HoleData
@@ -110,19 +112,31 @@ func place_carts(carts: Array[GolfCart]) -> void:
 		if carts[i] == null:
 			continue
 		var slot := cart_slot(carts[i], i)
-		var spot := hole.tee - forward * CART_BACK + lateral * cart_offset(slot)
+		var spot := cart_spot(hole.tee, forward, lateral, slot, CART_BACK)
 		carts[i].place_at(hole.lift(spot) + Vector3.UP * 0.4, yaw)
 
 
-## Two left of the tee, two right. Inner pair sits at CART_SIDE so nothing
-## overlaps the 8 m tee box; the outer pair steps out by CART_GAP.
+## Two left and two right per row. Inner pair sits at CART_SIDE so nothing
+## overlaps the 8 m tee box; the outer pair steps out by CART_GAP. Carts 4-7
+## sit one row further back.
 static func cart_offset(index: int) -> float:
-	var wing := -1.0 if index < 2 else 1.0
-	return wing * (CART_SIDE + float(index % 2) * CART_GAP)
+	var col := posmod(index, 4)
+	var wing := -1.0 if col < 2 else 1.0
+	return wing * (CART_SIDE + float(col % 2) * CART_GAP)
 
 
-## Cart0/1 stay left, Cart2/3 stay right, even if the array order differs
-## between host and joiner.
+static func cart_row(index: int) -> float:
+	return float(index / 4) * CART_ROW
+
+
+static func cart_spot(
+	origin: Vector3, along: Vector3, lateral: Vector3, slot: int, back := CART_BACK
+) -> Vector3:
+	return origin - along * (back + cart_row(slot)) + lateral * cart_offset(slot)
+
+
+## Cart0/1 stay left, Cart2/3 stay right. Cart4-7 repeat that in the back row,
+## even if the array order differs between host and joiner.
 static func cart_slot(cart: Node, fallback: int) -> int:
 	if cart == null:
 		return fallback
@@ -132,6 +146,13 @@ static func cart_slot(cart: Node, fallback: int) -> int:
 		if tail.is_valid_int():
 			return int(tail)
 	return fallback
+
+
+func cart_for_seat(seat: int, carts: Array[GolfCart]) -> GolfCart:
+	for i in carts.size():
+		if carts[i] != null and cart_slot(carts[i], i) == seat:
+			return carts[i]
+	return null
 
 
 func place_cart_girl() -> void:
@@ -169,7 +190,7 @@ func aim_play(sessions: Array) -> void:
 	place_tee_balls(balls)
 
 
-func begin_transit(carts: Array[GolfCart]) -> CartPath:
+func begin_transit(carts: Array[GolfCart], players: Array[Player] = []) -> CartPath:
 	var forward := along_hole()
 	cart_path = CartPath.build(
 		hole.cup, forward, hole.bounds, hole.height, hole_node, hole.green_radius
@@ -177,20 +198,85 @@ func begin_transit(carts: Array[GolfCart]) -> CartPath:
 	hole_node.add_child(cart_path)
 	_open_clubhouse()
 	_park_carts_for_transit(carts)
+	place_players_at_carts(players, carts)
 	return cart_path
 
 
 func _park_carts_for_transit(carts: Array[GolfCart]) -> void:
-	var forward := along_hole()
-	var lateral := forward.cross(Vector3.UP).normalized()
-	var yaw := rad_to_deg(atan2(-forward.x, -forward.z))
+	var lot := _transit_lot()
+	var along: Vector3 = lot["along"]
+	var lateral: Vector3 = lot["lateral"]
+	var origin: Vector3 = lot["at"]
+	var yaw: float = lot["yaw"]
 	for i in carts.size():
 		if carts[i] == null:
 			continue
 		var slot := cart_slot(carts[i], i)
-		var spot := hole.cup - forward * 6.0 + lateral * cart_offset(slot)
-		if carts[i].global_position.distance_to(hole.lift(hole.cup)) > 24.0:
-			carts[i].place_at(hole.lift(spot) + Vector3.UP * 0.4, yaw)
+		var spot := cart_spot(origin, along, lateral, slot, 0.0)
+		if hole != null and hole.height != null:
+			spot = hole.lift(spot)
+		carts[i].place_at(spot + Vector3.UP * 0.4, yaw)
+
+
+## Start of the cart path, facing the next tee. The lot sits just onto the
+## road so all eight carts point down the arrows.
+func _transit_lot() -> Dictionary:
+	var along := along_hole()
+	var at := hole.lift(hole.cup - along * 6.0)
+	if cart_path != null and cart_path.centerline.size() >= 2:
+		var a: Vector3 = cart_path.centerline[0]
+		var b: Vector3 = cart_path.centerline[1]
+		along = b - a
+		along.y = 0.0
+		if along.length_squared() < 0.0001:
+			along = cart_path.heading
+		along = along.normalized()
+		at = a + along * 10.0
+		at.y = a.y
+	return {
+		"at": at,
+		"along": along,
+		"lateral": along.cross(Vector3.UP).normalized(),
+		"yaw": rad_to_deg(atan2(-along.x, -along.z)),
+	}
+
+
+func place_players_at_carts(players: Array[Player], carts: Array[GolfCart]) -> void:
+	for player in players:
+		if player == null:
+			continue
+		if NetSession.is_active() and not player.is_multiplayer_authority():
+			continue
+		place_player_at_carts(player, carts)
+
+
+func place_player_at_carts(player: Player, carts: Array[GolfCart]) -> void:
+	if player == null:
+		return
+	var seat := NetSession.seat_for(player.peer_id)
+	if seat < 0:
+		seat = 0
+	var pose := transit_player_pose(seat, carts)
+	player.spawn_at(pose["at"], pose["yaw"])
+
+
+func transit_player_pose(seat: int, carts: Array[GolfCart]) -> Dictionary:
+	var cart := cart_for_seat(seat, carts)
+	if cart == null and not carts.is_empty():
+		cart = carts[0]
+	if cart == null:
+		return {"at": Vector3.UP, "yaw": 0.0}
+	var right := cart.transform.basis.x
+	right.y = 0.0
+	if right.length_squared() < 0.01:
+		right = Vector3.RIGHT
+	else:
+		right = right.normalized()
+	var origin := cart.global_position if cart.is_inside_tree() else cart.position
+	var at := origin + right * TRANSIT_STAND
+	if hole != null:
+		at = hole.lift(at)
+	return {"at": at + Vector3.UP * 1.2, "yaw": rad_to_deg(cart.rotation.y)}
 
 
 func _open_clubhouse() -> void:

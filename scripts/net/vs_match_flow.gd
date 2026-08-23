@@ -92,7 +92,7 @@ func start_hole(index: int) -> void:
 		(card as PlayerScore).advance_to(index)
 	_sync_local_score()
 	## Scene-baked carts exist on every peer. Park them here so a joiner sees
-	## the same 2+2 layout instead of four carts stacked at the origin.
+	## the same two-row lot instead of eight carts stacked at the origin.
 	course.place_carts(_carts)
 	if multiplayer.is_server():
 		course.place_balls(_balls)
@@ -597,13 +597,20 @@ func _complete_hole() -> void:
 		(card as PlayerScore).advance_to((card as PlayerScore).hole_index + 1)
 	_sync_local_score()
 	phase = Phase.TRANSIT
-	course.begin_transit(_carts)
+	_rally_to_carts()
+	course.begin_transit(_carts, _players)
 	spawner_ai.begin_transit(score.hole_index, course.cart_path.spawn_points)
 	scorecard_changed.emit()
-	_flash_message("Next tee", "Four carts. Steal the wheel. Follow the arrows.")
+	_flash_message("Next tee", "Eight carts. Steal the wheel. Follow the arrows.")
 	_replicate_event.rpc("transit")
 	_broadcast_scores()
 	_Music.play_level()
+
+
+func _rally_to_carts() -> void:
+	for player in _players:
+		if player != null and is_instance_valid(player) and player.health != null:
+			player.health.restore()
 
 
 func _do_arrive() -> void:
@@ -726,7 +733,7 @@ func _replicate_event(kind: String) -> void:
 			_Music.play_level()
 		"transit":
 			phase = Phase.TRANSIT
-			course.begin_transit(_carts)
+			course.begin_transit(_carts, _players)
 			_Music.play_level()
 		"shop":
 			phase = Phase.SHOP

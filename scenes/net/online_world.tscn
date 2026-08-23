@@ -79,6 +79,14 @@ directional_shadow_max_distance = 120.0
 
 [node name="Cart3" parent="Carts" instance=ExtResource("14_cart")]
 
+[node name="Cart4" parent="Carts" instance=ExtResource("14_cart")]
+
+[node name="Cart5" parent="Carts" instance=ExtResource("14_cart")]
+
+[node name="Cart6" parent="Carts" instance=ExtResource("14_cart")]
+
+[node name="Cart7" parent="Carts" instance=ExtResource("14_cart")]
+
 [node name="Zombies" type="Node3D" parent="."]
 
 [node name="PlayerSpawner" type="MultiplayerSpawner" parent="."]

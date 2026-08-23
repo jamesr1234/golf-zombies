@@ -72,6 +72,20 @@ func test_four_carts_park_two_on_each_side_of_the_tee() -> void:
 	assert_almost_eq(left[1], -right[1], 0.001)
 
 
+func test_eight_carts_use_two_rows_of_four() -> void:
+	assert_eq(VsCourse.CART_COUNT, 8)
+	var seen := {}
+	for i in VsCourse.CART_COUNT:
+		var key := Vector2(VsCourse.cart_offset(i), VsCourse.cart_row(i))
+		assert_false(seen.has(key), "slot %d overlaps another cart" % i)
+		seen[key] = true
+	assert_almost_eq(VsCourse.cart_row(0), 0.0, 0.001)
+	assert_almost_eq(VsCourse.cart_row(3), 0.0, 0.001)
+	assert_gt(VsCourse.cart_row(4), 0.0)
+	assert_almost_eq(VsCourse.cart_offset(4), VsCourse.cart_offset(0), 0.001)
+	assert_almost_eq(VsCourse.cart_offset(7), VsCourse.cart_offset(3), 0.001)
+
+
 func test_named_carts_keep_the_same_slots_on_both_peers() -> void:
 	assert_eq(VsCourse.cart_slot(null, 3), 3)
 	var cart := GolfCart.new()
@@ -111,13 +125,17 @@ func test_placed_carts_sit_beside_the_tee_not_on_it() -> void:
 	var course := VsCourse.new()
 	course.hole = HoleGenerator.generate(0, 20260816)
 	var carts: Array[GolfCart] = []
-	for _i in 4:
-		carts.append(GolfCart.new())
+	for i in VsCourse.CART_COUNT:
+		var cart := GolfCart.new()
+		cart.name = "Cart%d" % i
+		carts.append(cart)
 	course.place_carts(carts)
 	var forward := course.along_hole()
 	var lateral := forward.cross(Vector3.UP).normalized()
 	var left := 0
 	var right := 0
+	var front := 0
+	var back := 0
 	for cart in carts:
 		var offset := cart.position - course.hole.tee
 		offset.y = 0.0
@@ -126,9 +144,71 @@ func test_placed_carts_sit_beside_the_tee_not_on_it() -> void:
 			left += 1
 		else:
 			right += 1
+		if offset.dot(-forward) > VsCourse.CART_BACK + VsCourse.CART_ROW * 0.5:
+			back += 1
+		else:
+			front += 1
 		assert_gt(absf(side), 4.0, "the cart should not be on the tee box")
-	assert_eq(left, 2)
-	assert_eq(right, 2)
+	assert_eq(left, 4)
+	assert_eq(right, 4)
+	assert_eq(front, 4)
+	assert_eq(back, 4)
+	for cart in carts:
+		cart.free()
+	course.free()
+
+
+func test_players_start_at_the_carts_for_the_next_hole() -> void:
+	var course := VsCourse.new()
+	course.hole = HoleGenerator.generate(0, 20260816)
+	var carts: Array[GolfCart] = []
+	for i in VsCourse.CART_COUNT:
+		var cart := GolfCart.new()
+		cart.name = "Cart%d" % i
+		carts.append(cart)
+		cart.place_at(Vector3(float(i) * 6.0, 0.4, 0.0), 0.0)
+	var players: Array[Player] = []
+	for i in 2:
+		var player: Player = preload("res://scenes/players/player.tscn").instantiate()
+		player.peer_id = i + 1
+		add_child_autofree(player)
+		player.global_position = Vector3(80.0, 0.0, 80.0)
+		players.append(player)
+	NetSession.seats[1] = 0
+	NetSession.seats[2] = 1
+	course.place_players_at_carts(players, carts)
+	assert_lt(
+		players[0].global_position.distance_to(carts[0].position),
+		VsCourse.TRANSIT_STAND + 1.5,
+		"seat 0 starts at Cart0"
+	)
+	assert_lt(
+		players[1].global_position.distance_to(carts[1].position),
+		VsCourse.TRANSIT_STAND + 1.5,
+		"seat 1 starts at Cart1"
+	)
+	assert_gt(players[0].global_position.distance_to(Vector3(80.0, 0.0, 80.0)), 20.0)
+	for cart in carts:
+		cart.free()
+	course.free()
+
+
+func test_transit_parks_every_cart_at_the_lot() -> void:
+	var course := VsCourse.new()
+	course.hole = HoleGenerator.generate(0, 20260816)
+	var carts: Array[GolfCart] = []
+	for i in VsCourse.CART_COUNT:
+		var cart := GolfCart.new()
+		cart.name = "Cart%d" % i
+		carts.append(cart)
+		cart.place_at(course.hole.lift(course.hole.cup) + Vector3(2.0, 0.4, 0.0), 0.0)
+	course._park_carts_for_transit(carts)
+	var seen := {}
+	for cart in carts:
+		var key := Vector2(snappedf(cart.position.x, 0.01), snappedf(cart.position.z, 0.01))
+		assert_false(seen.has(key), "two carts stacked at the lot")
+		seen[key] = true
+	assert_eq(seen.size(), VsCourse.CART_COUNT)
 	for cart in carts:
 		cart.free()
 	course.free()
