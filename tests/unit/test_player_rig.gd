@@ -390,6 +390,38 @@ func test_a_swimming_robot_leans_and_kicks() -> void:
 	assert_ne(body.legs[0].rotation.x, 0.0, "the legs have to kick")
 
 
+func test_a_player_snaps_to_the_floor_instead_of_sinking() -> void:
+	var player: Player = preload("res://scenes/players/player.tscn").instantiate()
+	add_child_autofree(player)
+	assert_almost_eq(player.floor_snap_length, Player.FLOOR_SNAP, 0.001)
+	assert_almost_eq(player.floor_max_angle, deg_to_rad(Player.FLOOR_MAX_DEG), 0.001)
+	assert_almost_eq(player.safe_margin, Player.SAFE_MARGIN, 0.001)
+	assert_gt(player.floor_max_angle, deg_to_rad(50.0), "mounds must count as floor, not walls")
+
+
+func test_riding_turns_the_capsule_off() -> void:
+	var player: Player = preload("res://scenes/players/player.tscn").instantiate()
+	add_child_autofree(player)
+	assert_eq(player.collision_layer, Layers.PLAYER)
+	player.enter_ride()
+	assert_eq(player.collision_layer, 0, "a seated body cannot wedge into the cart")
+	assert_eq(player.collision_mask, 0)
+	player.exit_ride()
+	assert_eq(player.collision_layer, Layers.PLAYER)
+	assert_eq(player.collision_mask, Layers.PLAYER_MASK)
+
+
+func test_golfing_does_not_slide_the_stance() -> void:
+	var player: Player = preload("res://scenes/players/player.tscn").instantiate()
+	add_child_autofree(player)
+	player.stand_at(Vector3(2.0, 1.0, -3.0), 0.0)
+	player.enter_golf_mode()
+	player.velocity = Vector3(4.0, -2.0, 1.0)
+	player._move(1.0 / 60.0)
+	assert_eq(player.global_position, Vector3(2.0, 1.0, -3.0), "address is planted")
+	assert_eq(player.velocity, Vector3(4.0, -2.0, 1.0), "physics does not eat the stance")
+
+
 func test_a_hit_flash_paints_every_piece_of_the_robot() -> void:
 	var body := PlayerBody.new()
 	add_child_autofree(body)

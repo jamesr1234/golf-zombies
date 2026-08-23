@@ -68,6 +68,11 @@ const CHEER_CAM_SIDE := 1.15
 const CHEER_CAM_HEIGHT := 1.9
 const CHEER_CAM_LOOK := 1.15
 const CHEER_FOV := 70.0
+## Same snap the walkers use. Without it a capsule slowly sinks through the
+## heightmap, and after a minute of that physics can hang the whole play session.
+const FLOOR_SNAP := 0.45
+const FLOOR_MAX_DEG := 60.0
+const SAFE_MARGIN := 0.04
 
 @export var input_prefix := "p1"
 @export var uses_mouse := true
@@ -143,8 +148,11 @@ func _ready() -> void:
 	if GameSettings.mode == GameSettings.Mode.COOP:
 		uses_mouse = input_prefix != "p1"
 	input = PlayerInput.new(input_prefix, uses_mouse)
-	collision_layer = Layers.PLAYER
-	collision_mask = Layers.PLAYER_MASK
+	_set_solid(true)
+	floor_snap_length = FLOOR_SNAP
+	floor_max_angle = deg_to_rad(FLOOR_MAX_DEG)
+	floor_constant_speed = true
+	safe_margin = SAFE_MARGIN
 	body.build(body_color)
 	raygun.build(body_color)
 	_flash_material = MeshFactory.material(Color(1.0, 0.12, 0.08), false, Palette.GLOW_STRONG)
@@ -165,6 +173,12 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if (
+		state == State.RIDING
+		and (cart == null or not cart.is_riding(self))
+		and (not net_driven or is_multiplayer_authority())
+	):
+		_drop_from_lost_ride()
 	if net_driven and not is_multiplayer_authority():
 		_animate(delta)
 		return
@@ -464,6 +478,7 @@ func enter_ride() -> void:
 	state = State.RIDING
 	velocity = Vector3.ZERO
 	_cart_chase = false
+	_set_solid(false)
 	if _shield != null:
 		_shield.set_raised(false)
 
@@ -471,6 +486,21 @@ func enter_ride() -> void:
 func exit_ride() -> void:
 	state = State.NORMAL
 	_cart_chase = false
+	_set_solid(true)
+
+
+func _set_solid(on: bool) -> void:
+	collision_layer = Layers.PLAYER if on else 0
+	collision_mask = Layers.PLAYER_MASK if on else 0
+
+
+## Seat list and rider state drifted apart. Drop beside the cart, not inside it.
+func _drop_from_lost_ride() -> void:
+	var drop := global_position + Vector3.UP * 0.4
+	if cart != null:
+		drop = cart.exit_point(1.0 if cart.driver == self else -1.0)
+	exit_ride()
+	stand_at(drop, _yaw)
 
 
 func is_riding() -> bool:
@@ -764,8 +794,9 @@ func _place_in_water(at: Vector3) -> bool:
 
 
 func _move(delta: float) -> void:
-	# Riders are carried by the cart, so they must not steer or fall on their own.
-	if state == State.RIDING:
+	# Riders are carried by the cart. Golfers are planted at address. Either one
+	# calling move_and_slide inside the heightmap is how a seat can freeze.
+	if state == State.RIDING or state == State.GOLFING:
 		return
 	if _fling_left > 0.0:
 		_fling_left = maxf(0.0, _fling_left - delta)

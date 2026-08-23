@@ -65,6 +65,25 @@ func test_local_balls_stay_shared() -> void:
 	assert_true(ball.is_owned_by(pawn))
 
 
+func test_empty_seat_sync_lets_the_rider_walk() -> void:
+	var cart: GolfCart = preload("res://scenes/vehicles/golf_cart.tscn").instantiate()
+	add_child_autofree(cart)
+	var player := _pawn(4, Vector3(1.0, 0.0, 0.0))
+	cart.board(player)
+	assert_true(player.is_riding())
+	cart._replicate_seats(0, 0)
+	assert_false(player.is_riding(), "hopping out has to reach the other machine")
+	assert_eq(player.state, Player.State.NORMAL)
+
+
+func test_a_stranded_rider_can_walk() -> void:
+	var player := _pawn(2, Vector3.ZERO)
+	player.enter_ride()
+	assert_true(player.is_riding())
+	player._physics_process(0.016)
+	assert_false(player.is_riding(), "no cart in the seats means you are on foot")
+
+
 func test_a_client_swing_leaves_the_golfer_on_the_lie() -> void:
 	var ball: GolfBall = preload("res://scenes/golf/ball.tscn").instantiate()
 	add_child_autofree(ball)

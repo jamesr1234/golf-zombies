@@ -284,6 +284,27 @@ func test_a_boost_stripe_hurls_a_player_down_the_lane() -> void:
 	assert_gt(absf(next.z), Player.SPRINT_SPEED)
 
 
+func test_the_drop_off_sits_on_the_ground_not_inside_it() -> void:
+	var cart: GolfCart = preload("res://scenes/vehicles/golf_cart.tscn").instantiate()
+	add_child_autofree(cart)
+	cart.global_position = Vector3(0.0, 0.5, 0.0)
+	var floor := StaticBody3D.new()
+	floor.collision_layer = Layers.WORLD
+	var col := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(30.0, 0.4, 30.0)
+	col.shape = box
+	floor.add_child(col)
+	add_child_autofree(floor)
+	floor.global_position = Vector3(0.0, 3.0, 0.0)
+	await wait_physics_frames(2)
+	var at := cart.exit_point(1.0)
+	assert_almost_eq(
+		at.y, 3.2 + GolfCart.EXIT_LIFT, 0.15,
+		"the bank is higher than the cart; feet have to land on it"
+	)
+
+
 func test_chase_camera_sits_behind_and_above_the_cart() -> void:
 	var origin := Vector3(0.0, 1.0, 0.0)
 	var view := GolfCart.chase_cam(origin, 0.0)

@@ -836,7 +836,13 @@ func test_hopping_out_leaves_you_standing_beside_the_cart() -> void:
 	assert_false(players[0].is_riding())
 	var offset := players[0].global_position - cart.global_position
 	offset.y = 0.0
-	assert_between(offset.length(), 1.0, 3.0, "dropped off clear of the wheels")
+	assert_between(offset.length(), 1.0, 3.2, "dropped off clear of the wheels")
+	var ground := flow.hole.lift(players[0].global_position)
+	assert_gt(
+		players[0].global_position.y, ground.y - 0.05,
+		"hopping out cannot plant you inside the turf"
+	)
+	assert_eq(players[0].collision_layer, Layers.PLAYER, "hopping out puts the capsule back")
 	assert_eq(
 		players[0].body.cabin[0].layers, PlayerBody.WORLD_LAYER,
 		"hopping out puts the whole robot back in their own view"

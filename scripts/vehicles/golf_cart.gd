@@ -25,7 +25,9 @@ const DRIFT_TOP := 6.5
 const DRIFT_MIN_SPEED := 5.5
 const DRIFT_STEER := 0.28
 const BOARD_RANGE := 3.4
-const EXIT_SIDE := 1.7
+const EXIT_SIDE := 2.1
+## Above the turf so the capsule is not planted inside the heightmap.
+const EXIT_LIFT := 0.25
 const FLOOR_SNAP := 0.25
 const FLOOR_MAX_DEG := 50.0
 ## Faster than a crawl, and climbing, before the cart lets go of the ground.
@@ -194,6 +196,7 @@ func _do_board(player: Player) -> void:
 func eject(player: Player) -> void:
 	if NetSession.is_active() and not is_multiplayer_authority():
 		_request_eject.rpc_id(1, player.peer_id)
+		_do_eject(player)
 		return
 	_do_eject(player)
 	_broadcast_seats()
@@ -244,11 +247,16 @@ func try_hijack(attacker: Player) -> bool:
 	return true
 
 
-## Where a rider is dropped off: clear of the wheels on their own side.
+## Where a rider is dropped off: clear of the wheels on their own side, on the
+## turf rather than at the cart's origin, which sits below a bank.
 func exit_point(side: float) -> Vector3:
 	var right := global_transform.basis.x
 	right.y = 0.0
-	return global_position + right.normalized() * side * EXIT_SIDE
+	if right.length_squared() < 0.0001:
+		right = Vector3.RIGHT
+	else:
+		right = right.normalized()
+	return _ground_at(global_position + right * side * EXIT_SIDE)
 
 
 func _physics_process(delta: float) -> void:
@@ -538,6 +546,8 @@ static func crush_damage(speed: float, ram := 1.0) -> float:
 
 
 func _player_by_peer(peer_id: int) -> Player:
+	if peer_id <= 0:
+		return null
 	for node in get_tree().get_nodes_in_group("players"):
 		var player := node as Player
 		if player != null and player.peer_id == peer_id:
@@ -547,6 +557,24 @@ func _player_by_peer(peer_id: int) -> Player:
 
 func _peer_of(player: Player) -> int:
 	return 0 if player == null else player.peer_id
+
+
+func _ground_at(at: Vector3) -> Vector3:
+	var lift := Vector3.UP * EXIT_LIFT
+	if not is_inside_tree() or get_world_3d() == null:
+		return at + lift
+	var space := get_world_3d().direct_space_state
+	if space == null:
+		return at + lift
+	var query := PhysicsRayQueryParameters3D.create(
+		at + Vector3.UP * 8.0, at + Vector3.DOWN * 10.0
+	)
+	query.collision_mask = Layers.WORLD | Layers.PROP
+	query.exclude = [get_rid()]
+	var hit := space.intersect_ray(query)
+	if hit.is_empty():
+		return at + lift
+	return hit.position + lift
 
 
 func _broadcast_seats() -> void:
@@ -576,16 +604,30 @@ func _request_eject(peer_id: int) -> void:
 
 @rpc("authority", "call_remote", "reliable")
 func _replicate_seats(driver_id: int, passenger_id: int) -> void:
-	driver = _player_by_peer(driver_id)
-	passenger = _player_by_peer(passenger_id)
-	if driver != null:
-		driver.cart = self
-		if not driver.is_riding():
-			driver.enter_ride()
-	if passenger != null:
-		passenger.cart = self
-		if not passenger.is_riding():
-			passenger.enter_ride()
+	var next_driver := _player_by_peer(driver_id)
+	var next_passenger := _player_by_peer(passenger_id)
+	if driver != null and driver != next_driver and driver != next_passenger:
+		_drop_rider(driver, 1.0)
+	if passenger != null and passenger != next_driver and passenger != next_passenger:
+		_drop_rider(passenger, -1.0)
+	driver = next_driver
+	passenger = next_passenger
+	_occupy(driver)
+	_occupy(passenger)
+
+
+func _drop_rider(player: Player, side: float) -> void:
+	if player.is_riding():
+		player.exit_ride()
+	player.stand_at(exit_point(side), rad_to_deg(player.rotation.y))
+
+
+func _occupy(player: Player) -> void:
+	if player == null:
+		return
+	player.cart = self
+	if not player.is_riding():
+		player.enter_ride()
 
 
 @rpc("any_peer", "unreliable")
