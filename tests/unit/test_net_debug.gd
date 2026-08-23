@@ -17,6 +17,15 @@ func test_a_long_frame_counts_as_a_spike() -> void:
 	assert_true(body.contains("spikes 1"), body)
 
 
+## Godot counts drawing and the vsync wait inside its process timer, so that
+## number only ever restates the frame time. The card's own time is the one that
+## tells a fill-rate problem from a code one.
+func test_the_overlay_reports_the_card_time_not_the_process_timer() -> void:
+	var body := _overlay().report(0.016)
+	assert_true(body.contains("gpu"), body)
+	assert_false(body.contains("process"), "the process timer cannot separate cpu from gpu")
+
+
 ## A hitch on a steady beat is the signature of something on a timer, so the
 ## readout has to say how long the beat is rather than only that it happened.
 func test_the_overlay_times_the_gap_between_two_hitches() -> void:

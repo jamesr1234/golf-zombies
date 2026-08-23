@@ -10,9 +10,12 @@ extends Label
 ## is dropping frames. If frame time holds and a puppet's STALL climbs instead,
 ## the frames are fine and the snapshots are late.
 ##
-## When frames are slow, PROCESS and PHYSICS say whether gdscript is to blame.
-## A large REST means the time is going to the gpu or the driver instead, and the
-## fix is resolution or shaders rather than code.
+## When frames are slow, GPU is what separates a fill-rate problem from a code
+## one. It is the card's own time on this viewport, so it climbs with resolution
+## and shader cost rather than with how much script is running. RENDER is the cpu
+## side of handing that work over, and PHYSICS is the simulation step. Godot
+## folds drawing and the vsync wait into its process timer, so that number only
+## ever repeats the frame time and is not worth showing.
 ##
 ## A hitch on a steady beat is something on a timer, so HITCH reports the gap
 ## between the last two and how far the node count moved across the bad frame.
@@ -75,10 +78,18 @@ func toggle() -> String:
 	if visible:
 		var body := dump(_last_delta)
 		visible = false
+		_measure(false)
 		return body
 	visible = true
+	_measure(true)
 	reset()
 	return ""
+
+
+## Timing the card costs a little of what it measures, so only ask for it while
+## the overlay is up.
+func _measure(on: bool) -> void:
+	RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), on)
 
 
 func reset() -> void:
@@ -124,17 +135,16 @@ func _track_frame(delta: float) -> bool:
 
 
 func report(delta: float) -> String:
-	var script := Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0
-	var physics := Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0
+	var rid := get_viewport().get_viewport_rid()
 	var view := get_viewport().get_visible_rect().size
 	var lines: PackedStringArray = [
 		"fps %d   frame %.1f ms   worst %.1f ms   spikes %d" % [
 			Engine.get_frames_per_second(), delta * 1000.0, _worst_ms, _spikes
 		],
-		## Script time against the whole frame. If these two are small while frame
-		## is large, the time is going to the gpu or the driver, not to gdscript.
-		"process %.1f ms   physics %.1f ms   rest %.1f ms" % [
-			script, physics, maxf(0.0, delta * 1000.0 - script - physics)
+		"gpu %.1f ms   render %.1f ms   physics %.1f ms" % [
+			RenderingServer.viewport_get_measured_render_time_gpu(rid),
+			RenderingServer.viewport_get_measured_render_time_cpu(rid),
+			Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0,
 		],
 		"draw %d   objects %d   view %dx%d" % [
 			int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)),
