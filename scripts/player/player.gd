@@ -280,6 +280,7 @@ func _tick_watched_combat(delta: float) -> void:
 		melee.tick(delta)
 	if weapon != null:
 		weapon.tick_timers(delta)
+	_tick_hit_flash(delta)
 
 
 ## The stick is in the pawn's own frame, so the walk only goes the right way if

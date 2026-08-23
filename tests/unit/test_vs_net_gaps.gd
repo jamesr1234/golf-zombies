@@ -191,6 +191,14 @@ func test_a_watched_pawn_ticks_combat_clocks() -> void:
 	assert_true(player.melee.is_ready())
 
 
+func test_a_watched_pawn_clears_its_hit_flash() -> void:
+	var player := _remote_pawn()
+	player._start_hit_flash()
+	assert_true(player.is_hit_flashing())
+	player._tick_watched_combat(Player.HIT_FLASH_TIME)
+	assert_false(player.is_hit_flashing())
+
+
 func test_a_replicated_loadout_replaces_the_bag() -> void:
 	var gun := Weapon.new()
 	add_child_autofree(gun)
