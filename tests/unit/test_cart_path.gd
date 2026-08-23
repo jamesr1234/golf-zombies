@@ -391,6 +391,29 @@ func test_the_track_opens_with_a_clubhouse_gate() -> void:
 	assert_gt(_Gate.PILLAR_H, 8.0, "tall enough to read as an entrance")
 
 
+func test_the_tarmac_holds_you_the_whole_way() -> void:
+	var path := _path()
+	await wait_physics_frames(2)
+	_assert_solid_lane(path)
+
+
+func test_a_cheap_online_path_still_holds_you() -> void:
+	var data := HoleGenerator.generate(0, SEED)
+	var hole := HoleBuilder.build(data)
+	add_child_autofree(hole)
+	var along := data.cup - data.tee
+	along.y = 0.0
+	var path := CartPath.build(
+		data.cup, along.normalized(), data.bounds, data.height, hole, data.green_radius,
+		true, true
+	)
+	hole.add_child(path)
+	await wait_physics_frames(2)
+	assert_null(path.find_child("ForestGround", true, false), "cheap woods still skip the heightmap")
+	assert_gt(get_tree().get_nodes_in_group("cart_path_deck").size(), 8)
+	_assert_solid_lane(path)
+
+
 func test_a_joining_client_does_not_plant_the_woods_in_one_shot() -> void:
 	var data := HoleGenerator.generate(0, SEED)
 	var hole := HoleBuilder.build(data)
@@ -419,6 +442,36 @@ func test_a_joining_client_does_not_plant_the_woods_in_one_shot() -> void:
 			_lane_offset(path, tree.global_position), CartPath.PATH_WIDTH * 0.5,
 			"trees stay off the racing line"
 		)
+
+
+func _assert_solid_lane(path: CartPath) -> void:
+	var space := path.get_world_3d().direct_space_state
+	var step := maxi(1, path.centerline.size() / 16)
+	for i in range(0, path.centerline.size(), step):
+		var at: Vector3 = path.centerline[i]
+		var query := PhysicsRayQueryParameters3D.create(
+			at + Vector3.UP * 4.0, at + Vector3.DOWN * 8.0
+		)
+		query.collision_mask = Layers.WORLD
+		var hit := space.intersect_ray(query)
+		assert_false(hit.is_empty(), "the race path has to hold you at metre %d" % i)
+		assert_gt(
+			(hit["position"] as Vector3).y, at.y - 1.0,
+			"the deck cannot sit in a pit under the tarmac"
+		)
+	var mid: Vector3 = path.centerline[path.centerline.size() / 2]
+	var along: Vector3 = path.centerline[path.centerline.size() / 2 + 1] - mid
+	along.y = 0.0
+	var right := along.normalized().cross(Vector3.UP).normalized()
+	var shoulder := mid + right * (CartPath.PATH_WIDTH * 0.35)
+	var side := PhysicsRayQueryParameters3D.create(
+		shoulder + Vector3.UP * 4.0, shoulder + Vector3.DOWN * 8.0
+	)
+	side.collision_mask = Layers.WORLD
+	assert_false(
+		space.intersect_ray(side).is_empty(),
+		"the lane has to be wide enough to stand beside a cart"
+	)
 
 
 func _path() -> CartPath:

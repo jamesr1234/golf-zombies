@@ -217,14 +217,28 @@ func _path_strip(a: Vector3, b: Vector3) -> void:
 	var flat := Vector2(delta.x, delta.z).length()
 	if flat < 0.4:
 		return
+	var yaw := _yaw_along(Vector3(delta.x, 0.0, delta.z))
+	var pitch := -atan2(delta.y, flat)
+	var mid := a.lerp(b, 0.5)
+	# Cheap online woods skip the forest heightmap. The tarmac still has to
+	# hold walkers and carts on every peer, so the deck is a real floor.
+	var deck := MeshFactory.box_body(
+		Vector3(PATH_WIDTH, PATH_THICKNESS, flat + CartPathTrack.JOIN),
+		Palette.CART, Layers.WORLD, false
+	)
+	deck.add_to_group("cart_path_deck")
+	deck.position = mid + Vector3.UP * (0.14 - PATH_THICKNESS * 0.5)
+	deck.rotation.y = yaw
+	deck.rotation.x = pitch
+	add_child(deck)
 	var mesh := MeshFactory.box(
 		Vector3(PATH_WIDTH, 0.14, flat + CartPathTrack.JOIN),
 		Palette.CART, Palette.GLOW_FAINT
 	)
 	MeshFactory.apply_grid(mesh, Surface.LOOK[Surface.Type.FAIRWAY])
-	mesh.position = a.lerp(b, 0.5) + Vector3.UP * 0.07
-	mesh.rotation.y = _yaw_along(Vector3(delta.x, 0.0, delta.z))
-	mesh.rotation.x = -atan2(delta.y, flat)
+	mesh.position = mid + Vector3.UP * 0.07
+	mesh.rotation.y = yaw
+	mesh.rotation.x = pitch
 	add_child(mesh)
 
 
