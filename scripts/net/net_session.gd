@@ -25,6 +25,8 @@ var seats: Dictionary = {}
 var _active := false
 var _hosting := false
 var _connecting := false
+## macOS caffeinate pid. The menu is allowed to nap; a match is not.
+var _hold_pid := -1
 
 
 func is_active() -> bool:
@@ -82,6 +84,51 @@ func color_for(peer_id: int) -> Color:
 
 func is_steam() -> bool:
 	return backend == Backend.STEAM
+
+
+func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
+
+
+## A live match has to keep ticking even when nobody is pressing anything.
+## Computer 2 froze after a stretch of idle input: macOS App Nap (and Godot's
+## menu-time low-processor mode, if it flipped back on) stop _process, so Steam
+## callbacks and the clock die together. Sitting at that machine and playing
+## kept it awake, which is how this showed up.
+func _process(_delta: float) -> void:
+	if _active or _connecting:
+		_set_awake(true)
+
+
+## Headless test runs must not spawn caffeinate. A real Mac window must.
+static func holds_system_awake(os_name: String, display_name: String, on: bool) -> bool:
+	return on and os_name == "macOS" and display_name != "headless"
+
+
+func _set_awake(on: bool) -> void:
+	OS.low_processor_usage_mode = not on
+	DisplayServer.screen_set_keep_on(on)
+	if on:
+		_hold_system()
+	else:
+		_release_system()
+
+
+func _hold_system() -> void:
+	if _hold_pid > 0:
+		return
+	if not holds_system_awake(OS.get_name(), DisplayServer.get_name(), true):
+		return
+	_hold_pid = OS.create_process(
+		"caffeinate", PackedStringArray(["-dimsu", "-w", str(OS.get_process_id())])
+	)
+
+
+func _release_system() -> void:
+	if _hold_pid <= 0:
+		return
+	OS.kill(_hold_pid)
+	_hold_pid = -1
 
 
 ## LAN and solo testing. Steam cannot easily run two clients on one machine.
@@ -196,7 +243,7 @@ func close() -> void:
 	_hosting = false
 	_connecting = false
 	backend = Backend.ENET
-	OS.low_processor_usage_mode = true
+	_set_awake(false)
 	peers_changed.emit()
 
 
@@ -254,7 +301,7 @@ func _bind_peer(peer: MultiplayerPeer, hosting: bool, p_backend: Backend) -> voi
 	_active = hosting
 	_connecting = not hosting
 	backend = p_backend
-	OS.low_processor_usage_mode = false
+	_set_awake(true)
 	get_tree().get_multiplayer().multiplayer_peer = peer
 	multiplayer.peer_connected.connect(_on_peer_connected)
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)

@@ -92,6 +92,21 @@ func test_lan_addresses_skip_loopback() -> void:
 		assert_false(address.contains(":"), address)
 
 
+func test_a_watching_mac_stays_awake_but_headless_does_not() -> void:
+	assert_true(NetSession.holds_system_awake("macOS", "macos", true))
+	assert_false(NetSession.holds_system_awake("macOS", "headless", true), "GUT must not spawn caffeinate")
+	assert_false(NetSession.holds_system_awake("Windows", "windows", true))
+	assert_false(NetSession.holds_system_awake("macOS", "macos", false), "the menu may nap")
+
+
+func test_a_live_session_does_not_sleep() -> void:
+	var err := NetSession.host(FREE_PORT)
+	assert_eq(err, OK)
+	assert_false(OS.low_processor_usage_mode, "Computer 2 froze after a stretch of no input")
+	NetSession.close()
+	assert_true(OS.low_processor_usage_mode, "the title screen can sleep again")
+
+
 func test_a_lan_host_keeps_the_enet_backend() -> void:
 	var err := NetSession.host(FREE_PORT)
 	assert_eq(err, OK, "the LAN path still works alongside Steam")

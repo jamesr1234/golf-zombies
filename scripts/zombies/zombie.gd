@@ -86,6 +86,20 @@ func _ready() -> void:
 	_melee = Melee.new()
 	add_child(_melee)
 	_apply_stats()
+	_park_if_watched()
+
+
+## A watched zombie is a drawing. Sliding its capsule across the heightmap
+## every interpolated frame, and leaving its agent live for a bake it should
+## never have started, is how Computer 2 locked up late in a hole.
+func _park_if_watched() -> void:
+	if NetSession.should_simulate(self):
+		return
+	collision_mask = 0
+	if agent == null:
+		return
+	agent.avoidance_enabled = false
+	agent.process_mode = Node.PROCESS_MODE_DISABLED
 
 
 func _apply_stats() -> void:

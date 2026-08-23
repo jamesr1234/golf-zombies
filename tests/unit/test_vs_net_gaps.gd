@@ -98,6 +98,11 @@ func test_clients_defer_world_shots_to_the_host() -> void:
 	assert_true(NetSession.should_defer_world(true, false), "clients only request")
 
 
+func test_a_watching_peer_does_not_bake_the_hole() -> void:
+	assert_true(HoleBuilder.should_bake(false), "the host and offline both path")
+	assert_false(HoleBuilder.should_bake(true), "Computer 2 does not path zombies")
+
+
 func test_a_live_session_defers_only_when_not_the_server() -> void:
 	assert_false(NetSession.defers_world(), "GUT is offline, so fire stays local")
 	NetSession._active = true
@@ -422,6 +427,18 @@ func test_a_shooter_does_not_replay_its_own_hit_look() -> void:
 	assert_null(skipped, "the peer that already drew the flop must not draw it again")
 	assert_false(zombie.is_flashing())
 	assert_false(zombie.visual.is_limp())
+
+
+func test_a_watched_zombie_does_not_scrape_the_ground() -> void:
+	NetSession._active = true
+	var zombie: Zombie = ZOMBIE.instantiate()
+	zombie.stats = WALKER
+	zombie.set_multiplayer_authority(99)
+	add_child_autofree(zombie)
+	assert_false(NetSession.should_simulate(zombie))
+	assert_eq(zombie.collision_mask, 0, "interpolating must not grind the heightmap")
+	assert_eq(zombie.collision_layer, Layers.ZOMBIE, "bullets still have to find them")
+	assert_eq(zombie.agent.process_mode, Node.PROCESS_MODE_DISABLED)
 
 
 func test_a_client_trace_can_flop_without_scoring() -> void:

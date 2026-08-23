@@ -43,7 +43,17 @@ static func build(data: HoleData) -> Node3D:
 
 ## Baking needs the geometry to be inside the tree, so it happens after the hole
 ## has been added to the world. Threaded, so loading a hole never hitches.
+##
+## Only the peer that paths zombies should bake. Computer 2 does not, and a
+## course-sized threaded bake is what froze it mid-hole: the work finishes
+## whenever it finishes, then the main thread stops to apply the mesh.
+static func should_bake(defers_world: bool) -> bool:
+	return not defers_world
+
+
 static func bake_navigation(root: Node3D) -> void:
+	if root == null or not should_bake(NetSession.defers_world()):
+		return
 	for child in root.get_children():
 		var region := child as NavigationRegion3D
 		if region != null:
