@@ -3,6 +3,8 @@ extends Label
 ## Temporary readout for the online frame-drop hunt. It tells a real render hitch,
 ## where frame time spikes, apart from an interpolation stall, where frames stay on
 ## time but snapshots land late so a puppet parks and then jumps. Toggle with F3.
+## The same lines go to the Output log every two seconds, on a hitch, and once
+## more when you hide the overlay, so you can copy them after the match.
 ##
 ## Reading it: if WORST climbs well past 16 ms when you see the hitch, the client
 ## is dropping frames. If frame time holds and a puppet's STALL climbs instead,
@@ -13,12 +15,16 @@ const SPIKE_MS := 30.0
 ## How long the worst frame stands before it decays, so the number reflects recent
 ## play rather than the whole match.
 const WORST_HOLD := 6.0
+## How often the same lines go to the Output log while the overlay is up.
+const LOG_EVERY := 2.0
 
 var world: Node3D
 
 var _worst_ms := 0.0
 var _worst_left := 0.0
 var _spikes := 0
+var _log_left := 0.0
+var _last_delta := 1.0 / 60.0
 
 
 func _ready() -> void:
@@ -28,35 +34,56 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	_track_frame(delta)
-	if visible:
-		text = HudStyle.chrome(report(delta))
+	_last_delta = delta
+	var spiked := _track_frame(delta)
+	if not visible:
+		return
+	text = HudStyle.chrome(report(delta))
+	_log_left -= delta
+	if spiked or _log_left <= 0.0:
+		dump(delta)
+		_log_left = LOG_EVERY
 
 
 ## Toggling on clears the counters, so a second press is how you start a fresh
-## reading before trying to trigger the hitch again.
-func toggle() -> void:
-	visible = not visible
+## reading before trying to trigger the hitch again. Toggling off dumps one last
+## reading to the Output log so you can copy it after the hitch.
+func toggle() -> String:
 	if visible:
-		reset()
+		var body := dump(_last_delta)
+		visible = false
+		return body
+	visible = true
+	reset()
+	_log_left = 0.0
+	return ""
 
 
 func reset() -> void:
 	_worst_ms = 0.0
 	_worst_left = 0.0
 	_spikes = 0
+	_log_left = 0.0
 	for interp in puppets().values():
 		interp.reset_stats()
 
 
-func _track_frame(delta: float) -> void:
+func dump(delta: float) -> String:
+	var body := report(delta)
+	print("[net-debug]\n%s" % body)
+	return body
+
+
+func _track_frame(delta: float) -> bool:
 	var ms := delta * 1000.0
-	if ms >= SPIKE_MS:
+	var spiked := ms >= SPIKE_MS
+	if spiked:
 		_spikes += 1
 	_worst_left = maxf(0.0, _worst_left - delta)
 	if ms > _worst_ms or _worst_left <= 0.0:
 		_worst_ms = ms
 		_worst_left = WORST_HOLD
+	return spiked
 
 
 func report(delta: float) -> String:
