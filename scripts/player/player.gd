@@ -79,6 +79,7 @@ const CHEER_FOV := 70.0
 @export var sync_firing := false
 @export var sync_reload := 0.0
 @export var sync_scoped := false
+@export var sync_pitch := 0.0
 
 var peer_id := 0
 var net_driven := false
@@ -193,6 +194,7 @@ func _physics_process(delta: float) -> void:
 	sync_firing = weapon.is_firing()
 	sync_reload = weapon.reload_fraction()
 	sync_scoped = weapon.is_scoped()
+	sync_pitch = _pitch
 	_animate(delta)
 
 
@@ -937,6 +939,9 @@ func _apply_replicated_pose() -> void:
 		weapon.apply_replicated_pose(sync_firing, sync_reload, sync_scoped)
 	if _shield != null:
 		_shield.set_raised(state == State.SHIELDING)
+	_pitch = sync_pitch
+	if head != null:
+		head.rotation.x = deg_to_rad(clampf(sync_pitch, -PITCH_LIMIT, PITCH_LIMIT))
 	if health != null and health.is_downed():
 		head.position.y = DOWNED_HEAD_HEIGHT
 	elif is_riding():
@@ -972,6 +977,9 @@ func _animate(delta: float) -> void:
 		body.animate(delta, travel)
 	if not is_celebrating():
 		body.tick_melee(delta)
+	if net_driven and not is_multiplayer_authority() and body != null and body.head != null:
+		if not body.is_limp() and not is_celebrating():
+			body.head.rotation.x = deg_to_rad(clampf(sync_pitch, -PITCH_LIMIT, PITCH_LIMIT))
 	body.hide_cabin_from_driver(cabin_layer(), _hides_own_cabin())
 	var show_gun := (
 		health.is_alive() and state != State.GOLFING and not is_driving()

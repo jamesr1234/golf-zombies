@@ -37,6 +37,7 @@ func test_a_pawn_sync_speaks_for_its_owner() -> void:
 	assert_true(pawn_sync.replication_config.has_property(NodePath(":sync_firing")))
 	assert_true(pawn_sync.replication_config.has_property(NodePath(":sync_reload")))
 	assert_true(pawn_sync.replication_config.has_property(NodePath(":sync_scoped")))
+	assert_true(pawn_sync.replication_config.has_property(NodePath(":sync_pitch")))
 
 
 func test_zombie_and_cart_sync_carry_the_look_flags() -> void:
@@ -152,6 +153,17 @@ func test_a_remote_pawn_shows_the_synced_gun() -> void:
 	player._animate(1.0 / 60.0)
 	assert_true(player._beer.visible)
 	assert_false(player.raygun.visible)
+
+
+func test_a_remote_pawn_looks_up_and_down() -> void:
+	var player := _remote_pawn()
+	player.sync_pitch = 40.0
+	player._animate(1.0 / 60.0)
+	assert_almost_eq(player.head.rotation.x, deg_to_rad(40.0), 0.001)
+	assert_almost_eq(player.body.head.rotation.x, deg_to_rad(40.0), 0.001)
+	player.sync_pitch = -25.0
+	player._animate(1.0 / 60.0)
+	assert_almost_eq(player.head.rotation.x, deg_to_rad(-25.0), 0.001)
 
 
 func test_a_replicated_pose_picks_shield_swim_and_scope() -> void:

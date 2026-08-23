@@ -38,6 +38,7 @@ static func attach_pawn(node: Node, authority := 1) -> MultiplayerSynchronizer:
 		":position", ":rotation", ":sync_pace", ":aiming",
 		":sync_gun", ":holding_beer",
 		":sync_state", ":sync_dive", ":sync_firing", ":sync_reload", ":sync_scoped",
+		":sync_pitch",
 	]), PAWN_HZ, authority)
 
 
