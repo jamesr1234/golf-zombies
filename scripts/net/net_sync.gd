@@ -15,6 +15,15 @@ const ZOMBIE_HZ := 0.045
 ## Two ticks, 30 Hz. Carts cover ground fast enough that a missed send shows.
 const CART_HZ := 0.03
 
+## How far behind the newest snapshot a watched puppet is drawn, so a clump of
+## late packets still has one queued ahead of it. Measured wifi jitter reaches
+## roughly this far, and a queue shorter than the jitter runs dry.
+##
+## Only pawns and carts pay it. Zombies are what you shoot, the host scores shots
+## against where they really are, and drawing them a tenth of a second behind
+## would just make you miss. Nothing you aim at is buffered.
+const WATCH_DELAY := 0.1
+
 
 static func attach(
 	node: Node, paths: PackedStringArray, interval := PAWN_HZ, authority := -1

@@ -1,85 +1,92 @@
 class_name NetInterp
 extends RefCounted
-## Glides a puppet toward replicated snapshots. The glide runs over the measured
-## gap between arrivals rather than the nominal send rate, so a packet that
-## lands late stretches the run instead of parking the puppet on its last pose.
+## Draws a puppet a fixed step behind the newest snapshot, interpolating between
+## the two that bracket that moment.
+##
+## Holding the stream back is what absorbs jitter. Measured wifi jitter runs to
+## a hundred milliseconds, wider than the gap between sends, so packets arrive in
+## clumps rather than evenly. A puppet that chases the newest one runs out of
+## road during a clump, parks on its last pose, and jumps when the next arrives.
+## With a queue in hand it always has somewhere to go, and the delay a viewer
+## sees stops varying, which is the part the eye reads as a hitch.
+##
+## The delay is only ever as long as its owner asks for. Things you watch are
+## worth a real buffer; things you shoot are not, because the host scores shots
+## against live positions and drawing them late only makes you miss.
 
+## Past this the snapshot is a spawn or a seat change rather than a move, and
+## sliding across it would draw the puppet through the world.
 const SNAP_METERS := 4.0
-## Run a little past the measured gap so the next snapshot lands mid-glide
-## instead of after a stall. The cost is a few ms of extra visual lag.
-const STRETCH := 1.15
-## How much of a fresh measurement to fold in, so one jittery packet cannot
-## swing the window.
-const WINDOW_EASE := 0.25
-const WINDOW_MIN_SCALE := 0.5
-## Measured LAN gaps reach roughly seven times the send interval on a bad packet,
-## and a window shorter than that parks the puppet until the next one lands. The
-## ceiling only costs lag when the gaps are really that wide, because the window
-## eases toward what it measures rather than sitting at the limit.
-const WINDOW_MAX_SCALE := 7.0
 ## A puppet that moved less than this between snapshots was standing still, so
 ## the gap that preceded it says nothing about the connection.
 const STALL_METERS := 0.05
-## A 30 Hz stream read on a 60 Hz frame lands a whole frame late whenever the two
-## beats drift apart, which is often. The puppet parks for less than one
-## displayed frame, which nobody can see, so counting it buries the real stalls.
-const FRAME_GRACE := 1.0 / 60.0
 ## How long the worst gap stands before recent play can replace it. Without this
 ## a single hiccup while the match was still settling reads as the state of the
 ## connection for the rest of the round.
 const WORST_HOLD := 6.0
 
 var nominal := 0.05
-var window := 0.05
-var from := Transform3D.IDENTITY
-var to := Transform3D.IDENTITY
-var age := 0.0
-var _live := false
+var delay := 0.05
 
-## Read by the debug overlay. The glide never reads these back.
+## Read by the debug overlay. The draw never reads these back.
 var last_gap := 0.0
 var worst_gap := 0.0
 var arrivals := 0
-## Moving snapshots that landed after the glide had already finished, which is
-## the park-then-jump the eye reads as a dropped frame.
+## Snapshots that landed after the buffer had already run dry, which is the
+## park-then-jump the eye reads as a dropped frame.
 var stalls := 0
 var snaps := 0
+
+var _times: Array[float] = []
+var _poses: Array[Transform3D] = []
+var _clock := 0.0
+var _last_arrival := 0.0
+var _starved := false
 var _worst_left := 0.0
+var _live := false
 
 
-## A fresh snapshot. `age` still holds the real gap since the last one, which is
-## what the next glide runs over. It is clamped because a puppet that holds
-## still stops reporting, and that silence must not slow its next move.
-func arrive(target: Transform3D, current: Transform3D) -> void:
-	if not _live or current.origin.distance_to(target.origin) > SNAP_METERS:
+## A fresh snapshot joins the back of the queue. Distance is measured against the
+## newest snapshot rather than the drawn pose, because the drawn pose is
+## deliberately behind and a fast cart would otherwise read as a teleport.
+func arrive(target: Transform3D) -> void:
+	if not _live or _newest().origin.distance_to(target.origin) > SNAP_METERS:
 		if _live:
 			snaps += 1
-		from = target
-		to = target
-		window = nominal
-		age = window
-		_live = true
+		_restart_at(target)
 		return
-	_record(current.origin.distance_to(target.origin))
-	var measured := clampf(age, nominal * WINDOW_MIN_SCALE, nominal * WINDOW_MAX_SCALE)
-	window = lerpf(window, measured, WINDOW_EASE)
-	from = current
-	to = target
-	age = 0.0
+	_record(_newest().origin.distance_to(target.origin))
+	_times.append(_clock)
+	_poses.append(target)
+	_last_arrival = _clock
 
 
-## Called before the window and age are rolled forward, so `age` is still the gap
-## this snapshot arrived on and `window` is still the glide it had to beat.
 func _record(moved: float) -> void:
+	var was_starved := _starved
+	_starved = false
 	if moved <= STALL_METERS:
 		return
 	arrivals += 1
-	last_gap = age
-	if age > worst_gap or _worst_left <= 0.0:
-		worst_gap = age
+	last_gap = _clock - _last_arrival
+	if last_gap > worst_gap or _worst_left <= 0.0:
+		worst_gap = last_gap
 		_worst_left = WORST_HOLD
-	if age > window * STRETCH + FRAME_GRACE:
+	if was_starved:
 		stalls += 1
+
+
+## A spawn or a seat change has no history worth keeping. Backdating the one
+## snapshot by the delay puts the puppet on it now instead of easing toward it.
+func _restart_at(pose: Transform3D) -> void:
+	_times = [_clock - delay]
+	_poses = [pose]
+	_last_arrival = _clock
+	_starved = false
+	_live = true
+
+
+func _newest() -> Transform3D:
+	return _poses[_poses.size() - 1] if not _poses.is_empty() else Transform3D.IDENTITY
 
 
 func stall_percent() -> float:
@@ -98,18 +105,42 @@ func reset_stats() -> void:
 
 
 func sample(delta: float) -> Transform3D:
-	age += delta
+	_clock += delta
 	_worst_left = maxf(0.0, _worst_left - delta)
-	var span := window * STRETCH
-	if span <= 0.0:
-		return to
-	return from.interpolate_with(to, clampf(age / span, 0.0, 1.0))
+	if _poses.is_empty():
+		return Transform3D.IDENTITY
+	var at := _clock - delay
+	_drop_spent(at)
+	var newest := _poses.size() - 1
+	if at >= _times[newest]:
+		# One snapshot is the seeded state, not a queue that ran dry. There has
+		# to have been a pair to work through before running out means anything.
+		_starved = newest > 0
+		return _poses[newest]
+	if at <= _times[0]:
+		return _poses[0]
+	var span := _times[1] - _times[0]
+	var reached := 1.0 if span <= 0.0 else (at - _times[0]) / span
+	return _poses[0].interpolate_with(_poses[1], clampf(reached, 0.0, 1.0))
 
 
-## Entities call this every rendered frame. The target check is a fallback for
-## a snapshot that arrived without the property setter firing.
-func follow(node: Node3D, target: Transform3D, delta: float, p_interval: float) -> void:
+## Everything older than the moment being drawn is spent, bar the one on its near
+## side, which is still half of the pair being interpolated.
+func _drop_spent(at: float) -> void:
+	while _poses.size() > 2 and _times[1] <= at:
+		_times.remove_at(0)
+		_poses.remove_at(0)
+
+
+## Entities call this every rendered frame. The target check is a fallback for a
+## snapshot that arrived without the property setter firing.
+func follow(
+	node: Node3D, target: Transform3D, delta: float, p_interval: float, p_delay := 0.0
+) -> void:
 	nominal = p_interval
-	if not _live or not target.is_equal_approx(to):
-		arrive(target, node.global_transform)
+	# There is nothing to draw from between two snapshots that have not both
+	# arrived, so the queue is never shorter than the gap between sends.
+	delay = maxf(p_delay, p_interval)
+	if not _live or not target.is_equal_approx(_newest()):
+		arrive(target)
 	node.global_transform = sample(delta)

@@ -68,7 +68,7 @@ var drive_speed := 0.0
 	set(value):
 		sync_xform = value
 		if is_inside_tree() and not NetSession.should_simulate(self):
-			_net_interp.arrive(value, global_transform)
+			_net_interp.arrive(value)
 var _net_interp := NetInterp.new()
 ## 1 while drifting, then falls to 0 over DRIFT_RECOVER after you let go.
 var _drift := 0.0
@@ -279,7 +279,7 @@ func _physics_process(delta: float) -> void:
 ## to be re-seated afterwards or they would trail a frame behind the seat.
 func _process(delta: float) -> void:
 	if not NetSession.should_simulate(self):
-		_net_interp.follow(self, sync_xform, delta, NetSync.CART_HZ)
+		_net_interp.follow(self, sync_xform, delta, NetSync.CART_HZ, NetSync.WATCH_DELAY)
 		_seat_riders()
 
 

@@ -1,15 +1,22 @@
 extends GutTest
-## Client visual interpolation: glide across the measured gap between snapshots
-## rather than the nominal send rate, and snap teleports.
+## Client visual interpolation: hold arriving snapshots and draw the puppet a
+## fixed step behind the newest one, so a clump of late packets still has
+## something queued to move across. Teleports skip the queue.
 
 const NOMINAL := 0.05
+const DELAY := 0.1
 
 
-func _started(nominal := NOMINAL) -> NetInterp:
+func _started() -> NetInterp:
 	var interp := NetInterp.new()
-	interp.nominal = nominal
-	interp.arrive(Transform3D.IDENTITY, Transform3D.IDENTITY)
+	interp.nominal = NOMINAL
+	interp.delay = DELAY
+	interp.arrive(Transform3D.IDENTITY)
 	return interp
+
+
+func _at(x: float) -> Transform3D:
+	return Transform3D(Basis(), Vector3(x, 0.0, 0.0))
 
 
 func _step(interp: NetInterp, seconds: float, step := 1.0 / 60.0) -> Transform3D:
@@ -21,159 +28,149 @@ func _step(interp: NetInterp, seconds: float, step := 1.0 / 60.0) -> Transform3D
 	return pose
 
 
-func test_a_glide_outlasts_the_gap_so_the_puppet_never_parks() -> void:
-	var interp := _started()
-	interp.arrive(Transform3D(Basis(), Vector3(2.0, 0.0, 0.0)), Transform3D.IDENTITY)
-	var at_gap := interp.sample(NOMINAL)
-	assert_lt(
-		at_gap.origin.x, 2.0,
-		"still moving when the next snapshot is due, instead of sitting frozen"
-	)
-	var done := interp.sample(NOMINAL * NetInterp.STRETCH)
-	assert_almost_eq(done.origin.x, 2.0, 0.01, "it still lands on the snapshot")
-
-
-func test_a_late_arrival_stretches_the_next_glide() -> void:
-	var interp := _started()
-	var late := NOMINAL * 1.6
-	var x := 0.0
-	for i in 12:
+## Feed snapshots at the send rate for a while, so the queue is in the steady
+## state a match actually runs in rather than the one it starts in.
+func _stream(interp: NetInterp, from_x: float, count: int, every := NOMINAL) -> float:
+	var x := from_x
+	for _i in count:
+		_step(interp, every)
 		x += 1.0
-		interp.arrive(Transform3D(Basis(), Vector3(x, 0.0, 0.0)), interp.sample(0.0))
-		_step(interp, late)
-	assert_gt(
-		interp.window, NOMINAL * 1.2,
-		"a peer that keeps arriving late should be given a longer glide"
-	)
-	assert_lt(interp.window, late * 1.1, "but not longer than the gap it measured")
+		interp.arrive(_at(x))
+	return x
 
 
-func test_a_long_silence_does_not_slow_the_next_move() -> void:
+func test_the_puppet_is_drawn_behind_the_newest_snapshot() -> void:
 	var interp := _started()
-	interp.arrive(Transform3D(Basis(), Vector3(1.0, 0.0, 0.0)), Transform3D.IDENTITY)
-	_step(interp, 2.0)
-	interp.arrive(Transform3D(Basis(), Vector3(2.0, 0.0, 0.0)), interp.sample(0.0))
-	assert_lte(
-		interp.window, NOMINAL * NetInterp.WINDOW_MAX_SCALE,
-		"a puppet that held still must not crawl when it moves again"
+	var x := _stream(interp, 0.0, 8)
+	var drawn := interp.sample(0.0).origin.x
+	assert_lt(drawn, x, "it is deliberately behind the newest pose")
+	assert_almost_eq(
+		drawn, x - DELAY / NOMINAL, 0.35,
+		"by the delay, which at this send rate is two snapshots back"
 	)
-	var done := interp.sample(NOMINAL * NetInterp.WINDOW_MAX_SCALE * NetInterp.STRETCH)
-	assert_almost_eq(done.origin.x, 2.0, 0.01)
+
+
+func test_a_clump_of_late_packets_keeps_the_puppet_moving() -> void:
+	var interp := _started()
+	var x := _stream(interp, 0.0, 8)
+	# Nothing arrives for two send intervals, the shape jitter takes on the wire.
+	var before := interp.sample(0.0).origin.x
+	var during := _step(interp, NOMINAL * 2.0).origin.x
+	assert_gt(during, before, "the queue carried it through the silence")
+	assert_lte(during, x, "without running past what it was told")
+
+
+func test_the_puppet_parks_only_once_the_queue_is_spent() -> void:
+	var interp := _started()
+	_stream(interp, 0.0, 8)
+	var run_dry := _step(interp, DELAY + NOMINAL * 3.0)
+	var still := _step(interp, NOMINAL * 2.0)
+	assert_almost_eq(still.origin.x, run_dry.origin.x, 0.001, "nothing left to draw from")
+
+
+func test_a_snapshot_after_the_queue_ran_dry_counts_a_stall() -> void:
+	var interp := _started()
+	var x := _stream(interp, 0.0, 8)
+	assert_eq(interp.stalls, 0, "a stream arriving on time never parks")
+	_step(interp, DELAY + NOMINAL * 4.0)
+	interp.arrive(_at(x + 1.0))
+	assert_eq(interp.stalls, 1, "the puppet sat on its last pose before this one landed")
+	assert_gt(interp.worst_gap, NOMINAL * 3.0, "the gap it waited out is reported")
+
+
+func test_a_steady_stream_reports_no_stalls() -> void:
+	var interp := _started()
+	_stream(interp, 0.0, 40)
+	assert_gt(interp.arrivals, 30, "the moves were counted")
+	assert_eq(interp.stalls, 0, "a link this clean has nothing to report")
+	assert_eq(interp.stall_percent(), 0.0)
 
 
 func test_a_large_jump_snaps() -> void:
 	var interp := _started()
-	var far := Transform3D(Basis(), Vector3(20.0, 0.0, 0.0))
-	interp.arrive(far, Transform3D.IDENTITY)
-	var now := interp.sample(0.0)
-	assert_almost_eq(now.origin.x, 20.0, 0.01, "a spawn or seat change must not slide")
+	interp.arrive(_at(20.0))
+	assert_almost_eq(
+		interp.sample(0.0).origin.x, 20.0, 0.01, "a spawn or seat change must not slide"
+	)
 
 
-func test_a_mid_glide_update_starts_from_the_current_pose() -> void:
+func test_a_teleport_counts_as_a_snap_not_a_stall() -> void:
 	var interp := _started()
-	interp.arrive(Transform3D(Basis(), Vector3(2.0, 0.0, 0.0)), Transform3D.IDENTITY)
-	var mid := interp.sample(0.025)
-	interp.arrive(Transform3D(Basis(), Vector3(2.0, 0.0, 2.0)), mid)
-	var again := interp.sample(0.0)
-	assert_almost_eq(again.origin.x, mid.origin.x, 0.01)
-	assert_almost_eq(again.origin.z, 0.0, 0.01)
-	var end := interp.sample(NOMINAL * NetInterp.STRETCH)
-	assert_almost_eq(end.origin.z, 2.0, 0.01)
+	interp.arrive(_at(20.0))
+	assert_eq(interp.snaps, 1, "a spawn or seat change is reported on its own")
+	assert_eq(interp.stalls, 0, "and never blamed on the connection")
+
+
+## The drawn pose trails the newest snapshot on purpose, so measuring a teleport
+## against it would read a fast cart as one and snap every frame.
+func test_a_fast_mover_is_not_mistaken_for_a_teleport() -> void:
+	var interp := _started()
+	var x := 0.0
+	for _i in 20:
+		_step(interp, NOMINAL)
+		x += 1.5
+		interp.arrive(_at(x))
+	assert_eq(interp.snaps, 0, "steady ground covered at speed is still just moving")
+
+
+func test_a_puppet_standing_still_reports_no_gap() -> void:
+	var interp := _started()
+	for _i in 20:
+		_step(interp, NOMINAL)
+		interp.arrive(Transform3D.IDENTITY)
+	assert_eq(interp.arrivals, 0, "silence from a parked puppet is not a late packet")
+	assert_eq(interp.stalls, 0)
+	assert_eq(interp.worst_gap, 0.0)
+
+
+func test_the_worst_gap_fades_so_one_bad_moment_does_not_stand_all_match() -> void:
+	var interp := _started()
+	var x := _stream(interp, 0.0, 4)
+	_step(interp, NOMINAL * 5.0)
+	x += 1.0
+	interp.arrive(_at(x))
+	var bad := interp.worst_gap
+	assert_gt(bad, NOMINAL * 4.0, "the hiccup is on the board")
+	_stream(interp, x, int(NetInterp.WORST_HOLD / NOMINAL) + 2)
+	assert_lt(interp.worst_gap, bad, "a clean run since then takes it back down")
+
+
+func test_reset_stats_clears_the_readout_without_disturbing_the_draw() -> void:
+	var interp := _started()
+	var x := _stream(interp, 0.0, 8)
+	var drawn := interp.sample(0.0)
+	interp.reset_stats()
+	assert_eq(interp.arrivals, 0)
+	assert_eq(interp.worst_gap, 0.0)
+	assert_eq(interp.stall_percent(), 0.0)
+	assert_almost_eq(interp.sample(0.0).origin.x, drawn.origin.x, 0.01, "still mid draw")
+	_step(interp, DELAY + NOMINAL * 3.0)
+	assert_almost_eq(interp.sample(0.0).origin.x, x, 0.01, "and still reaches its snapshot")
 
 
 func test_follow_writes_the_sampled_pose() -> void:
 	var node := Node3D.new()
 	add_child_autofree(node)
 	var interp := NetInterp.new()
-	interp.follow(node, Transform3D.IDENTITY, 0.0, NOMINAL)
-	var dest := Transform3D(Basis(), Vector3(2.0, 0.0, 0.0))
-	interp.follow(node, dest, NOMINAL * NetInterp.STRETCH, NOMINAL)
+	interp.follow(node, Transform3D.IDENTITY, 0.0, NOMINAL, DELAY)
+	interp.follow(node, _at(2.0), DELAY + NOMINAL, NOMINAL, DELAY)
 	assert_almost_eq(node.global_position.x, 2.0, 0.01)
 
 
-func test_a_snapshot_that_lands_mid_glide_is_not_a_stall() -> void:
-	var interp := _started()
-	interp.arrive(Transform3D(Basis(), Vector3(1.0, 0.0, 0.0)), Transform3D.IDENTITY)
-	var mid := _step(interp, NOMINAL * 0.5)
-	interp.arrive(Transform3D(Basis(), Vector3(2.0, 0.0, 0.0)), mid)
-	assert_eq(interp.arrivals, 2, "both moves counted")
-	assert_eq(interp.stalls, 0, "arriving while the puppet is still gliding is on time")
-
-
-func test_a_snapshot_that_lands_after_the_glide_counts_a_stall() -> void:
-	var interp := _started()
-	interp.arrive(Transform3D(Basis(), Vector3(1.0, 0.0, 0.0)), Transform3D.IDENTITY)
-	var parked := _step(interp, NOMINAL * 4.0)
-	interp.arrive(Transform3D(Basis(), Vector3(2.0, 0.0, 0.0)), parked)
-	assert_eq(interp.stalls, 1, "the puppet sat on its last pose before this one landed")
-	assert_almost_eq(interp.stall_percent(), 50.0, 0.01, "one of the two moves stalled")
-	assert_gt(interp.worst_gap, NOMINAL * 3.0, "the gap it waited out is reported")
-
-
-## Sending at 30 Hz and reading at 60 Hz means the beats slip a whole frame
-## regularly. That slip was being counted, so a healthy connection reported a
-## double digit stall rate and the real stalls had nothing to stand out against.
-func test_a_gap_that_slips_one_render_frame_is_not_a_stall() -> void:
-	var interp := _started()
-	interp.arrive(Transform3D(Basis(), Vector3(1.0, 0.0, 0.0)), Transform3D.IDENTITY)
-	var slipped := _step(interp, NOMINAL * NetInterp.STRETCH + NetInterp.FRAME_GRACE * 0.5)
-	interp.arrive(Transform3D(Basis(), Vector3(2.0, 0.0, 0.0)), slipped)
-	assert_eq(interp.arrivals, 2, "both moves counted")
-	assert_gt(interp.last_gap, NOMINAL * NetInterp.STRETCH, "it did land past the glide")
-	assert_eq(interp.stalls, 0, "but by less than a frame, which nobody can see")
-
-
-func test_the_worst_gap_fades_so_one_bad_moment_does_not_stand_all_match() -> void:
-	var interp := _started()
-	interp.arrive(Transform3D(Basis(), Vector3(1.0, 0.0, 0.0)), Transform3D.IDENTITY)
-	_step(interp, NOMINAL * 4.0)
-	var x := 2.0
-	interp.arrive(Transform3D(Basis(), Vector3(x, 0.0, 0.0)), interp.sample(0.0))
-	var bad := interp.worst_gap
-	assert_gt(bad, NOMINAL * 3.0, "the hiccup is on the board")
-	var elapsed := 0.0
-	while elapsed < NetInterp.WORST_HOLD + NOMINAL:
-		_step(interp, NOMINAL)
-		x += 1.0
-		interp.arrive(Transform3D(Basis(), Vector3(x, 0.0, 0.0)), interp.sample(0.0))
-		elapsed += NOMINAL
-	assert_lt(interp.worst_gap, bad, "a clean run since then takes it back down")
-
-
-func test_a_puppet_standing_still_reports_no_gap() -> void:
-	var interp := _started()
-	_step(interp, 3.0)
-	interp.arrive(Transform3D.IDENTITY, Transform3D.IDENTITY)
-	assert_eq(interp.arrivals, 0, "silence from a parked puppet is not a late packet")
-	assert_eq(interp.stalls, 0)
-	assert_eq(interp.worst_gap, 0.0)
-
-
-func test_a_teleport_counts_as_a_snap_not_a_stall() -> void:
-	var interp := _started()
-	interp.arrive(Transform3D(Basis(), Vector3(20.0, 0.0, 0.0)), Transform3D.IDENTITY)
-	assert_eq(interp.snaps, 1, "a spawn or seat change is reported on its own")
-	assert_eq(interp.stalls, 0, "and never blamed on the connection")
-
-
-func test_reset_stats_clears_the_readout_without_disturbing_the_glide() -> void:
-	var interp := _started()
-	interp.arrive(Transform3D(Basis(), Vector3(1.0, 0.0, 0.0)), Transform3D.IDENTITY)
-	_step(interp, NOMINAL * 4.0)
-	interp.arrive(Transform3D(Basis(), Vector3(2.0, 0.0, 0.0)), interp.sample(0.0))
-	interp.reset_stats()
-	assert_eq(interp.stalls, 0)
-	assert_eq(interp.arrivals, 0)
-	assert_eq(interp.worst_gap, 0.0)
-	assert_eq(interp.stall_percent(), 0.0)
-	var done := interp.sample(NOMINAL * NetInterp.WINDOW_MAX_SCALE * NetInterp.STRETCH)
-	assert_almost_eq(done.origin.x, 2.0, 0.01, "the puppet still reaches its snapshot")
+## Nothing can be drawn between two snapshots until both have arrived, so asking
+## for less delay than the send rate cannot be honoured.
+func test_the_queue_is_never_shorter_than_the_gap_between_sends() -> void:
+	var node := Node3D.new()
+	add_child_autofree(node)
+	var interp := NetInterp.new()
+	interp.follow(node, Transform3D.IDENTITY, 0.0, NOMINAL, 0.0)
+	assert_eq(interp.delay, NOMINAL)
 
 
 func test_follow_still_catches_a_snapshot_that_skipped_the_setter() -> void:
 	var node := Node3D.new()
 	add_child_autofree(node)
 	var interp := NetInterp.new()
-	interp.follow(node, Transform3D.IDENTITY, 0.0, NOMINAL)
-	interp.follow(node, Transform3D(Basis(), Vector3(1.0, 0.0, 0.0)), 0.0, NOMINAL)
-	assert_almost_eq(interp.to.origin.x, 1.0, 0.01)
+	interp.follow(node, Transform3D.IDENTITY, 0.0, NOMINAL, DELAY)
+	interp.follow(node, _at(1.0), 0.0, NOMINAL, DELAY)
+	assert_eq(interp.arrivals, 1, "the snapshot was picked up without the setter")

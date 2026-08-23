@@ -47,7 +47,7 @@ var move_speed := 3.4
 	set(value):
 		sync_xform = value
 		if is_inside_tree() and not NetSession.should_simulate(self):
-			_net_interp.arrive(value, global_transform)
+			_net_interp.arrive(value)
 var last_hit_by: Player
 var _net_interp := NetInterp.new()
 

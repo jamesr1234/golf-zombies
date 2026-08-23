@@ -32,7 +32,7 @@ var owner_peer := 0
 	set(value):
 		sync_xform = value
 		if is_inside_tree() and not NetSession.should_simulate(self):
-			_net_interp.arrive(value, global_transform)
+			_net_interp.arrive(value)
 var _net_interp := NetInterp.new()
 
 ## Multiset of overlapping Surface.Type patches; the highest priority is the lie.

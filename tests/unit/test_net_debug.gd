@@ -88,13 +88,11 @@ func test_the_link_reads_idle_when_there_is_no_one_on_the_other_end() -> void:
 func test_line_for_a_puppet_reports_gap_and_stall() -> void:
 	var interp := NetInterp.new()
 	interp.nominal = 0.05
-	interp.arrive(Transform3D.IDENTITY, Transform3D.IDENTITY)
-	interp.arrive(Transform3D(Basis(), Vector3(1.0, 0.0, 0.0)), Transform3D.IDENTITY)
-	interp.sample(0.2)
-	interp.arrive(
-		Transform3D(Basis(), Vector3(2.0, 0.0, 0.0)),
-		Transform3D(Basis(), Vector3(1.0, 0.0, 0.0))
-	)
+	interp.arrive(Transform3D.IDENTITY)
+	interp.sample(0.05)
+	interp.arrive(Transform3D(Basis(), Vector3(1.0, 0.0, 0.0)))
+	interp.sample(0.4)
+	interp.arrive(Transform3D(Basis(), Vector3(2.0, 0.0, 0.0)))
 	var line := NetDebug.line_for("p2", interp)
 	assert_true(line.contains("p2"), line)
 	assert_true(line.contains("stall"), line)

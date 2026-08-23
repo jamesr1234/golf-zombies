@@ -92,7 +92,7 @@ const REMOTE_POSE_EASE := 18.0
 	set(value):
 		sync_xform = value
 		if is_inside_tree() and not NetSession.should_simulate(self) and not carried_by_cart():
-			_net_interp.arrive(value, global_transform)
+			_net_interp.arrive(value)
 
 var peer_id := 0
 var net_driven := false
@@ -229,7 +229,7 @@ func _physics_process(delta: float) -> void:
 func _process(delta: float) -> void:
 	if not NetSession.should_simulate(self):
 		if not carried_by_cart():
-			_net_interp.follow(self, sync_xform, delta, NetSync.PAWN_HZ)
+			_net_interp.follow(self, sync_xform, delta, NetSync.PAWN_HZ, NetSync.WATCH_DELAY)
 		_animate(delta)
 
 

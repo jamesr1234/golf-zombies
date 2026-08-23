@@ -35,7 +35,7 @@ var drive_speed := 0.0
 	set(value):
 		sync_xform = value
 		if is_inside_tree() and not NetSession.should_simulate(self):
-			_net_interp.arrive(value, global_transform)
+			_net_interp.arrive(value)
 var _net_interp := NetInterp.new()
 
 var _lid: Node3D
