@@ -72,6 +72,41 @@ func test_four_carts_park_two_on_each_side_of_the_tee() -> void:
 	assert_almost_eq(left[1], -right[1], 0.001)
 
 
+func test_named_carts_keep_the_same_slots_on_both_peers() -> void:
+	assert_eq(VsCourse.cart_slot(null, 3), 3)
+	var cart := GolfCart.new()
+	cart.name = "Cart2"
+	assert_eq(VsCourse.cart_slot(cart, 0), 2)
+	assert_gt(VsCourse.cart_offset(2), 0.0, "Cart2 is a right-side slot")
+	assert_lt(VsCourse.cart_offset(0), 0.0, "Cart0 is a left-side slot")
+	cart.free()
+
+
+func test_named_carts_park_the_same_way_in_any_order() -> void:
+	var course := VsCourse.new()
+	course.hole = HoleGenerator.generate(0, 20260816)
+	var carts: Array[GolfCart] = []
+	for i in 4:
+		var cart := GolfCart.new()
+		cart.name = "Cart%d" % i
+		carts.append(cart)
+	carts.reverse()
+	course.place_carts(carts)
+	var lateral := course.along_hole().cross(Vector3.UP).normalized()
+	var by_name := {}
+	for cart in carts:
+		var offset := cart.position - course.hole.tee
+		offset.y = 0.0
+		by_name[String(cart.name)] = offset.dot(lateral)
+	assert_lt(by_name["Cart0"], 0.0)
+	assert_lt(by_name["Cart1"], 0.0)
+	assert_gt(by_name["Cart2"], 0.0)
+	assert_gt(by_name["Cart3"], 0.0)
+	for cart in carts:
+		cart.free()
+	course.free()
+
+
 func test_placed_carts_sit_beside_the_tee_not_on_it() -> void:
 	var course := VsCourse.new()
 	course.hole = HoleGenerator.generate(0, 20260816)

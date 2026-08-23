@@ -31,6 +31,8 @@ const GIRL_COLOR := Palette.HOT_PINK
 var drive_speed := 0.0
 @export var visit := Visit.WAITING
 @export var tending := false
+@export var sync_xform := Transform3D.IDENTITY
+var _net_interp := NetInterp.new()
 
 var _lid: Node3D
 var _wheel: SteeringWheel
@@ -284,6 +286,12 @@ func _physics_process(delta: float) -> void:
 		return
 	_drive(delta)
 	_animate(delta)
+	sync_xform = global_transform
+
+
+func _process(delta: float) -> void:
+	if not NetSession.should_simulate(self):
+		_net_interp.follow(self, sync_xform, delta, NetSync.CART_HZ)
 
 
 func _apply_replicated() -> void:

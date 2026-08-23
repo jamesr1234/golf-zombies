@@ -73,6 +73,7 @@ func bind_spawned() -> void:
 			_carts.append(node)
 			node.set_multiplayer_authority(1)
 			NetSync.attach_cart(node)
+	_carts.sort_custom(func(a, b): return String(a.name) < String(b.name))
 	_wire_players()
 
 
@@ -90,8 +91,10 @@ func start_hole(index: int) -> void:
 	for card in _scores.values():
 		(card as PlayerScore).advance_to(index)
 	_sync_local_score()
+	## Scene-baked carts exist on every peer. Park them here so a joiner sees
+	## the same 2+2 layout instead of four carts stacked at the origin.
+	course.place_carts(_carts)
 	if multiplayer.is_server():
-		course.place_carts(_carts)
 		course.place_balls(_balls)
 	## Each pawn is owned by its peer, so the host's spawn_at is overwritten by
 	## the joiner's default origin unless that joiner plants itself too.

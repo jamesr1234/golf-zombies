@@ -85,9 +85,11 @@ const SAFE_MARGIN := 0.04
 @export var sync_reload := 0.0
 @export var sync_scoped := false
 @export var sync_pitch := 0.0
+@export var sync_xform := Transform3D.IDENTITY
 
 var peer_id := 0
 var net_driven := false
+var _net_interp := NetInterp.new()
 var score
 
 var input: PlayerInput
@@ -209,7 +211,13 @@ func _physics_process(delta: float) -> void:
 	sync_reload = weapon.reload_fraction()
 	sync_scoped = weapon.is_scoped()
 	sync_pitch = _pitch
+	sync_xform = global_transform
 	_animate(delta)
+
+
+func _process(delta: float) -> void:
+	if not NetSession.should_simulate(self):
+		_net_interp.follow(self, sync_xform, delta, NetSync.PAWN_HZ)
 
 
 func is_golfing() -> bool:

@@ -28,6 +28,8 @@ var bounds := Rect2(-500.0, -500.0, 1000.0, 1000.0)
 var last_safe_position := Vector3.ZERO
 ## 0 means anyone can play it (local co-op). Online VS sets the owning peer.
 var owner_peer := 0
+@export var sync_xform := Transform3D.IDENTITY
+var _net_interp := NetInterp.new()
 
 ## Multiset of overlapping Surface.Type patches; the highest priority is the lie.
 var _surfaces: Array = []
@@ -309,34 +311,38 @@ func toss(origin: Vector3, velocity: Vector3) -> void:
 
 func _physics_process(delta: float) -> void:
 	if not NetSession.should_simulate(self):
+		freeze = true
 		return
 	_bounce_cool = maxf(0.0, _bounce_cool - delta)
 	if _carrier != null:
 		_follow_carrier()
-		return
-	if _sinking:
+	elif _sinking:
 		_tick_sink(delta)
-		return
-	_grounded = _check_grounded()
-	_keep_putt_down()
-	_apply_lie_damping()
-	if not _in_play:
-		return
-	var off_the_map := not bounds.has_point(Vector2(global_position.x, global_position.z))
-	if off_the_map or global_position.y < UNDER_THE_WORLD:
-		_in_play = false
-		_putting = false
-		entered_hazard.emit("out of bounds")
-		Sfx.play("hazard", self)
-		return
-	if linear_velocity.length() <= REST_SPEED and _grounded:
-		_rest_timer += delta
-		if _rest_timer >= REST_TIME:
-			_in_play = false
-			_putting = false
-			came_to_rest.emit(global_position)
 	else:
-		_rest_timer = 0.0
+		_grounded = _check_grounded()
+		_keep_putt_down()
+		_apply_lie_damping()
+		if _in_play:
+			var off_the_map := not bounds.has_point(Vector2(global_position.x, global_position.z))
+			if off_the_map or global_position.y < UNDER_THE_WORLD:
+				_in_play = false
+				_putting = false
+				entered_hazard.emit("out of bounds")
+				Sfx.play("hazard", self)
+			elif linear_velocity.length() <= REST_SPEED and _grounded:
+				_rest_timer += delta
+				if _rest_timer >= REST_TIME:
+					_in_play = false
+					_putting = false
+					came_to_rest.emit(global_position)
+			else:
+				_rest_timer = 0.0
+	sync_xform = global_transform
+
+
+func _process(delta: float) -> void:
+	if not NetSession.should_simulate(self):
+		_net_interp.follow(self, sync_xform, delta, NetSync.BALL_HZ)
 
 
 func _follow_carrier() -> void:

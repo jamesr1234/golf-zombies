@@ -101,11 +101,16 @@ static func ball_offset(seat: int, count: int) -> float:
 
 
 func place_carts(carts: Array[GolfCart]) -> void:
+	if hole == null:
+		return
 	var forward := along_hole()
 	var lateral := forward.cross(Vector3.UP).normalized()
 	var yaw := rad_to_deg(atan2(-forward.x, -forward.z))
 	for i in carts.size():
-		var spot := hole.tee - forward * CART_BACK + lateral * cart_offset(i)
+		if carts[i] == null:
+			continue
+		var slot := cart_slot(carts[i], i)
+		var spot := hole.tee - forward * CART_BACK + lateral * cart_offset(slot)
 		carts[i].place_at(hole.lift(spot) + Vector3.UP * 0.4, yaw)
 
 
@@ -114,6 +119,19 @@ func place_carts(carts: Array[GolfCart]) -> void:
 static func cart_offset(index: int) -> float:
 	var wing := -1.0 if index < 2 else 1.0
 	return wing * (CART_SIDE + float(index % 2) * CART_GAP)
+
+
+## Cart0/1 stay left, Cart2/3 stay right, even if the array order differs
+## between host and joiner.
+static func cart_slot(cart: Node, fallback: int) -> int:
+	if cart == null:
+		return fallback
+	var label := String(cart.name)
+	if label.begins_with("Cart"):
+		var tail := label.substr(4)
+		if tail.is_valid_int():
+			return int(tail)
+	return fallback
 
 
 func place_cart_girl() -> void:
@@ -167,7 +185,10 @@ func _park_carts_for_transit(carts: Array[GolfCart]) -> void:
 	var lateral := forward.cross(Vector3.UP).normalized()
 	var yaw := rad_to_deg(atan2(-forward.x, -forward.z))
 	for i in carts.size():
-		var spot := hole.cup - forward * 6.0 + lateral * cart_offset(i)
+		if carts[i] == null:
+			continue
+		var slot := cart_slot(carts[i], i)
+		var spot := hole.cup - forward * 6.0 + lateral * cart_offset(slot)
 		if carts[i].global_position.distance_to(hole.lift(hole.cup)) > 24.0:
 			carts[i].place_at(hole.lift(spot) + Vector3.UP * 0.4, yaw)
 

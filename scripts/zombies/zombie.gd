@@ -43,7 +43,9 @@ var move_speed := 3.4
 @export var sync_drink := 0.0
 @export var sync_dying := false
 @export var sync_yaw := 0.0
+@export var sync_xform := Transform3D.IDENTITY
 var last_hit_by: Player
+var _net_interp := NetInterp.new()
 
 @onready var agent: NavigationAgent3D = $Agent
 @onready var shape: CollisionShape3D = $Shape
@@ -293,8 +295,14 @@ func _publish_look() -> void:
 	sync_netted = is_netted()
 	sync_drink = _drink_left
 	sync_dying = _dying
+	sync_xform = global_transform
 	if visual != null:
 		sync_yaw = visual.rotation.y
+
+
+func _process(delta: float) -> void:
+	if not NetSession.should_simulate(self):
+		_net_interp.follow(self, sync_xform, delta, NetSync.ZOMBIE_HZ)
 
 
 func _apply_replicated_look(delta: float) -> void:
