@@ -57,7 +57,7 @@ static func attach_ball(node: Node) -> MultiplayerSynchronizer:
 static func attach_zombie(node: Node) -> MultiplayerSynchronizer:
 	return attach(node, PackedStringArray([
 		":position", ":rotation",
-		":allied", ":sync_netted", ":sync_drink", ":sync_dying",
+		":allied", ":sync_netted", ":sync_drink", ":sync_dying", ":sync_yaw",
 	]), ZOMBIE_HZ)
 
 

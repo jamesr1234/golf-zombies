@@ -48,6 +48,7 @@ func test_zombie_and_cart_sync_carry_the_look_flags() -> void:
 	assert_true(zombie_sync.replication_config.has_property(NodePath(":sync_netted")))
 	assert_true(zombie_sync.replication_config.has_property(NodePath(":sync_drink")))
 	assert_true(zombie_sync.replication_config.has_property(NodePath(":sync_dying")))
+	assert_true(zombie_sync.replication_config.has_property(NodePath(":sync_yaw")))
 	var cart := Node3D.new()
 	add_child_autofree(cart)
 	var cart_sync := NetSync.attach_cart(cart)
@@ -314,6 +315,22 @@ func test_a_replicated_sfx_plays_unless_this_peer_already_did() -> void:
 	Sfx.clear_log()
 	world.apply_sfx("zombie_explode", multiplayer.get_unique_id())
 	assert_eq(Sfx.last_cue, "")
+
+
+func test_the_host_publishes_the_visual_yaw() -> void:
+	var zombie := _zombie(Vector3.ZERO)
+	zombie.visual.rotation.y = PI
+	zombie._publish_look()
+	assert_almost_eq(zombie.sync_yaw, PI, 0.001)
+
+
+func test_a_replicated_zombie_faces_the_synced_yaw() -> void:
+	var zombie := _zombie(Vector3.ZERO)
+	assert_almost_eq(zombie.visual.rotation.y, 0.0, 0.001)
+	zombie.sync_yaw = PI
+	for _i in 20:
+		zombie._apply_replicated_look(0.05)
+	assert_almost_eq(absf(zombie.visual.rotation.y), PI, 0.05)
 
 
 func test_a_replicated_ally_wears_the_cap() -> void:

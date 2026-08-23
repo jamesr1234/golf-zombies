@@ -3,6 +3,7 @@ extends Node
 ## Builds the shared hole and parks players, balls, and the four carts.
 
 const PLAYER_SPREAD := 2.2
+const BALL_SPREAD := 1.2
 const CART_BACK := 2.0
 const CART_SIDE := 8.0
 const CART_GAP := 5.5
@@ -71,13 +72,32 @@ static func tee_offset(seat: int, count: int) -> float:
 
 
 func place_balls(balls: Array[GolfBall]) -> void:
-	var forward := along_hole()
-	var lateral := forward.cross(Vector3.UP).normalized()
+	_seat_balls(balls, hole.practice_tee)
+
+
+## Circle on the tee: every ball lands on the box at once, spaced so they
+## do not stack.
+func place_tee_balls(balls: Array[GolfBall]) -> void:
+	_seat_balls(balls, hole.tee)
+
+
+func _seat_balls(balls: Array[GolfBall], origin: Vector3) -> void:
+	if hole == null:
+		return
 	var n := maxi(1, balls.size())
+	var lateral := along_hole().cross(Vector3.UP).normalized()
 	for i in balls.size():
-		var side := (float(i) - float(n - 1) * 0.5) * 0.55
-		balls[i].place_at(hole.lift(hole.practice_tee + lateral * side))
+		if balls[i] == null:
+			continue
+		var seat := NetSession.seat_for(balls[i].owner_peer)
+		if seat < 0:
+			seat = i
+		balls[i].place_at(hole.lift(origin + lateral * ball_offset(seat, n)))
 		balls[i].bounds = hole.bounds
+
+
+static func ball_offset(seat: int, count: int) -> float:
+	return (float(seat) - float(maxi(1, count) - 1) * 0.5) * BALL_SPREAD
 
 
 func place_carts(carts: Array[GolfCart]) -> void:
@@ -85,9 +105,15 @@ func place_carts(carts: Array[GolfCart]) -> void:
 	var lateral := forward.cross(Vector3.UP).normalized()
 	var yaw := rad_to_deg(atan2(-forward.x, -forward.z))
 	for i in carts.size():
-		var slot := (float(i) - 1.5) * CART_GAP
-		var spot := hole.tee - forward * CART_BACK + lateral * (CART_SIDE + slot)
+		var spot := hole.tee - forward * CART_BACK + lateral * cart_offset(i)
 		carts[i].place_at(hole.lift(spot) + Vector3.UP * 0.4, yaw)
+
+
+## Two left of the tee, two right. Inner pair sits at CART_SIDE so nothing
+## overlaps the 8 m tee box; the outer pair steps out by CART_GAP.
+static func cart_offset(index: int) -> float:
+	var wing := -1.0 if index < 2 else 1.0
+	return wing * (CART_SIDE + float(index % 2) * CART_GAP)
 
 
 func place_cart_girl() -> void:
@@ -114,13 +140,15 @@ func aim_practice(sessions: Array) -> void:
 func aim_play(sessions: Array) -> void:
 	if hole == null:
 		return
+	var balls: Array[GolfBall] = []
 	for session in sessions:
 		var golf := session as GolfController
 		if golf == null or golf.ball == null:
 			continue
 		golf.release()
-		golf.ball.place_at(hole.tee)
+		balls.append(golf.ball)
 		golf.setup(golf.ball, hole.cup, hole.green_span())
+	place_tee_balls(balls)
 
 
 func begin_transit(carts: Array[GolfCart]) -> CartPath:
@@ -139,8 +167,7 @@ func _park_carts_for_transit(carts: Array[GolfCart]) -> void:
 	var lateral := forward.cross(Vector3.UP).normalized()
 	var yaw := rad_to_deg(atan2(-forward.x, -forward.z))
 	for i in carts.size():
-		var slot := (float(i) - 1.5) * CART_GAP
-		var spot := hole.cup - forward * 6.0 + lateral * (4.0 + slot)
+		var spot := hole.cup - forward * 6.0 + lateral * cart_offset(i)
 		if carts[i].global_position.distance_to(hole.lift(hole.cup)) > 24.0:
 			carts[i].place_at(hole.lift(spot) + Vector3.UP * 0.4, yaw)
 

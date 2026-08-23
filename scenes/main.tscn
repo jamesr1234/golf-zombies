@@ -1,50 +1,51 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene format=3 uid="uid://dssukfmhc38in"]
 
-[ext_resource type="Script" path="res://scripts/core/splitscreen.gd" id="1_split"]
-[ext_resource type="PackedScene" path="res://scenes/world.tscn" id="2_world"]
+[ext_resource type="Script" uid="uid://1rrnwphjb5w8" path="res://scripts/core/splitscreen.gd" id="1_split"]
+[ext_resource type="PackedScene" uid="uid://dbaca7it1ly2w" path="res://scenes/world.tscn" id="2_world"]
 [ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="3_hud"]
-[ext_resource type="Script" path="res://scripts/player/player_camera.gd" id="4_camera"]
+[ext_resource type="Script" uid="uid://bhwxdwnu0yolq" path="res://scripts/player/player_camera.gd" id="4_camera"]
 
-[node name="Main" type="Node"]
+[node name="Main" type="Node" unique_id=19786951]
 process_mode = 3
 script = ExtResource("1_split")
 
-[node name="Screens" type="VBoxContainer" parent="."]
+[node name="Screens" type="VBoxContainer" parent="." unique_id=469743252]
 process_mode = 1
+anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 theme_override_constants/separation = 3
 
-[node name="Top" type="SubViewportContainer" parent="Screens"]
+[node name="Top" type="SubViewportContainer" parent="Screens" unique_id=1679419188]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 stretch = true
 
-[node name="Viewport" type="SubViewport" parent="Screens/Top"]
+[node name="Viewport" type="SubViewport" parent="Screens/Top" unique_id=60993390]
 handle_input_locally = false
 size = Vector2i(1280, 398)
 render_target_update_mode = 4
 
-[node name="World" parent="Screens/Top/Viewport" instance=ExtResource("2_world")]
+[node name="World" parent="Screens/Top/Viewport" unique_id=1189016407 instance=ExtResource("2_world")]
 
-[node name="Camera" type="Camera3D" parent="Screens/Top/Viewport"]
+[node name="Camera" type="Camera3D" parent="Screens/Top/Viewport" unique_id=1694437140]
 script = ExtResource("4_camera")
 
-[node name="Hud" parent="Screens/Top/Viewport" instance=ExtResource("3_hud")]
+[node name="Hud" parent="Screens/Top/Viewport" unique_id=2093206096 instance=ExtResource("3_hud")]
 
-[node name="Bottom" type="SubViewportContainer" parent="Screens"]
+[node name="Bottom" type="SubViewportContainer" parent="Screens" unique_id=483191046]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 stretch = true
 
-[node name="Viewport" type="SubViewport" parent="Screens/Bottom"]
+[node name="Viewport" type="SubViewport" parent="Screens/Bottom" unique_id=2041765052]
 handle_input_locally = false
-size = Vector2i(1280, 398)
+size = Vector2i(1280, 399)
 render_target_update_mode = 4
 
-[node name="Camera" type="Camera3D" parent="Screens/Bottom/Viewport"]
+[node name="Camera" type="Camera3D" parent="Screens/Bottom/Viewport" unique_id=1273619904]
 script = ExtResource("4_camera")
 
-[node name="Hud" parent="Screens/Bottom/Viewport" instance=ExtResource("3_hud")]
+[node name="Hud" parent="Screens/Bottom/Viewport" unique_id=1983982583 instance=ExtResource("3_hud")]

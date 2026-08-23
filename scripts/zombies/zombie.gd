@@ -42,6 +42,7 @@ var move_speed := 3.4
 @export var sync_netted := false
 @export var sync_drink := 0.0
 @export var sync_dying := false
+@export var sync_yaw := 0.0
 var last_hit_by: Player
 
 @onready var agent: NavigationAgent3D = $Agent
@@ -292,11 +293,16 @@ func _publish_look() -> void:
 	sync_netted = is_netted()
 	sync_drink = _drink_left
 	sync_dying = _dying
+	if visual != null:
+		sync_yaw = visual.rotation.y
 
 
 func _apply_replicated_look(delta: float) -> void:
 	if visual == null:
 		return
+	visual.rotation.y = lerp_angle(
+		visual.rotation.y, sync_yaw, clampf(TURN_SPEED * delta, 0.0, 1.0)
+	)
 	if allied and not _shown_ally:
 		_shown_ally = true
 		add_to_group("allies")

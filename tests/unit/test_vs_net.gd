@@ -23,6 +23,82 @@ func test_tee_spread_follows_seat_not_spawn_order() -> void:
 	assert_eq(VsCourse.tee_offset(0, 1), 0.0, "a solo host stands on the line")
 
 
+func test_two_balls_sit_apart_on_the_tee() -> void:
+	assert_almost_eq(VsCourse.ball_offset(0, 2), -0.6, 0.01)
+	assert_almost_eq(VsCourse.ball_offset(1, 2), 0.6, 0.01)
+	assert_eq(VsCourse.ball_offset(0, 1), 0.0, "a solo ball sits on the line")
+	assert_gt(absf(VsCourse.ball_offset(0, 2) - VsCourse.ball_offset(1, 2)), 1.0)
+
+
+func test_starting_play_tees_both_balls_apart() -> void:
+	var course := VsCourse.new()
+	course.hole = HoleGenerator.generate(0, 20260816)
+	var balls: Array[GolfBall] = []
+	var sessions: Array = []
+	for i in 2:
+		var ball := GolfBall.new()
+		ball.owner_peer = i + 1
+		add_child_autofree(ball)
+		balls.append(ball)
+		var golf := GolfController.new()
+		golf.ball = ball
+		add_child_autofree(golf)
+		sessions.append(golf)
+	course.aim_play(sessions)
+	var lateral := course.along_hole().cross(Vector3.UP).normalized()
+	var sides: Array[float] = []
+	for ball in balls:
+		var offset := ball.global_position - course.hole.tee
+		offset.y = 0.0
+		sides.append(offset.dot(lateral))
+		assert_lt(offset.length(), 1.5, "the ball should be on the tee, not the practice green")
+		assert_true(ball.visible, "pressing Circle has to put the ball in play")
+	assert_gt(absf(sides[0] - sides[1]), 1.0, "the pair is not stacked")
+	course.free()
+
+
+func test_four_carts_park_two_on_each_side_of_the_tee() -> void:
+	var left := [VsCourse.cart_offset(0), VsCourse.cart_offset(1)]
+	var right := [VsCourse.cart_offset(2), VsCourse.cart_offset(3)]
+	assert_lt(left[0], 0.0)
+	assert_lt(left[1], 0.0)
+	assert_gt(right[0], 0.0)
+	assert_gt(right[1], 0.0)
+	for side in left + right:
+		assert_gt(absf(side), 4.0, "clear of the tee box")
+	assert_gt(absf(left[0] - left[1]), 4.0, "the pair is not stacked")
+	assert_gt(absf(right[0] - right[1]), 4.0, "the pair is not stacked")
+	assert_almost_eq(left[0], -right[0], 0.001)
+	assert_almost_eq(left[1], -right[1], 0.001)
+
+
+func test_placed_carts_sit_beside_the_tee_not_on_it() -> void:
+	var course := VsCourse.new()
+	course.hole = HoleGenerator.generate(0, 20260816)
+	var carts: Array[GolfCart] = []
+	for _i in 4:
+		carts.append(GolfCart.new())
+	course.place_carts(carts)
+	var forward := course.along_hole()
+	var lateral := forward.cross(Vector3.UP).normalized()
+	var left := 0
+	var right := 0
+	for cart in carts:
+		var offset := cart.position - course.hole.tee
+		offset.y = 0.0
+		var side := offset.dot(lateral)
+		if side < 0.0:
+			left += 1
+		else:
+			right += 1
+		assert_gt(absf(side), 4.0, "the cart should not be on the tee box")
+	assert_eq(left, 2)
+	assert_eq(right, 2)
+	for cart in carts:
+		cart.free()
+	course.free()
+
+
 func test_a_player_pose_sits_on_the_height_field() -> void:
 	var course := VsCourse.new()
 	course.hole = HoleGenerator.generate(0, 20260816)
@@ -82,6 +158,30 @@ func test_a_stranded_rider_can_walk() -> void:
 	assert_true(player.is_riding())
 	player._physics_process(0.016)
 	assert_false(player.is_riding(), "no cart in the seats means you are on foot")
+
+
+func test_a_remote_aim_turns_the_arrow() -> void:
+	var ball: GolfBall = preload("res://scenes/golf/ball.tscn").instantiate()
+	add_child_autofree(ball)
+	ball.place_at(Vector3.ZERO)
+	var golf := GolfSession.new()
+	ball.add_child(golf)
+	golf.setup(ball, Vector3(0.0, 0.0, -20.0))
+	var player := _pawn(2, Vector3(1.5, 0.0, 0.0))
+	golf.try_toggle(player)
+	golf._show_club(0.016)
+	var start := golf.aim_yaw
+	var start_facing := -golf._arrow.global_transform.basis.z
+	golf.apply_remote_aim(2, start + 45.0)
+	assert_almost_eq(golf.aim_yaw, start + 45.0, 0.01)
+	golf._show_club(0.016)
+	var facing := -golf._arrow.global_transform.basis.z
+	assert_gt(facing.angle_to(start_facing), 0.5, "the other screen has to see the turn")
+	assert_almost_eq(
+		facing.angle_to(Shot.aim_direction(start + 45.0, 0.0)), 0.0, 0.01
+	)
+	golf.apply_remote_aim(99, start)
+	assert_almost_eq(golf.aim_yaw, start + 45.0, 0.01, "a bystander cannot steer")
 
 
 func test_a_client_swing_leaves_the_golfer_on_the_lie() -> void:

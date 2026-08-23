@@ -1,7 +1,11 @@
 class_name GolfSession
 extends GolfController
 ## Per-ball golf for online VS. Claim and strike are host-validated; the swing
-## meter still runs on the golfer's machine.
+## meter still runs on the golfer's machine. Live aim is sent from that machine
+## so the other screens can turn the pink arrow with them.
+
+var _sent_aim_yaw := INF
+
 
 func can_claim(player: Node) -> bool:
 	if ball != null and not ball.is_owned_by(player):
@@ -41,12 +45,28 @@ func _process(delta: float) -> void:
 		_show_club(delta)
 		return
 	super._process(delta)
+	_publish_aim()
 
 
 func _show_club(delta: float) -> void:
 	_refresh_lie()
 	_pose_arrow()
 	_club.pose(_lie, aim_yaw, meter.value, delta, _is_putting())
+
+
+func apply_remote_aim(peer_id: int, yaw: float) -> void:
+	if golfer == null or _peer_of(golfer) != peer_id:
+		return
+	aim_yaw = yaw
+
+
+func _publish_aim() -> void:
+	if not NetSession.is_active():
+		return
+	if is_equal_approx(aim_yaw, _sent_aim_yaw):
+		return
+	_sent_aim_yaw = aim_yaw
+	_replicate_aim.rpc(aim_yaw)
 
 
 func _finish_local_swing() -> void:
@@ -88,6 +108,11 @@ func _request_strike(yaw: float, deviation: float, power: float) -> void:
 	meter.deviation_deg = deviation
 	meter.power = power
 	super._strike()
+
+
+@rpc("any_peer", "unreliable_ordered")
+func _replicate_aim(yaw: float) -> void:
+	apply_remote_aim(multiplayer.get_remote_sender_id(), yaw)
 
 
 @rpc("authority", "call_local", "reliable")
