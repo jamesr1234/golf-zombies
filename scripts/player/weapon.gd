@@ -134,6 +134,19 @@ func apply_replicated_index(gun_index: int) -> void:
 	index = clampi(gun_index, 0, loadout.size() - 1)
 
 
+func apply_replicated_pose(firing: bool, reload: float, scoped: bool) -> void:
+	_firing = firing
+	if scoped and stats().has_scope():
+		if zoom_step < 0:
+			zoom_step = 0
+	else:
+		zoom_step = -1
+	if reload <= 0.0:
+		_reload_left = 0.0
+	else:
+		_reload_left = (1.0 - clampf(reload, 0.0, 1.0)) * maxf(0.001, stats().reload_time)
+
+
 func apply_replicated_loadout(gun_index: int, paths: PackedStringArray) -> void:
 	if paths.is_empty():
 		return
@@ -245,7 +258,9 @@ func _spend_round(view: Transform3D) -> WeaponStats:
 		_flash.global_position = view.origin - view.basis.z * 0.6
 	ammo_changed.emit()
 	fired.emit()
-	Sfx.play(Sfx.fire_cue(current.visual), self)
+	var cue := Sfx.fire_cue(current.visual)
+	Sfx.play(cue, self)
+	_WorldFx.announce_sfx(self, cue, _shooter_peer())
 	return current
 
 
@@ -326,14 +341,22 @@ func _trace(view: Transform3D, spread: float, current: WeaponStats) -> void:
 	var end: Vector3 = target if hit.is_empty() else hit["position"]
 	var collider: Object = null if hit.is_empty() else hit["collider"]
 	var is_zombie := hurts_target(collider)
+	var kind := "tracer"
+	var color := TRACER_COLOR
 	if current.has_scope():
+		kind = "sniper_hit" if collider != null else "sniper"
+		color = BLOOD_COLOR if is_zombie else DUST_COLOR
 		HitFx.sniper_beam(root, muzzle, end, HitFx.sniper_tint(true))
 		if collider != null:
-			HitFx.spark(root, end, BLOOD_COLOR if is_zombie else DUST_COLOR)
+			HitFx.spark(root, end, color)
+		else:
+			color = HitFx.sniper_tint(true)
 	elif hit.is_empty():
 		HitFx.spawn(root, muzzle, target, TRACER_COLOR)
 	else:
-		HitFx.spawn(root, muzzle, end, BLOOD_COLOR if is_zombie else DUST_COLOR)
+		color = BLOOD_COLOR if is_zombie else DUST_COLOR
+		HitFx.spawn(root, muzzle, end, color)
+	_WorldFx.announce_hitscan(self, muzzle, end, kind, color, _shooter_peer())
 	if NetSession.is_active() and not multiplayer.is_server():
 		return
 	if is_zombie:
@@ -348,3 +371,8 @@ func _trace(view: Transform3D, spread: float, current: WeaponStats) -> void:
 
 static func hurts_target(collider: Object) -> bool:
 	return collider is Zombie
+
+
+func _shooter_peer() -> int:
+	var owner := get_parent() as Player
+	return 0 if owner == null else owner.peer_id

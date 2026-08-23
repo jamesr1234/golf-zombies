@@ -11,6 +11,7 @@ enum Phase { PREP, PLAYING, RETRIEVE, TRANSIT, SHOP }
 const HOLE_BANNER_TIME := 3.5
 const TEE_READY_RANGE := 4.0
 const _Music := preload("res://scripts/fx/music.gd")
+const _WorldFx := preload("res://scripts/net/world_fx.gd")
 
 var phase: Phase = Phase.PREP
 var hole: HoleData
@@ -318,6 +319,8 @@ func buy_shop_item(item_id: String, buyer: Player = null) -> bool:
 		scorecard_changed.emit()
 		_broadcast_scores()
 		_broadcast_loadout(buyer)
+		_broadcast_look(buyer)
+		_WorldFx.announce_sfx(self, "purchase")
 	return ok
 
 
@@ -491,6 +494,8 @@ func _on_stroke_taken(player: Player) -> void:
 		player.golf.club_kit = card.club_kit()
 	scorecard_changed.emit()
 	_broadcast_scores()
+	if card.strokes == 1:
+		_summon_cart_girl()
 	if card.at_stroke_limit() and not card.done_this_hole:
 		_pickup(player)
 
@@ -749,6 +754,29 @@ func _replicate_end(reason: String) -> void:
 	run_ended.emit(true)
 
 
+func _summon_cart_girl() -> void:
+	if course == null or course.cart_girl == null:
+		return
+	if not is_instance_valid(course.cart_girl):
+		return
+	course.cart_girl.begin_approach()
+
+
+func note_beer_sale(player: Player) -> void:
+	if player == null:
+		return
+	scorecard_changed.emit()
+	if multiplayer.is_server():
+		_broadcast_scores()
+		_apply_beers.rpc(player.peer_id, player.buzz.held)
+
+
+func _broadcast_look(buyer: Player) -> void:
+	if not multiplayer.is_server() or buyer == null or buyer.body == null:
+		return
+	_apply_apparel.rpc(buyer.peer_id, buyer.body.worn)
+
+
 func _broadcast_loadout(buyer: Player) -> void:
 	if not multiplayer.is_server() or buyer == null or buyer.weapon == null:
 		return
@@ -757,6 +785,24 @@ func _broadcast_loadout(buyer: Player) -> void:
 		if stats != null and stats.resource_path != "":
 			paths.append(stats.resource_path)
 	_apply_loadout.rpc(buyer.peer_id, buyer.weapon.index, paths)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _apply_beers(peer_id: int, held: int) -> void:
+	var player := _player_for(peer_id)
+	if player != null:
+		player.apply_held_beers(held)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _apply_apparel(peer_id: int, worn: Dictionary) -> void:
+	var player := _player_for(peer_id)
+	if player == null:
+		return
+	for item_id in worn.values():
+		var item := ShopStock.wear_by_id(String(item_id))
+		if not item.is_empty():
+			player.wear_apparel(item)
 
 
 @rpc("authority", "call_remote", "reliable")

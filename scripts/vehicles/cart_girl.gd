@@ -27,10 +27,10 @@ const SEAT := Vector3(-0.42, 0.86, 0.18)
 const STAND := Vector3(1.38, 0.0, 2.05)
 const GIRL_COLOR := Palette.HOT_PINK
 
-var cooler_open := false
+@export var cooler_open := false
 var drive_speed := 0.0
-var visit := Visit.WAITING
-var tending := false
+@export var visit := Visit.WAITING
+@export var tending := false
 
 var _lid: Node3D
 var _wheel: SteeringWheel
@@ -102,6 +102,7 @@ static func cooler_yaw(to_player: Vector3) -> float:
 
 
 func _ready() -> void:
+	add_to_group("cart_girl")
 	if visit == Visit.WAITING:
 		_set_present(false)
 	else:
@@ -277,8 +278,26 @@ func sell_to(player: Player, wallet: GameState = null) -> bool:
 
 
 func _physics_process(delta: float) -> void:
+	if not NetSession.should_simulate(self):
+		_apply_replicated()
+		_animate(delta)
+		return
 	_drive(delta)
 	_animate(delta)
+
+
+func _apply_replicated() -> void:
+	var present := (
+		visit == Visit.APPROACHING or visit == Visit.SERVING or visit == Visit.LEAVING
+	)
+	if visible != present:
+		_set_present(present)
+	_parked = visit == Visit.SERVING
+	if tending:
+		if _girl != null and _girl.position != STAND:
+			hop_out()
+	elif _girl != null and _girl.position != SEAT:
+		hop_in()
 
 
 func _drive(delta: float) -> void:

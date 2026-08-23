@@ -96,6 +96,8 @@ func place_cart_girl() -> void:
 		return
 	cart_girl = CartGirl.spawn_at_hole(hole)
 	hole_node.add_child(cart_girl)
+	cart_girl.set_multiplayer_authority(1)
+	NetSync.attach_cart_girl(cart_girl)
 
 
 func aim_practice(sessions: Array) -> void:

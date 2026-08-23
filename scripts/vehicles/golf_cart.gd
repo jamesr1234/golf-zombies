@@ -59,9 +59,9 @@ var _net_steer := 0.0
 var _net_boost := false
 ## Signed speed along the cart's own forward axis; negative is reverse.
 var drive_speed := 0.0
-var turbo := false
-var ram_plate := false
-var armored := false
+@export var turbo := false
+@export var ram_plate := false
+@export var armored := false
 ## 1 while drifting, then falls to 0 over DRIFT_RECOVER after you let go.
 var _drift := 0.0
 var _boost_count := 0

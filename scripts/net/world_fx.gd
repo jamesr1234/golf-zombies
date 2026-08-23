@@ -1,6 +1,7 @@
 class_name WorldFx
 extends Node
-## Host copies short-lived world objects onto clients: walls, shots, cans, ammo.
+## Host copies short-lived world objects onto clients: walls, shots, cans, ammo,
+## hitscan, fireworks, and the one-shot looks that NetSync does not carry.
 
 var _ammo_seq := 0
 var _ammo: Dictionary = {}
@@ -74,6 +75,34 @@ static func announce_ammo_gone(from: Node, drop_id: int) -> void:
 		fx._replicate_ammo_gone.rpc(drop_id)
 
 
+static func announce_hitscan(
+	from: Node, muzzle: Vector3, end: Vector3, kind: String, color: Color, skip_peer := 0
+) -> void:
+	var fx := _broadcaster(from)
+	if fx != null:
+		fx._replicate_hitscan.rpc(muzzle, end, kind, color, skip_peer)
+
+
+static func announce_sfx(from: Node, cue: String, skip_peer := 0) -> void:
+	if cue.is_empty():
+		return
+	var fx := _broadcaster(from)
+	if fx != null:
+		fx._replicate_sfx.rpc(cue, skip_peer)
+
+
+static func announce_fireworks(from: Node, at: Vector3, color: Color) -> void:
+	var fx := _broadcaster(from)
+	if fx != null:
+		fx._replicate_fireworks.rpc(at, color)
+
+
+static func announce_cart_girl(from: Node, kind: String) -> void:
+	var fx := _broadcaster(from)
+	if fx != null:
+		fx._replicate_cart_girl.rpc(kind)
+
+
 func apply_barrier(at: Vector3, yaw_deg: float) -> Node:
 	return HexBarrier.spawn(_fx_root(), at, yaw_deg)
 
@@ -110,6 +139,38 @@ func remove_ammo(drop_id: int) -> void:
 	_ammo.erase(drop_id)
 	if pickup != null and is_instance_valid(pickup):
 		pickup.queue_free()
+
+
+func apply_hitscan(muzzle: Vector3, end: Vector3, kind: String, color: Color, skip_peer := 0) -> void:
+	if _skip(skip_peer):
+		return
+	var root := _fx_root()
+	match kind:
+		"sniper":
+			HitFx.sniper_beam(root, muzzle, end, color)
+		"sniper_hit":
+			HitFx.sniper_beam(root, muzzle, end, HitFx.sniper_tint(true))
+			HitFx.spark(root, end, color)
+		_:
+			HitFx.spawn(root, muzzle, end, color)
+
+
+func apply_sfx(cue: String, skip_peer := 0) -> void:
+	if _skip(skip_peer):
+		return
+	Sfx.play(cue)
+
+
+func apply_fireworks(at: Vector3, color: Color) -> Node:
+	return Fireworks.spawn(_fx_root(), at, color)
+
+
+func apply_cart_girl(kind: String) -> void:
+	var girl := get_tree().get_first_node_in_group("cart_girl")
+	if girl == null or not girl.has_method("cheer"):
+		return
+	if kind == "cheer":
+		girl.cheer("enjoy!")
 
 
 @rpc("authority", "call_remote", "reliable")
@@ -151,6 +212,28 @@ func _replicate_ammo_gone(drop_id: int) -> void:
 	remove_ammo(drop_id)
 
 
+@rpc("authority", "call_remote", "reliable")
+func _replicate_hitscan(
+	muzzle: Vector3, end: Vector3, kind: String, color: Color, skip_peer: int
+) -> void:
+	apply_hitscan(muzzle, end, kind, color, skip_peer)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _replicate_sfx(cue: String, skip_peer: int) -> void:
+	apply_sfx(cue, skip_peer)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _replicate_fireworks(at: Vector3, color: Color) -> void:
+	apply_fireworks(at, color)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _replicate_cart_girl(kind: String) -> void:
+	apply_cart_girl(kind)
+
+
 static func _broadcaster(from: Node) -> WorldFx:
 	if not NetSession.is_active() or from == null or not from.is_inside_tree():
 		return null
@@ -162,3 +245,7 @@ static func _broadcaster(from: Node) -> WorldFx:
 func _fx_root() -> Node:
 	var root := get_tree().get_first_node_in_group("fx_root")
 	return root if root != null else get_parent()
+
+
+func _skip(skip_peer: int) -> bool:
+	return skip_peer != 0 and skip_peer == multiplayer.get_unique_id()

@@ -11,8 +11,9 @@ func after_each() -> void:
 	NetSession.close()
 	NetSession.seats.clear()
 	GameSettings.reset()
-	for group in ["rockets", "net_shots", "net_traps", "thrown_beers"]:
+	for group in ["rockets", "net_shots", "net_traps", "thrown_beers", "fireworks", "sniper_beams"]:
 		for node in get_tree().get_nodes_in_group(group):
+			node.remove_from_group(group)
 			node.queue_free()
 
 
@@ -31,6 +32,33 @@ func test_a_pawn_sync_speaks_for_its_owner() -> void:
 	assert_true(pawn_sync.replication_config.has_property(NodePath(":aiming")))
 	assert_true(pawn_sync.replication_config.has_property(NodePath(":sync_gun")))
 	assert_true(pawn_sync.replication_config.has_property(NodePath(":holding_beer")))
+	assert_true(pawn_sync.replication_config.has_property(NodePath(":sync_state")))
+	assert_true(pawn_sync.replication_config.has_property(NodePath(":sync_dive")))
+	assert_true(pawn_sync.replication_config.has_property(NodePath(":sync_firing")))
+	assert_true(pawn_sync.replication_config.has_property(NodePath(":sync_reload")))
+	assert_true(pawn_sync.replication_config.has_property(NodePath(":sync_scoped")))
+
+
+func test_zombie_and_cart_sync_carry_the_look_flags() -> void:
+	var zombie := Node3D.new()
+	add_child_autofree(zombie)
+	var zombie_sync := NetSync.attach_zombie(zombie)
+	assert_true(zombie_sync.replication_config.has_property(NodePath(":allied")))
+	assert_true(zombie_sync.replication_config.has_property(NodePath(":sync_netted")))
+	assert_true(zombie_sync.replication_config.has_property(NodePath(":sync_drink")))
+	assert_true(zombie_sync.replication_config.has_property(NodePath(":sync_dying")))
+	var cart := Node3D.new()
+	add_child_autofree(cart)
+	var cart_sync := NetSync.attach_cart(cart)
+	assert_true(cart_sync.replication_config.has_property(NodePath(":turbo")))
+	assert_true(cart_sync.replication_config.has_property(NodePath(":ram_plate")))
+	assert_true(cart_sync.replication_config.has_property(NodePath(":armored")))
+	var girl := Node3D.new()
+	add_child_autofree(girl)
+	var girl_sync := NetSync.attach_cart_girl(girl)
+	assert_true(girl_sync.replication_config.has_property(NodePath(":visit")))
+	assert_true(girl_sync.replication_config.has_property(NodePath(":cooler_open")))
+	assert_true(girl_sync.replication_config.has_property(NodePath(":tending")))
 
 
 func test_clients_defer_world_shots_to_the_host() -> void:
@@ -126,6 +154,61 @@ func test_a_remote_pawn_shows_the_synced_gun() -> void:
 	assert_false(player.raygun.visible)
 
 
+func test_a_replicated_pose_picks_shield_swim_and_scope() -> void:
+	var player := _remote_pawn()
+	player.sync_state = int(Player.State.SHIELDING)
+	player._animate(1.0 / 60.0)
+	assert_true(player.is_shielding())
+	assert_true(player._shield.visible)
+	assert_false(player.raygun.visible)
+	player.sync_state = int(Player.State.SWIMMING)
+	player.sync_dive = true
+	player._animate(1.0 / 60.0)
+	assert_true(player.is_swimming())
+	assert_true(player.is_underwater())
+	assert_false(player.raygun.visible)
+	var sniper: WeaponStats = preload("res://resources/weapons/sniper.tres")
+	player.sync_state = int(Player.State.NORMAL)
+	player.sync_dive = false
+	player.sync_gun = player.weapon.loadout.find(sniper)
+	player.sync_scoped = true
+	player._animate(1.0 / 60.0)
+	assert_true(player.weapon.is_scoped())
+	assert_false(player.raygun.visible)
+
+
+func test_a_remote_pawn_crouches_when_downed_and_hides_the_gun_while_placing() -> void:
+	var player := _remote_pawn()
+	player.health.state = Health.State.DOWNED
+	player._animate(1.0 / 60.0)
+	assert_almost_eq(player.head.position.y, Player.DOWNED_HEAD_HEIGHT, 0.001)
+	player.health.state = Health.State.ALIVE
+	player.sync_state = int(Player.State.PLACING)
+	player._animate(1.0 / 60.0)
+	assert_true(player.is_placing())
+	assert_false(player.raygun.visible)
+
+
+func test_a_replicated_gun_pose_shows_reload_and_fire() -> void:
+	var gun := Weapon.new()
+	add_child_autofree(gun)
+	gun.apply_replicated_pose(true, 0.4, false)
+	assert_true(gun.is_firing())
+	assert_almost_eq(gun.reload_fraction(), 0.4, 0.001)
+	assert_false(gun.is_scoped())
+	var sniper: WeaponStats = preload("res://resources/weapons/sniper.tres")
+	gun.index = gun.loadout.find(sniper)
+	gun.apply_replicated_pose(false, 0.0, true)
+	assert_true(gun.is_scoped())
+	assert_false(gun.is_firing())
+
+
+func test_a_replicated_melee_starts_the_swing() -> void:
+	var player := _remote_pawn()
+	player._replicate_melee()
+	assert_true(player.body.is_meleeing())
+
+
 func test_a_replicated_barrier_sits_at_the_pose() -> void:
 	var world := _world_fx()
 	var hex: Node3D = world.apply_barrier(Vector3(2.0, 0.0, 4.0), 90.0)
@@ -191,6 +274,101 @@ func test_a_visual_beer_does_not_convert_a_zombie() -> void:
 	assert_true(zombie.can_catch())
 
 
+func test_a_replicated_hitscan_draws_a_tracer() -> void:
+	var world := _world_fx()
+	var before := world._fx_root().get_child_count()
+	world.apply_hitscan(Vector3.ZERO, Vector3(0.0, 0.0, -12.0), "tracer", Color.WHITE)
+	assert_gt(world._fx_root().get_child_count(), before)
+
+
+func test_a_replicated_sniper_beam_is_visible() -> void:
+	var world := _world_fx()
+	world.apply_hitscan(Vector3.ZERO, Vector3(0.0, 0.0, -40.0), "sniper", Color.WHITE)
+	assert_gt(get_tree().get_nodes_in_group("sniper_beams").size(), 0)
+
+
+func test_a_replicated_firework_bursts() -> void:
+	var world := _world_fx()
+	var burst := world.apply_fireworks(Vector3.UP, Palette.MAGENTA)
+	assert_not_null(burst)
+	assert_gt(get_tree().get_nodes_in_group("fireworks").size(), 0)
+
+
+func test_a_replicated_sfx_plays_unless_this_peer_already_did() -> void:
+	Sfx.clear_log()
+	var world := _world_fx()
+	world.apply_sfx("zombie_explode", 0)
+	assert_eq(Sfx.last_cue, "zombie_explode")
+	Sfx.clear_log()
+	world.apply_sfx("zombie_explode", multiplayer.get_unique_id())
+	assert_eq(Sfx.last_cue, "")
+
+
+func test_a_replicated_ally_wears_the_cap() -> void:
+	var zombie := _zombie(Vector3.ZERO)
+	zombie.allied = true
+	zombie._apply_replicated_look(0.016)
+	assert_true(zombie.is_in_group("allies"))
+	assert_not_null(zombie.visual._ally_cap)
+	assert_not_null(zombie.visual.get_node_or_null("Cheer"))
+
+
+func test_a_replicated_netted_zombie_idles() -> void:
+	var zombie := _zombie(Vector3.ZERO)
+	zombie.sync_netted = true
+	zombie._apply_replicated_look(0.016)
+	assert_null(zombie.visual._beer)
+
+
+func test_a_replicated_drink_puts_a_can_in_hand() -> void:
+	var zombie := _zombie(Vector3.ZERO)
+	zombie.sync_drink = Zombie.DRINK_TIME * 0.5
+	zombie._apply_replicated_look(0.016)
+	assert_not_null(zombie.visual._beer)
+
+
+func test_cart_girl_shows_up_when_visit_replicates() -> void:
+	var girl := CartGirl.new()
+	add_child_autofree(girl)
+	assert_false(girl.visible)
+	girl.visit = CartGirl.Visit.APPROACHING
+	girl._apply_replicated()
+	assert_true(girl.visible)
+	girl.tending = true
+	girl._apply_replicated()
+	assert_true(girl.attendant().position.is_equal_approx(CartGirl.STAND))
+
+
+func test_a_replicated_cheer_pops_enjoy() -> void:
+	var world := _world_fx()
+	var girl := CartGirl.new()
+	add_child_autofree(girl)
+	world.apply_cart_girl("cheer")
+	assert_not_null(girl.attendant().get_node_or_null("Cheer"))
+	assert_eq(girl.attendant().get_node("Cheer").text, CartGirl.ENJOY)
+
+
+func test_held_beers_can_be_granted() -> void:
+	var player: Player = PLAYER.instantiate()
+	add_child_autofree(player)
+	player.apply_held_beers(2)
+	assert_eq(player.buzz.held, 2)
+	player.apply_held_beers(-3)
+	assert_eq(player.buzz.held, 0)
+
+
+func test_a_replicated_outfit_goes_on() -> void:
+	var player: Player = PLAYER.instantiate()
+	add_child_autofree(player)
+	var item := ShopStock.wear_by_id("shirt_cyan")
+	player.wear_apparel(item)
+	assert_true(player.is_wearing("shirt_cyan"))
+	var other: Player = PLAYER.instantiate()
+	add_child_autofree(other)
+	other.wear_apparel(ShopStock.wear_by_id(String(player.body.worn["shirt"])))
+	assert_true(other.is_wearing("shirt_cyan"))
+
+
 func test_ammo_drop_ids_count_up_on_the_host_copy() -> void:
 	var world := _world_fx()
 	assert_eq(WorldFxScript.take_ammo_id(world), 1)
@@ -212,3 +390,11 @@ func _zombie(at: Vector3) -> Zombie:
 	add_child_autofree(zombie)
 	zombie.global_position = at
 	return zombie
+
+
+func _remote_pawn() -> Player:
+	var player: Player = PLAYER.instantiate()
+	add_child_autofree(player)
+	player.net_driven = true
+	player.set_multiplayer_authority(99)
+	return player

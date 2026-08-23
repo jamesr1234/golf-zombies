@@ -37,6 +37,7 @@ static func attach_pawn(node: Node, authority := 1) -> MultiplayerSynchronizer:
 	return attach(node, PackedStringArray([
 		":position", ":rotation", ":sync_pace", ":aiming",
 		":sync_gun", ":holding_beer",
+		":sync_state", ":sync_dive", ":sync_firing", ":sync_reload", ":sync_scoped",
 	]), PAWN_HZ, authority)
 
 
@@ -55,10 +56,19 @@ static func attach_ball(node: Node) -> MultiplayerSynchronizer:
 static func attach_zombie(node: Node) -> MultiplayerSynchronizer:
 	return attach(node, PackedStringArray([
 		":position", ":rotation",
+		":allied", ":sync_netted", ":sync_drink", ":sync_dying",
 	]), ZOMBIE_HZ)
 
 
 static func attach_cart(node: Node) -> MultiplayerSynchronizer:
 	return attach(node, PackedStringArray([
 		":position", ":rotation",
+		":turbo", ":ram_plate", ":armored",
+	]), CART_HZ)
+
+
+static func attach_cart_girl(node: Node) -> MultiplayerSynchronizer:
+	return attach(node, PackedStringArray([
+		":position", ":rotation",
+		":visit", ":cooler_open", ":tending",
 	]), CART_HZ)

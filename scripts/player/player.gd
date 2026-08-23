@@ -74,6 +74,11 @@ const CHEER_FOV := 70.0
 @export var body_color := Palette.PLAYER_ONE
 @export var sync_pace := 0.0
 @export var sync_gun := 0
+@export var sync_state := 0
+@export var sync_dive := false
+@export var sync_firing := false
+@export var sync_reload := 0.0
+@export var sync_scoped := false
 
 var peer_id := 0
 var net_driven := false
@@ -183,6 +188,11 @@ func _physics_process(delta: float) -> void:
 	_tick_cheer(delta)
 	sync_pace = pace()
 	sync_gun = weapon.index
+	sync_state = int(state)
+	sync_dive = _underwater
+	sync_firing = weapon.is_firing()
+	sync_reload = weapon.reload_fraction()
+	sync_scoped = weapon.is_scoped()
 	_animate(delta)
 
 
@@ -885,16 +895,21 @@ func _try_melee() -> void:
 	var strength := buzz.strength_mult()
 	if NetSession.is_active() and not multiplayer.is_server():
 		_request_melee.rpc_id(1, origin, forward, strength)
-		body.start_melee()
-		raygun.start_melee()
-		_view_kick += MELEE_VIEW_KICK
-		Sfx.play("melee_swing", self)
+		_play_melee()
 		return
 	if melee.shove(origin, forward, strength, self):
+		_play_melee()
+
+
+func _play_melee() -> void:
+	if body != null:
 		body.start_melee()
+	if raygun != null:
 		raygun.start_melee()
-		_view_kick += MELEE_VIEW_KICK
-		Sfx.play("melee_swing", self)
+	_view_kick += MELEE_VIEW_KICK
+	Sfx.play("melee_swing", self)
+	if NetSession.is_active() and is_multiplayer_authority():
+		_replicate_melee.rpc()
 
 
 @rpc("any_peer", "reliable")
@@ -906,11 +921,35 @@ func _request_melee(origin: Vector3, forward: Vector3, strength: float) -> void:
 	melee.shove(origin, forward, strength, self)
 
 
+@rpc("authority", "call_remote", "reliable")
+func _replicate_melee() -> void:
+	if body != null:
+		body.start_melee()
+	if raygun != null:
+		raygun.start_melee()
+
+
+func _apply_replicated_pose() -> void:
+	state = sync_state as State
+	_underwater = sync_dive
+	if weapon != null:
+		weapon.apply_replicated_index(sync_gun)
+		weapon.apply_replicated_pose(sync_firing, sync_reload, sync_scoped)
+	if _shield != null:
+		_shield.set_raised(state == State.SHIELDING)
+	if health != null and health.is_downed():
+		head.position.y = DOWNED_HEAD_HEIGHT
+	elif is_riding():
+		head.position.y = SIT_HEAD_HEIGHT
+	else:
+		head.position.y = STAND_HEAD_HEIGHT
+
+
 ## The gun is stowed for the swing, since the golfer is holding a club, and dropped
 ## when you go down.
 func _animate(delta: float) -> void:
-	if net_driven and not is_multiplayer_authority() and weapon != null:
-		weapon.apply_replicated_index(sync_gun)
+	if net_driven and not is_multiplayer_authority():
+		_apply_replicated_pose()
 	if health.is_alive() and body != null and body.is_locked_limp():
 		body.stop_limp()
 	var travel := pace()
@@ -1327,13 +1366,39 @@ func _beer_prompt() -> String:
 
 
 func _use_beer_cart() -> void:
+	if NetSession.is_active() and not multiplayer.is_server():
+		_request_beer_cart.rpc_id(1)
+		return
+	_commit_beer_cart()
+
+
+func _commit_beer_cart() -> void:
 	var girl = _beer_cart()
 	if girl == null:
 		return
 	if not girl.cooler_open:
 		girl.open_cooler()
+		_WorldFx.announce_sfx(self, "cooler_open")
 		return
-	girl.sell_to(self)
+	if not girl.sell_to(self):
+		return
+	_WorldFx.announce_sfx(self, "buy_beer")
+	_WorldFx.announce_cart_girl(self, "cheer")
+	if flow != null and flow.has_method("note_beer_sale"):
+		flow.note_beer_sale(self)
+
+
+func apply_held_beers(held: int) -> void:
+	buzz.held = maxi(0, held)
+
+
+@rpc("any_peer", "reliable")
+func _request_beer_cart() -> void:
+	if not multiplayer.is_server():
+		return
+	if multiplayer.get_remote_sender_id() != peer_id:
+		return
+	_commit_beer_cart()
 
 
 func is_holding_beer() -> bool:
@@ -1399,6 +1464,8 @@ func _request_throw_beer(muzzle: Vector3, fly: Vector3) -> void:
 		return
 	if multiplayer.get_remote_sender_id() != peer_id:
 		return
+	if not buzz.spend():
+		return
 	_spawn_thrown_beer(muzzle, fly)
 
 
@@ -1414,7 +1481,18 @@ func chug() -> bool:
 		_beer.drink()
 	_view_kick += Buzz.CHUG_KICK
 	Sfx.play("drink_beer", self)
+	if NetSession.is_active() and not multiplayer.is_server():
+		_request_chug.rpc_id(1)
 	return true
+
+
+@rpc("any_peer", "reliable")
+func _request_chug() -> void:
+	if not multiplayer.is_server():
+		return
+	if multiplayer.get_remote_sender_id() != peer_id:
+		return
+	buzz.spend()
 
 
 func wants_drunk_fx() -> bool:

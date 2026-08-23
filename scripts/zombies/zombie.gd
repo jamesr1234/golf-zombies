@@ -38,7 +38,10 @@ const DRINK_TIME := 1.8
 
 var hp := 90.0
 var move_speed := 3.4
-var allied := false
+@export var allied := false
+@export var sync_netted := false
+@export var sync_drink := 0.0
+@export var sync_dying := false
 var last_hit_by: Player
 
 @onready var agent: NavigationAgent3D = $Agent
@@ -61,6 +64,8 @@ var _beer_prop: Node3D
 var _melee: Melee
 var _melee_pending := false
 var _trap
+var _shown_ally := false
+var _shown_beer := false
 
 
 func _ready() -> void:
@@ -95,12 +100,12 @@ func _apply_stats() -> void:
 
 func _physics_process(delta: float) -> void:
 	if not NetSession.should_simulate(self):
-		if visual != null and not _dying:
-			visual.animate(delta, 0.35)
+		_apply_replicated_look(delta)
 		return
 	if _dying:
 		_fly(delta)
 		_explode_in = maxf(0.0, _explode_in - delta)
+		_publish_look()
 		return
 	if not is_on_floor():
 		velocity += get_gravity() * delta
@@ -167,6 +172,7 @@ func _physics_process(delta: float) -> void:
 		visual.animate(delta, pace)
 		visual.tick_melee(delta)
 	_resolve_melee_contact()
+	_publish_look()
 
 
 func take_damage(amount: float, direction := Vector3.ZERO, hit_at := Vector3.INF) -> void:
@@ -177,7 +183,7 @@ func take_damage(amount: float, direction := Vector3.ZERO, hit_at := Vector3.INF
 		_flash_left = FLASH_TIME
 		_set_flash(true)
 		_flop(region, direction, Ragdoll.strength_for(amount * 0.35, stats.stagger_resistance), false, true)
-		Sfx.play("zombie_hit", self)
+		_sfx("zombie_hit")
 		return
 	if stats.headshot_only:
 		hp = 0.0
@@ -194,7 +200,7 @@ func take_damage(amount: float, direction := Vector3.ZERO, hit_at := Vector3.INF
 	_flop(region, direction, Ragdoll.strength_for(amount, stats.stagger_resistance), false, true)
 	if velocity.y > 0.0:
 		velocity.y = 0.0
-	Sfx.play("zombie_hit", self)
+	_sfx("zombie_hit")
 
 
 ## A melee hit is the pop-into-fireworks move: launch them from the contact
@@ -214,7 +220,7 @@ func melee_hit(origin: Vector3, strength := 1.0) -> void:
 	_flop(
 		_hit_region(hit), launch, 1.8 * maxf(0.4, strength), true
 	)
-	Sfx.play("melee_hit", self)
+	_sfx("melee_hit")
 	_begin_death(MELEE_EXPLODE_DELAY)
 
 
@@ -277,6 +283,41 @@ func release_net() -> void:
 	_trap = null
 
 
+func _sfx(cue: String) -> void:
+	Sfx.play(cue, self)
+	_WorldFx.announce_sfx(self, cue)
+
+
+func _publish_look() -> void:
+	sync_netted = is_netted()
+	sync_drink = _drink_left
+	sync_dying = _dying
+
+
+func _apply_replicated_look(delta: float) -> void:
+	if visual == null:
+		return
+	if allied and not _shown_ally:
+		_shown_ally = true
+		add_to_group("allies")
+		visual.drop_beer()
+		visual.wear_ally_cap()
+		visual.cheer("delicious!")
+		_shown_beer = false
+	if sync_drink > 0.0:
+		if not _shown_beer:
+			_shown_beer = true
+			visual.hold_beer(_BeerCan.create(1.5))
+		visual.drink(1.0 - sync_drink / DRINK_TIME)
+		return
+	if _shown_beer:
+		visual.drop_beer()
+		_shown_beer = false
+	if sync_dying:
+		return
+	visual.animate(delta, 0.0 if sync_netted else 0.35)
+
+
 func catch_beer() -> bool:
 	if not can_catch():
 		return false
@@ -287,7 +328,7 @@ func catch_beer() -> bool:
 	_beer_prop = _BeerCan.create(1.5)
 	visual.hold_beer(_beer_prop)
 	visual.drink(0.0)
-	Sfx.play("beer_catch", self)
+	_sfx("beer_catch")
 	return true
 
 
@@ -428,6 +469,7 @@ func _begin_death(delay: float) -> void:
 	collision_layer = 0
 	collision_mask = Layers.WORLD | Layers.BARRIER | Layers.PROP | Layers.FORT
 	died.emit(self)
+	_publish_look()
 	if delay <= 0.0:
 		_explode()
 	else:
@@ -443,13 +485,15 @@ func _explode() -> void:
 	var root := get_tree().get_first_node_in_group("fx_root")
 	if root == null:
 		root = get_parent()
-	Fireworks.spawn(root, global_position + Vector3.UP * stats.height * 0.45, stats.body_color)
-	Sfx.play("zombie_explode", self)
+	var at := global_position + Vector3.UP * stats.height * 0.45
+	Fireworks.spawn(root, at, stats.body_color)
+	_sfx("zombie_explode")
+	_WorldFx.announce_fireworks(self, at, stats.body_color)
 	if randf() < stats.ammo_drop_chance:
-		var at := global_position + Vector3.UP * 0.4
+		var drop_at := global_position + Vector3.UP * 0.4
 		var drop_id := _WorldFx.take_ammo_id(self)
-		AmmoPickup.spawn(get_parent(), at, stats.ammo_drop_amount, drop_id)
-		_WorldFx.announce_ammo(self, drop_id, at, stats.ammo_drop_amount)
+		AmmoPickup.spawn(get_parent(), drop_at, stats.ammo_drop_amount, drop_id)
+		_WorldFx.announce_ammo(self, drop_id, drop_at, stats.ammo_drop_amount)
 	queue_free()
 
 
@@ -538,7 +582,7 @@ func _begin_melee() -> void:
 	_attack_timer = stats.attack_cooldown
 	_melee_pending = true
 	visual.start_melee()
-	Sfx.play("zombie_attack", self)
+	_sfx("zombie_attack")
 
 
 func _resolve_melee_contact() -> void:
@@ -597,7 +641,7 @@ func _ally_shove() -> void:
 	if not _melee.shove(origin, forward):
 		return
 	visual.start_melee()
-	Sfx.play("melee_swing", self)
+	_sfx("melee_swing")
 
 
 func _fire_at(target: Node3D) -> void:
@@ -613,7 +657,7 @@ func _fire_at(target: Node3D) -> void:
 		root, muzzle, fly, stats.damage, stats.projectile_speed, stats.attack_range + 8.0, allied,
 		_shot_color(), _shot_radius(), _shot_streak(), stats.stationary
 	)
-	Sfx.play("zombie_shot" if not stats.stationary else "sniper_fire", self)
+	_sfx("zombie_shot" if not stats.stationary else "sniper_fire")
 
 
 func _shot_color() -> Color:
@@ -706,4 +750,4 @@ func _sip(delta: float) -> void:
 	_beer_prop = null
 	_attack_timer = 0.0
 	agent.target_desired_distance = Melee.RANGE * 0.55
-	Sfx.play("beer_convert", self)
+	_sfx("beer_convert")
