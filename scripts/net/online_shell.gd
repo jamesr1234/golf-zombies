@@ -22,6 +22,10 @@ var _flow: VsMatchFlow
 var _debug: NetDebug
 var _paused := false
 var _ended := false
+var _cpu_on := false
+var _ghost: InputGhost
+var _brain: VsCpu
+var _cpu_banner: Label
 
 
 func _enter_tree() -> void:
@@ -37,6 +41,17 @@ func _ready() -> void:
 	_debug = NetDebug.new()
 	_debug.world = world
 	hud.add_child(_debug)
+	_cpu_banner = Label.new()
+	_cpu_banner.visible = false
+	_cpu_banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_cpu_banner.anchor_left = 0.5
+	_cpu_banner.anchor_right = 0.5
+	_cpu_banner.offset_left = -160.0
+	_cpu_banner.offset_right = 160.0
+	_cpu_banner.offset_top = 18.0
+	_cpu_banner.offset_bottom = 48.0
+	_cpu_banner.label_settings = HudStyle.readout(Palette.LIME, 18)
+	overlay.get_parent().add_child(_cpu_banner)
 	call_deferred("_bind_local")
 
 
@@ -51,6 +66,8 @@ func _bind_local() -> void:
 	camera.keep_aspect = Camera3D.KEEP_HEIGHT
 	camera.player = _local
 	hud.setup(_local, _flow)
+	if _cpu_on and _brain != null and _ghost != null:
+		_brain.setup(_local, _ghost)
 
 
 func _find_local() -> Player:
@@ -64,12 +81,54 @@ func _find_local() -> Player:
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		if _local != null:
+		if _local != null and not _cpu_on:
 			_local.add_mouse_look((event as InputEventMouseMotion).relative)
 		return
 	var key := event as InputEventKey
-	if key != null and key.pressed and not key.echo and key.keycode == KEY_F3:
+	if key == null or not key.pressed or key.echo:
+		return
+	if key.keycode == KEY_F3:
 		_debug.toggle()
+	elif key.keycode == KEY_F4:
+		_toggle_cpu()
+
+
+func _physics_process(delta: float) -> void:
+	if not _cpu_on or _paused or _ended or _local == null or _ghost == null or _brain == null:
+		return
+	_ghost.begin_frame()
+	_brain.tick(delta)
+	_ghost.apply()
+
+
+func _toggle_cpu() -> void:
+	if _local == null:
+		_local = _find_local()
+	if _local == null:
+		return
+	_cpu_on = not _cpu_on
+	if _cpu_on:
+		if _ghost == null:
+			_ghost = InputGhost.new()
+		if _brain == null:
+			_brain = VsCpu.new()
+		_brain.setup(_local, _ghost)
+	elif _ghost != null:
+		_ghost.release_all()
+	_cpu_banner.visible = _cpu_on
+	_cpu_banner.text = HudStyle.chrome("CPU ON" if _cpu_on else "CPU OFF")
+	if not _cpu_on:
+		_cpu_banner.visible = true
+		get_tree().create_timer(1.2).timeout.connect(
+			func() -> void:
+				if not _cpu_on and _cpu_banner != null:
+					_cpu_banner.visible = false
+		)
+
+
+func _exit_tree() -> void:
+	if _ghost != null:
+		_ghost.release_all()
 
 
 func _process(_delta: float) -> void:
