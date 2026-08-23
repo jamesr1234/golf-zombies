@@ -65,6 +65,54 @@ func test_local_balls_stay_shared() -> void:
 	assert_true(ball.is_owned_by(pawn))
 
 
+func test_a_client_swing_leaves_the_golfer_on_the_lie() -> void:
+	var ball: GolfBall = preload("res://scenes/golf/ball.tscn").instantiate()
+	add_child_autofree(ball)
+	ball.place_at(Vector3.ZERO)
+	var golf := GolfSession.new()
+	ball.add_child(golf)
+	golf.setup(ball, Vector3(0.0, 0.0, -20.0))
+	var player := _pawn(2, Vector3(1.5, 0.0, 0.0))
+	golf.try_toggle(player)
+	golf._process(0.016)
+	var feet := player.global_position
+	var eye := golf.get_camera_transform().origin
+	golf._shot_eye = eye
+	golf._finish_local_swing()
+	assert_false(ball.is_in_play(), "the client has not applied the strike")
+	ball.global_position = Vector3(0.0, 5.0, -22.0)
+	golf._process(0.016)
+	assert_almost_eq(
+		player.global_position.distance_to(feet), 0.0, 0.05,
+		"the golfer stays on the lie while the ball flies"
+	)
+	assert_almost_eq(
+		golf.get_camera_transform().origin.distance_to(eye), 0.0, 0.05,
+		"the camera stays behind the stance"
+	)
+
+
+func test_a_strike_leaves_the_golfer_on_the_lie() -> void:
+	var ball: GolfBall = preload("res://scenes/golf/ball.tscn").instantiate()
+	add_child_autofree(ball)
+	ball.place_at(Vector3.ZERO)
+	var golf := GolfController.new()
+	add_child_autofree(golf)
+	golf.setup(ball, Vector3(0.0, 0.0, -20.0))
+	var player := _pawn(1, Vector3(1.5, 0.0, 0.0))
+	golf.try_toggle(player)
+	golf._process(0.016)
+	var feet := player.global_position
+	golf.meter.power = 0.4
+	golf._strike()
+	ball.global_position = Vector3(0.0, 6.0, -24.0)
+	golf._process(0.016)
+	assert_almost_eq(
+		player.global_position.distance_to(feet), 0.0, 0.05,
+		"the host golfer stays planted after contact"
+	)
+
+
 func test_wallets_and_strokes_are_per_player() -> void:
 	var cyan := PlayerScore.new()
 	var amber := PlayerScore.new()

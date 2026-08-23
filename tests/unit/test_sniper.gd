@@ -57,7 +57,8 @@ func test_snipers_never_walk_in_with_the_horde() -> void:
 	assert_false(director._type_allowed(SNIPER))
 
 
-func test_place_snipers_puts_them_on_the_decks() -> void:
+func test_place_snipers_stays_off_for_now() -> void:
+	assert_false(SpawnDirector.SNIPERS_ENABLED)
 	var director := SpawnDirector.new()
 	add_child_autofree(director)
 	var box := Node3D.new()
@@ -65,16 +66,7 @@ func test_place_snipers_puts_them_on_the_decks() -> void:
 	director.container = box
 	var perches: Array[Vector3] = [Vector3(10.0, 14.5, 40.0), Vector3(-12.0, 14.5, 55.0)]
 	director.place_snipers(perches)
-	var living := get_tree().get_nodes_in_group("zombies")
-	assert_eq(living.size(), 2)
-	for node in living:
-		var zombie := node as Zombie
-		assert_eq(zombie.stats.display_name, "Sniper")
-		var near := false
-		for perch in perches:
-			if zombie.global_position.distance_to(perch) < 0.01:
-				near = true
-		assert_true(near, "each sniper has to stand on a deck")
+	assert_eq(get_tree().get_nodes_in_group("zombies").size(), 0, "tower snipers are parked")
 
 
 func test_a_body_shot_does_not_drop_a_sniper() -> void:

@@ -20,6 +20,7 @@ const TRANSIT_BURST := 20
 
 const ZOMBIE_SCENE := preload("res://scenes/zombies/zombie.tscn")
 const SNIPER := preload("res://resources/zombies/sniper.tres")
+const SNIPERS_ENABLED := false
 
 var types: Array[ZombieStats] = [
 	preload("res://resources/zombies/walker.tres"),
@@ -48,7 +49,7 @@ func begin_hole(hole_index: int, spawn_points: Array[Vector3]) -> void:
 
 
 func place_snipers(perches: Array[Vector3]) -> void:
-	if container == null:
+	if not SNIPERS_ENABLED or container == null:
 		return
 	for perch in perches:
 		_spawn_at(perch, SNIPER)
@@ -205,8 +206,8 @@ func _pick_type() -> ZombieStats:
 
 
 ## Gunners wait until after hole one. The cart-path swarm stays melee so you
-## run them over instead of eating bolts on the tarmac. Tower snipers are placed
-## by place_snipers, never rolled into the walking pack.
+## run them over instead of eating bolts on the tarmac. Tower snipers stay off
+## the walking pack; place_snipers is parked until they come back.
 func _type_allowed(stats: ZombieStats) -> bool:
 	if stats.stationary:
 		return false

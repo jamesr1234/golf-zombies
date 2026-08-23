@@ -191,7 +191,7 @@ func test_flying_into_the_trees_puts_the_cart_back_on_the_path() -> void:
 	)
 
 
-func test_snipers_wait_in_the_towers_until_the_hole_starts() -> void:
+func test_snipers_stay_off_the_towers() -> void:
 	flow.start_hole(0)
 	await wait_physics_frames(6)
 	assert_eq(flow.phase, MatchFlow.Phase.PREP)
@@ -205,7 +205,7 @@ func test_snipers_wait_in_the_towers_until_the_hole_starts() -> void:
 		var zombie := node as Zombie
 		if zombie != null and zombie.stats != null and zombie.stats.display_name == "Sniper":
 			snipers += 1
-	assert_eq(snipers, 2, "readying up is what puts them on the decks")
+	assert_eq(snipers, 0, "tower snipers are parked for now")
 
 
 func test_a_hole_opens_on_the_practice_green_with_nothing_running() -> void:

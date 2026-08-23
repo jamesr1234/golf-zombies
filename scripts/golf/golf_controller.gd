@@ -37,6 +37,9 @@ var _shot_eye := Vector3.ZERO
 ## Where the ball was addressed. Held while the ball is in the air so the golfer
 ## and the club stay planted on the lie instead of riding the shot.
 var _lie := Vector3.ZERO
+## Locked at contact. Online clients never mark their own ball in play, so this
+## is what keeps the stance from tracking the synced flight.
+var _lie_locked := false
 
 
 func _ready() -> void:
@@ -95,6 +98,7 @@ func try_toggle(player: Node) -> void:
 
 
 func release() -> void:
+	_lie_locked = false
 	if golfer == null:
 		return
 	var previous := golfer
@@ -114,7 +118,7 @@ func cancel_swing() -> void:
 
 
 func click() -> void:
-	if golfer == null or ball.is_in_play():
+	if golfer == null or _is_watching_shot():
 		return
 	meter.click()
 	if meter.state == SwingMeter.State.DOWNSWING:
@@ -134,7 +138,7 @@ func aim_by(degrees: float) -> void:
 
 func get_camera_transform() -> Transform3D:
 	var pivot := ball.global_position if ball != null else global_position
-	if ball != null and ball.is_in_play():
+	if _is_watching_shot():
 		return _look_from(_shot_eye, pivot)
 	var forward := Shot.aim_direction(aim_yaw, 0.0)
 	var eye := (
@@ -151,11 +155,17 @@ func _process(delta: float) -> void:
 		meter.tick(delta)
 		if meter.is_done():
 			_strike()
-	if not ball.is_in_play():
-		_lie = ball.global_position
-	_arrow.global_position = _lie
-	_arrow.rotation = Vector3(0.0, deg_to_rad(aim_yaw), 0.0)
+	_refresh_lie()
+	_pose_arrow()
 	_pose_swing(delta)
+
+
+## World space, not local: online the session lives on the ball, and leftover
+## flight spin would otherwise twist the arrow off the aim line after the tee shot.
+func _pose_arrow() -> void:
+	_arrow.global_transform = Transform3D(
+		Basis.looking_at(Shot.aim_direction(aim_yaw, 0.0), Vector3.UP), _lie
+	)
 
 
 ## Holds the golfer at address beside the ball and swings the club through it.
@@ -173,6 +183,7 @@ func _claim(player: Node) -> void:
 	golfer = player
 	meter.reset()
 	_apply_kit()
+	_lie_locked = false
 	_lie = ball.global_position
 	aim_yaw = _yaw_towards(_cup)
 	_arrow.visible = true
@@ -184,6 +195,7 @@ func _claim(player: Node) -> void:
 
 
 func _strike() -> void:
+	_lock_lie()
 	_apply_kit()
 	ball.strike(aim_yaw, meter.deviation_deg, meter.power, _shot_kit(), green_span)
 	meter.reset()
@@ -207,6 +219,22 @@ func _apply_kit() -> void:
 	meter.kit = club_kit
 	if _club != null:
 		_club.apply_kit(club_kit)
+
+
+func _lock_lie() -> void:
+	if not _lie_locked and _shot_eye == Vector3.ZERO:
+		_shot_eye = get_camera_transform().origin
+	_lie_locked = true
+
+
+func _refresh_lie() -> void:
+	if _lie_locked or ball == null or ball.is_in_play():
+		return
+	_lie = ball.global_position
+
+
+func _is_watching_shot() -> bool:
+	return _lie_locked or (ball != null and ball.is_in_play())
 
 
 func _is_putting() -> bool:

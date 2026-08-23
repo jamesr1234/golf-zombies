@@ -66,6 +66,25 @@ func test_the_stance_swings_around_with_the_aim() -> void:
 	assert_almost_eq(north.length(), east.length(), 0.001, "always the same step to the side")
 
 
+## Online the session is a child of the ball, so leftover flight spin has to be
+## ignored or the arrow peels off the line the golfer is facing.
+func test_the_aim_arrow_follows_world_yaw_when_the_parent_has_spun() -> void:
+	var parent := Node3D.new()
+	add_child_autofree(parent)
+	parent.rotation = Vector3(0.6, 1.3, -0.9)
+	var golf := GolfController.new()
+	parent.add_child(golf)
+	golf.aim_yaw = 90.0
+	golf._lie = Vector3(2.0, 0.15, -5.0)
+	golf._pose_arrow()
+	var facing := -golf._arrow.global_transform.basis.z
+	assert_almost_eq(
+		facing.angle_to(Shot.aim_direction(90.0, 0.0)), 0.0, 0.01,
+		"the arrow has to stay on the aim line, not the ball's leftover spin"
+	)
+	assert_almost_eq(golf._arrow.global_position.distance_to(golf._lie), 0.0, 0.01)
+
+
 ## The shaft is built from this gap, so if the grip drifts off the stance the head
 ## stops meeting the ball.
 func test_the_grip_sits_above_the_golfer() -> void:

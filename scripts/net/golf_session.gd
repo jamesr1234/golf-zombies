@@ -44,14 +44,13 @@ func _process(delta: float) -> void:
 
 
 func _show_club(delta: float) -> void:
-	if not ball.is_in_play():
-		_lie = ball.global_position
-	_arrow.global_position = _lie
-	_arrow.rotation = Vector3(0.0, deg_to_rad(aim_yaw), 0.0)
+	_refresh_lie()
+	_pose_arrow()
 	_club.pose(_lie, aim_yaw, meter.value, delta, _is_putting())
 
 
 func _finish_local_swing() -> void:
+	_lock_lie()
 	meter.reset()
 	_arrow.visible = false
 	_club.start_follow_through()
