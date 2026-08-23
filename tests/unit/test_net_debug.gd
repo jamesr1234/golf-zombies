@@ -36,6 +36,21 @@ func test_hiding_the_overlay_dumps_one_last_reading() -> void:
 	assert_true(body.contains("spikes 1"), body)
 
 
+## The trap this guards: on a machine slow enough that every frame is a spike, an
+## unthrottled dump prints every frame and becomes its own bottleneck.
+func test_a_constant_spike_cannot_log_every_frame() -> void:
+	assert_false(
+		NetDebug.due_to_log(true, 1.0 / 15.0),
+		"a spiking frame right after a dump must wait"
+	)
+	assert_true(NetDebug.due_to_log(true, NetDebug.LOG_MIN_GAP), "but not wait forever")
+
+
+func test_a_quiet_run_still_logs_on_the_slow_tick() -> void:
+	assert_false(NetDebug.due_to_log(false, NetDebug.LOG_MIN_GAP), "no spike, no early dump")
+	assert_true(NetDebug.due_to_log(false, NetDebug.LOG_EVERY))
+
+
 func test_line_for_a_puppet_reports_gap_and_stall() -> void:
 	var interp := NetInterp.new()
 	interp.nominal = 0.05

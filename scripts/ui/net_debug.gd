@@ -17,13 +17,17 @@ const SPIKE_MS := 30.0
 const WORST_HOLD := 6.0
 ## How often the same lines go to the Output log while the overlay is up.
 const LOG_EVERY := 2.0
+## A floor on logging, even while spiking. On a machine slow enough that every
+## frame counts as a spike, a print per frame is its own performance problem and
+## would poison the very reading we are taking.
+const LOG_MIN_GAP := 0.5
 
 var world: Node3D
 
 var _worst_ms := 0.0
 var _worst_left := 0.0
 var _spikes := 0
-var _log_left := 0.0
+var _since_log := 0.0
 var _last_delta := 1.0 / 60.0
 
 
@@ -39,10 +43,16 @@ func _process(delta: float) -> void:
 	if not visible:
 		return
 	text = HudStyle.chrome(report(delta))
-	_log_left -= delta
-	if spiked or _log_left <= 0.0:
+	_since_log += delta
+	if due_to_log(spiked, _since_log):
 		dump(delta)
-		_log_left = LOG_EVERY
+		_since_log = 0.0
+
+
+static func due_to_log(spiked: bool, since_log: float) -> bool:
+	if since_log >= LOG_EVERY:
+		return true
+	return spiked and since_log >= LOG_MIN_GAP
 
 
 ## Toggling on clears the counters, so a second press is how you start a fresh
@@ -55,7 +65,6 @@ func toggle() -> String:
 		return body
 	visible = true
 	reset()
-	_log_left = 0.0
 	return ""
 
 
@@ -63,7 +72,7 @@ func reset() -> void:
 	_worst_ms = 0.0
 	_worst_left = 0.0
 	_spikes = 0
-	_log_left = 0.0
+	_since_log = 0.0
 	for interp in puppets().values():
 		interp.reset_stats()
 
