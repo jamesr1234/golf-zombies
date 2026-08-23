@@ -1,7 +1,7 @@
 class_name WorldFx
 extends Node
 ## Host copies short-lived world objects onto clients: walls, shots, cans, ammo,
-## hitscan, fireworks, and the one-shot looks that NetSync does not carry.
+## hitscan, hit flops, fireworks, and the one-shot looks that NetSync does not carry.
 
 var _ammo_seq := 0
 var _ammo: Dictionary = {}
@@ -91,6 +91,15 @@ static func announce_sfx(from: Node, cue: String, skip_peer := 0) -> void:
 		fx._replicate_sfx.rpc(cue, skip_peer)
 
 
+static func announce_zombie_hit(
+	from: Node, region: int, direction: Vector3, strength: float, locked := false,
+	planted := true
+) -> void:
+	var fx := _broadcaster(from)
+	if fx != null:
+		fx._replicate_zombie_hit.rpc(from.get_path(), region, direction, strength, locked, planted)
+
+
 static func announce_fireworks(from: Node, at: Vector3, color: Color) -> void:
 	var fx := _broadcaster(from)
 	if fx != null:
@@ -161,6 +170,17 @@ func apply_sfx(cue: String, skip_peer := 0) -> void:
 	Sfx.play(cue)
 
 
+func apply_zombie_hit(
+	zombie_path: NodePath, region: int, direction: Vector3, strength: float,
+	locked := false, planted := true
+) -> Zombie:
+	var zombie := get_tree().root.get_node_or_null(zombie_path) as Zombie
+	if zombie == null:
+		return null
+	zombie.apply_hit_look(region as Ragdoll.Region, direction, strength, locked, planted)
+	return zombie
+
+
 func apply_fireworks(at: Vector3, color: Color) -> Node:
 	return Fireworks.spawn(_fx_root(), at, color)
 
@@ -222,6 +242,14 @@ func _replicate_hitscan(
 @rpc("authority", "call_remote", "reliable")
 func _replicate_sfx(cue: String, skip_peer: int) -> void:
 	apply_sfx(cue, skip_peer)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _replicate_zombie_hit(
+	zombie_path: NodePath, region: int, direction: Vector3, strength: float, locked: bool,
+	planted: bool
+) -> void:
+	apply_zombie_hit(zombie_path, region, direction, strength, locked, planted)
 
 
 @rpc("authority", "call_remote", "reliable")

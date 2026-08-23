@@ -391,6 +391,29 @@ func test_a_replicated_firework_bursts() -> void:
 	assert_gt(get_tree().get_nodes_in_group("fireworks").size(), 0)
 
 
+func test_a_replicated_hit_lights_up_and_flops() -> void:
+	var world := _world_fx()
+	var zombie := _zombie(Vector3.ZERO)
+	assert_false(zombie.is_flashing())
+	assert_false(zombie.visual.is_limp())
+	var shown := world.apply_zombie_hit(
+		zombie.get_path(), int(Ragdoll.Region.TORSO), Vector3.FORWARD, 1.2
+	)
+	assert_eq(shown, zombie)
+	assert_true(zombie.is_flashing())
+	assert_true(zombie.visual.is_limp())
+
+
+func test_a_watched_zombie_ticks_a_hit_look() -> void:
+	var zombie := _zombie(Vector3.ZERO)
+	zombie.apply_hit_look(Ragdoll.Region.TORSO, Vector3.FORWARD, 1.2)
+	assert_true(zombie.is_flashing())
+	assert_true(zombie.visual.is_limp())
+	zombie._apply_replicated_look(Zombie.FLASH_TIME + 0.05)
+	assert_false(zombie.is_flashing(), "the blink has to go out on a watcher")
+	assert_true(zombie.visual.is_limp(), "the flop outlives the blink")
+
+
 func test_a_replicated_sfx_plays_unless_this_peer_already_did() -> void:
 	Sfx.clear_log()
 	var world := _world_fx()

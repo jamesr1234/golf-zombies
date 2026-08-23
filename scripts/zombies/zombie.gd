@@ -118,10 +118,7 @@ func _physics_process(delta: float) -> void:
 		velocity += get_gravity() * delta
 	_attack_timer = maxf(0.0, _attack_timer - delta)
 	_stagger = _stagger.move_toward(Vector3.ZERO, STAGGER_DECAY * delta)
-	if _flash_left > 0.0:
-		_flash_left = maxf(0.0, _flash_left - delta)
-		if is_zero_approx(_flash_left):
-			_set_flash(false)
+	_tick_flash(delta)
 	if _drink_left > 0.0:
 		_sip(delta)
 		return
@@ -187,9 +184,9 @@ func take_damage(amount: float, direction := Vector3.ZERO, hit_at := Vector3.INF
 		return
 	var region := _hit_region(hit_at)
 	if stats.headshot_only and not is_headshot(hit_at, global_position, stats.height):
-		_flash_left = FLASH_TIME
-		_set_flash(true)
-		_flop(region, direction, Ragdoll.strength_for(amount * 0.35, stats.stagger_resistance), false, true)
+		_hit_look(
+			region, direction, Ragdoll.strength_for(amount * 0.35, stats.stagger_resistance)
+		)
 		_sfx("zombie_hit")
 		return
 	if stats.headshot_only:
@@ -200,11 +197,9 @@ func take_damage(amount: float, direction := Vector3.ZERO, hit_at := Vector3.INF
 	if hp <= 0.0:
 		_begin_death(0.0)
 		return
-	_flash_left = FLASH_TIME
-	_set_flash(true)
 	var shove := knockback(direction, amount, stats.stagger_resistance)
 	_stagger = stack_knockback(_stagger, shove, stats.stagger_resistance)
-	_flop(region, direction, Ragdoll.strength_for(amount, stats.stagger_resistance), false, true)
+	_hit_look(region, direction, Ragdoll.strength_for(amount, stats.stagger_resistance))
 	if velocity.y > 0.0:
 		velocity.y = 0.0
 	_sfx("zombie_hit")
@@ -220,13 +215,9 @@ func melee_hit(origin: Vector3, strength := 1.0) -> void:
 		origin, hit, global_position, stats.height, stats.stagger_resistance, strength
 	)
 	hp = 0.0
-	_flash_left = FLASH_TIME
-	_set_flash(true)
 	_launch(launch, hit)
 	velocity.y = maxf(velocity.y, MELEE_SKY_LIFT)
-	_flop(
-		_hit_region(hit), launch, 1.8 * maxf(0.4, strength), true
-	)
+	_hit_look(_hit_region(hit), launch, 1.8 * maxf(0.4, strength), true, false)
 	_sfx("melee_hit")
 	_begin_death(MELEE_EXPLODE_DELAY)
 
@@ -316,6 +307,9 @@ func net_interp() -> NetInterp:
 func _apply_replicated_look(delta: float) -> void:
 	if visual == null:
 		return
+	_tick_flash(delta)
+	if visual.is_limp():
+		_tick_limp(delta, false)
 	visual.rotation.y = lerp_angle(
 		visual.rotation.y, sync_yaw, clampf(TURN_SPEED * delta, 0.0, 1.0)
 	)
@@ -398,6 +392,31 @@ static func ground_velocity(wish: Vector3, floor_normal: Vector3) -> Vector3:
 	if along.length_squared() < 0.0001:
 		return Vector3.ZERO
 	return along.normalized() * wish.length()
+
+
+func apply_hit_look(
+	region: Ragdoll.Region, direction: Vector3, strength: float, locked := false,
+	planted := true
+) -> void:
+	_flash_left = FLASH_TIME
+	_set_flash(true)
+	_flop(region, direction, strength, locked, planted)
+
+
+func _hit_look(
+	region: Ragdoll.Region, direction: Vector3, strength: float, locked := false,
+	planted := true
+) -> void:
+	apply_hit_look(region, direction, strength, locked, planted)
+	_WorldFx.announce_zombie_hit(self, int(region), direction, strength, locked, planted)
+
+
+func _tick_flash(delta: float) -> void:
+	if _flash_left <= 0.0:
+		return
+	_flash_left = maxf(0.0, _flash_left - delta)
+	if is_zero_approx(_flash_left):
+		_set_flash(false)
 
 
 func _set_flash(on: bool) -> void:
@@ -736,10 +755,7 @@ func _pick_target() -> Node3D:
 func _hold_in_net(delta: float) -> void:
 	_attack_timer = maxf(0.0, _attack_timer - delta)
 	_stagger = Vector3.ZERO
-	if _flash_left > 0.0:
-		_flash_left = maxf(0.0, _flash_left - delta)
-		if is_zero_approx(_flash_left):
-			_set_flash(false)
+	_tick_flash(delta)
 	velocity.x = 0.0
 	velocity.z = 0.0
 	if not is_on_floor():
