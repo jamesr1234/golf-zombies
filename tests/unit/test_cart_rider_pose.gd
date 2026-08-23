@@ -69,13 +69,16 @@ func test_a_carried_rider_ignores_a_stale_replicated_transform() -> void:
 	assert_eq(player.net_interp().snaps, 0, "and must not be logged as a teleport")
 
 
-## The host simulates every cart, so a joining player's own vehicle arrives as
-## snapshots. Their camera hangs off the seat, and a queue held to smooth the
-## ride for a watcher puts the driver's view behind their own steering.
-func test_a_cart_knows_when_the_local_player_is_aboard() -> void:
+## Prediction is for the peer that owns the stick and does not own the cart. On
+## the host, and in solo, the cart is simulated for real and there is nothing to
+## predict against.
+func test_a_cart_it_already_simulates_is_never_predicted() -> void:
+	var pair := await _cart_with_driver()
+	assert_false((pair[0] as GolfCart).predicts_locally())
+
+
+func test_an_empty_cart_is_only_ever_watched() -> void:
 	var cart: GolfCart = CART.instantiate()
 	add_child_autofree(cart)
 	await wait_frames(1)
-	assert_false(cart.carries_local_player(), "an empty cart is only ever watched")
-	var pair := await _cart_with_driver()
-	assert_true((pair[0] as GolfCart).carries_local_player())
+	assert_false(cart.predicts_locally(), "with no one at the wheel there is no stick to read")

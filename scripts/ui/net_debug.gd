@@ -212,7 +212,10 @@ func puppets() -> Dictionary:
 		return found
 	for node in carts.get_children():
 		var cart := node as GolfCart
-		if cart != null and not NetSession.should_simulate(cart):
+		# The cart the local player drives is simulated here rather than glided,
+		# so its queue stands still. Listing its frozen numbers would read as a
+		# perfect link on the one body that never used the link at all.
+		if cart != null and not NetSession.should_simulate(cart) and not cart.predicts_locally():
 			found[String(cart.name).to_lower()] = cart.net_interp()
 	return found
 

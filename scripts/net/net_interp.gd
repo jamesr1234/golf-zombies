@@ -54,12 +54,6 @@ var delay := 0.05
 ## What it actually sits behind by, which is deeper whenever the link has been
 ## producing gaps the requested delay could not cover.
 var depth := 0.05
-## Set on a puppet the local player is riding or steering, which is drawn as
-## close to live as the snapshots allow. Buffering buys smoothness with delay,
-## and that is the right trade for something you watch and the wrong one for
-## something you are inside: the delay lands between the wheel and the view, so
-## a fifth of a second of it reads as broken steering rather than a smooth ride.
-var responsive := false
 
 ## Read by the debug overlay. The draw never reads these back.
 var last_gap := 0.0
@@ -150,7 +144,7 @@ func sample(delta: float) -> Transform3D:
 	_clock += delta
 	_worst_left = maxf(0.0, _worst_left - delta)
 	_need = maxf(0.0, _need - DEPTH_DECAY * delta)
-	depth = clampf(_need * DEPTH_MARGIN, delay, delay if responsive else delay * DEPTH_CEILING)
+	depth = clampf(_need * DEPTH_MARGIN, delay, delay * DEPTH_CEILING)
 	if _poses.is_empty():
 		return Transform3D.IDENTITY
 	_advance(delta)

@@ -111,19 +111,6 @@ func test_the_room_to_grow_is_measured_against_what_was_asked_for() -> void:
 	assert_lt(aimed.depth, DELAY * NetInterp.DEPTH_CEILING, "well short of a watched pawn")
 
 
-## Whoever is aboard steers by what they see, so the queue that would smooth the
-## ride is the same queue that puts their view behind their hands.
-func test_a_puppet_the_local_player_is_riding_never_deepens_its_queue() -> void:
-	var ridden := _started()
-	ridden.responsive = true
-	var x := 0.0
-	for _i in 6:
-		_step(ridden, DELAY * 2.5)
-		x += 1.0
-		ridden.arrive(_at(x))
-	assert_almost_eq(ridden.depth, DELAY, 0.001, "gaps this wide would have deepened a watcher")
-
-
 func test_a_link_that_settles_earns_its_responsiveness_back() -> void:
 	var interp := _started()
 	var x := _stream(interp, 0.0, 4)
