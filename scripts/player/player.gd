@@ -232,6 +232,10 @@ func _process(delta: float) -> void:
 		_animate(delta)
 
 
+func net_interp() -> NetInterp:
+	return _net_interp
+
+
 func is_golfing() -> bool:
 	return state == State.GOLFING
 

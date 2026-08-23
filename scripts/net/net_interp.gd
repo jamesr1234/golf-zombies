@@ -13,6 +13,9 @@ const STRETCH := 1.15
 const WINDOW_EASE := 0.25
 const WINDOW_MIN_SCALE := 0.5
 const WINDOW_MAX_SCALE := 3.0
+## A puppet that moved less than this between snapshots was standing still, so
+## the gap that preceded it says nothing about the connection.
+const STALL_METERS := 0.05
 
 var nominal := 0.05
 var window := 0.05
@@ -21,23 +24,61 @@ var to := Transform3D.IDENTITY
 var age := 0.0
 var _live := false
 
+## Read by the debug overlay. The glide never reads these back.
+var last_gap := 0.0
+var worst_gap := 0.0
+var arrivals := 0
+## Moving snapshots that landed after the glide had already finished, which is
+## the park-then-jump the eye reads as a dropped frame.
+var stalls := 0
+var snaps := 0
+
 
 ## A fresh snapshot. `age` still holds the real gap since the last one, which is
 ## what the next glide runs over. It is clamped because a puppet that holds
 ## still stops reporting, and that silence must not slow its next move.
 func arrive(target: Transform3D, current: Transform3D) -> void:
 	if not _live or current.origin.distance_to(target.origin) > SNAP_METERS:
+		if _live:
+			snaps += 1
 		from = target
 		to = target
 		window = nominal
 		age = window
 		_live = true
 		return
+	_record(current.origin.distance_to(target.origin))
 	var measured := clampf(age, nominal * WINDOW_MIN_SCALE, nominal * WINDOW_MAX_SCALE)
 	window = lerpf(window, measured, WINDOW_EASE)
 	from = current
 	to = target
 	age = 0.0
+
+
+## Called before the window and age are rolled forward, so `age` is still the gap
+## this snapshot arrived on and `window` is still the glide it had to beat.
+func _record(moved: float) -> void:
+	if moved <= STALL_METERS:
+		return
+	arrivals += 1
+	last_gap = age
+	worst_gap = maxf(worst_gap, age)
+	if age > window * STRETCH:
+		stalls += 1
+
+
+func stall_percent() -> float:
+	if arrivals == 0:
+		return 0.0
+	return float(stalls) / float(arrivals) * 100.0
+
+
+func reset_stats() -> void:
+	last_gap = 0.0
+	worst_gap = 0.0
+	arrivals = 0
+	stalls = 0
+	snaps = 0
 
 
 func sample(delta: float) -> Transform3D:

@@ -280,6 +280,10 @@ func _process(delta: float) -> void:
 		_net_interp.follow(self, sync_xform, delta, NetSync.CART_HZ)
 
 
+func net_interp() -> NetInterp:
+	return _net_interp
+
+
 func fling(direction: Vector3, speed: float, lift := 14.0, lock := 1.0) -> void:
 	var dir := Vector3(direction.x, 0.0, direction.z)
 	if dir.length_squared() < 0.0001:

@@ -91,6 +91,55 @@ func test_follow_writes_the_sampled_pose() -> void:
 	assert_almost_eq(node.global_position.x, 2.0, 0.01)
 
 
+func test_a_snapshot_that_lands_mid_glide_is_not_a_stall() -> void:
+	var interp := _started()
+	interp.arrive(Transform3D(Basis(), Vector3(1.0, 0.0, 0.0)), Transform3D.IDENTITY)
+	var mid := _step(interp, NOMINAL * 0.5)
+	interp.arrive(Transform3D(Basis(), Vector3(2.0, 0.0, 0.0)), mid)
+	assert_eq(interp.arrivals, 2, "both moves counted")
+	assert_eq(interp.stalls, 0, "arriving while the puppet is still gliding is on time")
+
+
+func test_a_snapshot_that_lands_after_the_glide_counts_a_stall() -> void:
+	var interp := _started()
+	interp.arrive(Transform3D(Basis(), Vector3(1.0, 0.0, 0.0)), Transform3D.IDENTITY)
+	var parked := _step(interp, NOMINAL * 4.0)
+	interp.arrive(Transform3D(Basis(), Vector3(2.0, 0.0, 0.0)), parked)
+	assert_eq(interp.stalls, 1, "the puppet sat on its last pose before this one landed")
+	assert_almost_eq(interp.stall_percent(), 50.0, 0.01, "one of the two moves stalled")
+	assert_gt(interp.worst_gap, NOMINAL * 3.0, "the gap it waited out is reported")
+
+
+func test_a_puppet_standing_still_reports_no_gap() -> void:
+	var interp := _started()
+	_step(interp, 3.0)
+	interp.arrive(Transform3D.IDENTITY, Transform3D.IDENTITY)
+	assert_eq(interp.arrivals, 0, "silence from a parked puppet is not a late packet")
+	assert_eq(interp.stalls, 0)
+	assert_eq(interp.worst_gap, 0.0)
+
+
+func test_a_teleport_counts_as_a_snap_not_a_stall() -> void:
+	var interp := _started()
+	interp.arrive(Transform3D(Basis(), Vector3(20.0, 0.0, 0.0)), Transform3D.IDENTITY)
+	assert_eq(interp.snaps, 1, "a spawn or seat change is reported on its own")
+	assert_eq(interp.stalls, 0, "and never blamed on the connection")
+
+
+func test_reset_stats_clears_the_readout_without_disturbing_the_glide() -> void:
+	var interp := _started()
+	interp.arrive(Transform3D(Basis(), Vector3(1.0, 0.0, 0.0)), Transform3D.IDENTITY)
+	_step(interp, NOMINAL * 4.0)
+	interp.arrive(Transform3D(Basis(), Vector3(2.0, 0.0, 0.0)), interp.sample(0.0))
+	interp.reset_stats()
+	assert_eq(interp.stalls, 0)
+	assert_eq(interp.arrivals, 0)
+	assert_eq(interp.worst_gap, 0.0)
+	assert_eq(interp.stall_percent(), 0.0)
+	var done := interp.sample(NOMINAL * NetInterp.WINDOW_MAX_SCALE * NetInterp.STRETCH)
+	assert_almost_eq(done.origin.x, 2.0, 0.01, "the puppet still reaches its snapshot")
+
+
 func test_follow_still_catches_a_snapshot_that_skipped_the_setter() -> void:
 	var node := Node3D.new()
 	add_child_autofree(node)

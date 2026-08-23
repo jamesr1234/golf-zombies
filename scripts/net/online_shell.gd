@@ -12,6 +12,7 @@ const _Music := preload("res://scripts/fx/music.gd")
 
 var _local: Player
 var _flow: VsMatchFlow
+var _debug: NetDebug
 var _paused := false
 var _ended := false
 
@@ -26,6 +27,9 @@ func _ready() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	_Music.play_lounge()
 	overlay.visible = false
+	_debug = NetDebug.new()
+	_debug.world = world
+	hud.add_child(_debug)
 	call_deferred("_bind_local")
 
 
@@ -55,6 +59,10 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		if _local != null:
 			_local.add_mouse_look((event as InputEventMouseMotion).relative)
+		return
+	var key := event as InputEventKey
+	if key != null and key.pressed and not key.echo and key.keycode == KEY_F3:
+		_debug.toggle()
 
 
 func _process(_delta: float) -> void:
