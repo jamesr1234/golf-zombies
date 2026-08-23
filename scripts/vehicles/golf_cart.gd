@@ -279,12 +279,25 @@ func _physics_process(delta: float) -> void:
 ## to be re-seated afterwards or they would trail a frame behind the seat.
 func _process(delta: float) -> void:
 	if not NetSession.should_simulate(self):
-		_net_interp.follow(self, sync_xform, delta, NetSync.CART_HZ, NetSync.WATCH_DELAY)
+		_net_interp.responsive = carries_local_player()
+		var watch := 0.0 if _net_interp.responsive else NetSync.WATCH_DELAY
+		_net_interp.follow(self, sync_xform, delta, NetSync.CART_HZ, watch)
 		_seat_riders()
 
 
 func net_interp() -> NetInterp:
 	return _net_interp
+
+
+## Every cart is simulated on the host, so a joining player's own vehicle reaches
+## them as snapshots like any other puppet. Their camera hangs off the seat,
+## which makes a buffered cart a buffered view of the whole world, and they are
+## the one peer who cannot tell that apart from the game running badly.
+func carries_local_player() -> bool:
+	return (
+		(driver != null and NetSession.should_simulate(driver))
+		or (passenger != null and NetSession.should_simulate(passenger))
+	)
 
 
 func fling(direction: Vector3, speed: float, lift := 14.0, lock := 1.0) -> void:

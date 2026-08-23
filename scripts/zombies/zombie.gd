@@ -309,6 +309,10 @@ func _process(delta: float) -> void:
 		_net_interp.follow(self, sync_xform, delta, NetSync.ZOMBIE_HZ)
 
 
+func net_interp() -> NetInterp:
+	return _net_interp
+
+
 func _apply_replicated_look(delta: float) -> void:
 	if visual == null:
 		return

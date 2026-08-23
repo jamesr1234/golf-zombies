@@ -90,7 +90,38 @@ func test_the_queue_deepens_when_the_link_makes_gaps_it_cannot_cover() -> void:
 		x += 1.0
 		interp.arrive(_at(x))
 	assert_gt(interp.depth, DELAY, "gaps this wide need more queue than that")
-	assert_lte(interp.depth, NetInterp.MAX_DEPTH, "though only so much is worth holding")
+	assert_lte(
+		interp.depth, DELAY * NetInterp.DEPTH_CEILING, "though only so much is worth holding"
+	)
+
+
+## The requested delay is the owner saying how late it can stand to be, so the
+## room to grow is measured against that. A zombie asking for one send interval
+## is something you aim at and must not drift as far back as a watched pawn.
+func test_the_room_to_grow_is_measured_against_what_was_asked_for() -> void:
+	var aimed := NetInterp.new()
+	aimed.delay = NOMINAL
+	aimed.arrive(Transform3D.IDENTITY)
+	var x := 0.0
+	for _i in 6:
+		_step(aimed, DELAY * 4.0)
+		x += 1.0
+		aimed.arrive(_at(x))
+	assert_lte(aimed.depth, NOMINAL * NetInterp.DEPTH_CEILING, "it stays near live")
+	assert_lt(aimed.depth, DELAY * NetInterp.DEPTH_CEILING, "well short of a watched pawn")
+
+
+## Whoever is aboard steers by what they see, so the queue that would smooth the
+## ride is the same queue that puts their view behind their hands.
+func test_a_puppet_the_local_player_is_riding_never_deepens_its_queue() -> void:
+	var ridden := _started()
+	ridden.responsive = true
+	var x := 0.0
+	for _i in 6:
+		_step(ridden, DELAY * 2.5)
+		x += 1.0
+		ridden.arrive(_at(x))
+	assert_almost_eq(ridden.depth, DELAY, 0.001, "gaps this wide would have deepened a watcher")
 
 
 func test_a_link_that_settles_earns_its_responsiveness_back() -> void:

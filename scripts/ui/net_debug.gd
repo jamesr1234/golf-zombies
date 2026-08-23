@@ -204,6 +204,9 @@ func puppets() -> Dictionary:
 		var player := node as Player
 		if player != null and not NetSession.should_simulate(player):
 			found["p%d" % player.peer_id] = player.net_interp()
+	var pack := worst_zombie(get_tree().get_nodes_in_group("zombies"))
+	if pack != null:
+		found["zombie"] = pack
 	var carts: Node = world.get_node_or_null("Carts") if world != null else null
 	if carts == null:
 		return found
@@ -212,3 +215,17 @@ func puppets() -> Dictionary:
 		if cart != null and not NetSession.should_simulate(cart):
 			found[String(cart.name).to_lower()] = cart.net_interp()
 	return found
+
+
+## One line for the whole pack. There are dozens of them and they all ride the
+## same link, so only the one having the worst time of it says anything.
+static func worst_zombie(nodes: Array) -> NetInterp:
+	var worst: NetInterp = null
+	for node in nodes:
+		var zombie := node as Zombie
+		if zombie == null or NetSession.should_simulate(zombie):
+			continue
+		var interp := zombie.net_interp()
+		if worst == null or interp.stall_percent() > worst.stall_percent():
+			worst = interp
+	return worst

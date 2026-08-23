@@ -28,9 +28,12 @@ const STALL_METERS := 0.05
 ## connection for the rest of the round.
 const WORST_HOLD := 6.0
 
-## The deepest queue worth holding. Past here the delay costs the viewer more
-## than the hitch it would hide.
-const MAX_DEPTH := 0.3
+## How far past the requested delay the queue may grow. Proportional rather than
+## absolute, because the request is the owner's statement of how much lateness it
+## can live with: a watched pawn asking for a tenth of a second will tolerate
+## three, while a zombie asking for one send interval is something you aim at and
+## must not wander that far behind where the host says it is.
+const DEPTH_CEILING := 3.0
 ## How much deeper than the worst recent gap to sit, so a gap slightly worse than
 ## the last one still lands in time.
 const DEPTH_MARGIN := 1.25
@@ -51,6 +54,12 @@ var delay := 0.05
 ## What it actually sits behind by, which is deeper whenever the link has been
 ## producing gaps the requested delay could not cover.
 var depth := 0.05
+## Set on a puppet the local player is riding or steering, which is drawn as
+## close to live as the snapshots allow. Buffering buys smoothness with delay,
+## and that is the right trade for something you watch and the wrong one for
+## something you are inside: the delay lands between the wheel and the view, so
+## a fifth of a second of it reads as broken steering rather than a smooth ride.
+var responsive := false
 
 ## Read by the debug overlay. The draw never reads these back.
 var last_gap := 0.0
@@ -141,7 +150,7 @@ func sample(delta: float) -> Transform3D:
 	_clock += delta
 	_worst_left = maxf(0.0, _worst_left - delta)
 	_need = maxf(0.0, _need - DEPTH_DECAY * delta)
-	depth = clampf(_need * DEPTH_MARGIN, delay, MAX_DEPTH)
+	depth = clampf(_need * DEPTH_MARGIN, delay, delay if responsive else delay * DEPTH_CEILING)
 	if _poses.is_empty():
 		return Transform3D.IDENTITY
 	_advance(delta)
