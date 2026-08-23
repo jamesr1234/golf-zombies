@@ -72,9 +72,18 @@ const CHASE_FOV := 88.0
 
 var driver: Player
 var passenger: Player
-var _net_throttle := 0.0
-var _net_steer := 0.0
-var _net_boost := false
+## The driver's stick as the host resolved it, in (steer, throttle), and whether
+## they are on the trigger. Replicated so every peer can run the same drive
+## instead of replaying the result of it.
+##
+## This is the difference between a cart that glides and one that hitches. A pose
+## is a sample, so watching one means reconstructing motion from arrivals and
+## every irregularity in them is on screen. A stick is a cause: hand it to a peer
+## and the motion is generated there, continuously, at the physics rate. A late
+## stick holds the last one for a few milliseconds and the cart keeps rolling,
+## which is a sliver of steering lag rather than a stutter.
+@export var sync_stick := Vector2.ZERO
+@export var sync_boost := false
 ## Signed speed along the cart's own forward axis; negative is reverse.
 var drive_speed := 0.0
 @export var turbo := false
@@ -321,21 +330,19 @@ func net_interp() -> NetInterp:
 	return _net_interp
 
 
-## Every cart is simulated on the host, so a joining driver would otherwise steer
-## by snapshots, and neither thing a queue can do is any good to them: held back,
-## their view trails their own hands; drawn live, it parks every time a packet is
-## late. Running the same drive code they already have is the only way the wheel
-## answers on the frame it is turned.
+## A cart with someone at the wheel is driven on every peer, from that driver's
+## stick: their own machine reads the wheel directly, everyone else reads the
+## copy that came with the pose. Nobody replays the pose while it is being
+## driven, because a pose is a sample and a stick is a cause, and only one of
+## those survives a link that delivers unevenly.
 ##
-## Only the driver, and only their own cart. The host still owns every cart for
-## everyone watching and for anything that scores, and a passenger is better off
-## with the smooth ride than with a say they cannot use.
+## An empty cart is glided instead. There is no stick behind a parked cart, and
+## a fling is exactly the kind of thing a watcher cannot see coming.
+##
+## The host still owns every cart. This decides how the motion is drawn, never
+## where the cart really is or what it hit.
 func predicts_locally() -> bool:
-	return (
-		driver != null
-		and not NetSession.should_simulate(self)
-		and NetSession.should_simulate(driver)
-	)
+	return driver != null and not NetSession.should_simulate(self)
 
 
 func _remember_pose() -> void:
@@ -400,14 +407,19 @@ func _drive(delta: float) -> void:
 	var boosting := false
 	if driver != null and driver.health.is_alive():
 		if driver.net_driven and driver.peer_id != multiplayer.get_unique_id():
-			throttle = _net_throttle
-			steer = _net_steer
-			boosting = _net_boost
+			steer = sync_stick.x
+			throttle = sync_stick.y
+			boosting = sync_boost
 		else:
 			var stick := driver.input.move_vector()
 			throttle = -stick.y
 			steer = stick.x
 			boosting = driver.input.pressed("shoot")
+			# A host at the wheel is the only source of its own stick, so it has
+			# to publish what it just read or no one else can run this.
+			if is_multiplayer_authority():
+				sync_stick = Vector2(steer, throttle)
+				sync_boost = boosting
 	var drifting := is_drifting(boosting, steer, drive_speed)
 	_drift = next_drift(_drift, drifting, delta)
 	var pull := ACCELERATION
@@ -742,6 +754,11 @@ func report_drive(stick: Vector2, boosting: bool) -> void:
 		return
 	if multiplayer.get_remote_sender_id() != driver.peer_id:
 		return
-	_net_steer = stick.x
-	_net_throttle = -stick.y
-	_net_boost = boosting
+	sync_stick = stick_drive(stick)
+	sync_boost = boosting
+
+
+## A move vector points up the screen as -Y, and drive wants forward throttle to
+## be positive. Everything downstream reads (steer, throttle).
+static func stick_drive(stick: Vector2) -> Vector2:
+	return Vector2(stick.x, -stick.y)

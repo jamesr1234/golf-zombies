@@ -65,6 +65,10 @@ func test_zombie_and_cart_sync_carry_the_look_flags() -> void:
 	assert_true(cart_sync.replication_config.has_property(NodePath(":turbo")))
 	assert_true(cart_sync.replication_config.has_property(NodePath(":ram_plate")))
 	assert_true(cart_sync.replication_config.has_property(NodePath(":armored")))
+	# Without the stick a watcher can only replay the pose, and replaying a pose
+	# is what puts every uneven arrival on screen.
+	assert_true(cart_sync.replication_config.has_property(NodePath(":sync_stick")))
+	assert_true(cart_sync.replication_config.has_property(NodePath(":sync_boost")))
 	var girl := Node3D.new()
 	add_child_autofree(girl)
 	var girl_sync := NetSync.attach_cart_girl(girl)

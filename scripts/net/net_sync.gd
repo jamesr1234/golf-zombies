@@ -78,9 +78,11 @@ static func attach_zombie(node: Node) -> MultiplayerSynchronizer:
 	]), ZOMBIE_HZ)
 
 
+## The stick rides along with the pose. Watchers drive from it rather than
+## replaying the pose, and the pose is what corrects them when they are wrong.
 static func attach_cart(node: Node) -> MultiplayerSynchronizer:
 	return attach(node, PackedStringArray([
-		":sync_xform",
+		":sync_xform", ":sync_stick", ":sync_boost",
 		":turbo", ":ram_plate", ":armored",
 	]), CART_HZ)
 
