@@ -1,7 +1,7 @@
 class_name NetInterp
 extends RefCounted
-## Draws a puppet a fixed step behind the newest snapshot, interpolating between
-## the two that bracket that moment.
+## Draws a puppet a step behind the newest snapshot, interpolating between the
+## two that bracket that moment.
 ##
 ## Holding the stream back is what absorbs jitter. Measured wifi jitter runs to
 ## a hundred milliseconds, wider than the gap between sends, so packets arrive in
@@ -9,6 +9,9 @@ extends RefCounted
 ## road during a clump, parks on its last pose, and jumps when the next arrives.
 ## With a queue in hand it always has somewhere to go, and the delay a viewer
 ## sees stops varying, which is the part the eye reads as a hitch.
+##
+## The queue sits as deep as the link has lately required and no deeper, so a
+## clean connection is drawn close to live and only a bad one pays for it.
 ##
 ## The delay is only ever as long as its owner asks for. Things you watch are
 ## worth a real buffer; things you shoot are not, because the host scores shots
@@ -25,8 +28,29 @@ const STALL_METERS := 0.05
 ## connection for the rest of the round.
 const WORST_HOLD := 6.0
 
+## The deepest queue worth holding. Past here the delay costs the viewer more
+## than the hitch it would hide.
+const MAX_DEPTH := 0.3
+## How much deeper than the worst recent gap to sit, so a gap slightly worse than
+## the last one still lands in time.
+const DEPTH_MARGIN := 1.25
+## Seconds of depth handed back per second of clean play, so a link that settles
+## earns its responsiveness back instead of paying for one bad patch all match.
+const DEPTH_DECAY := 0.02
+## How much faster than real time the draw runs to make up ground lost to a dry
+## queue, and how much slower to give ground back. Both are far too small to see.
+const CATCHUP := 1.08
+const EASE_OFF := 0.92
+## Slack either side before the draw changes pace, so ordinary jitter does not
+## keep nudging it.
+const PACE_SLACK := 0.02
+
 var nominal := 0.05
+## What the owner asks to sit behind by.
 var delay := 0.05
+## What it actually sits behind by, which is deeper whenever the link has been
+## producing gaps the requested delay could not cover.
+var depth := 0.05
 
 ## Read by the debug overlay. The draw never reads these back.
 var last_gap := 0.0
@@ -40,6 +64,10 @@ var snaps := 0
 var _times: Array[float] = []
 var _poses: Array[Transform3D] = []
 var _clock := 0.0
+## The moment being drawn. It runs on its own pace so a dry queue costs a pause
+## rather than a jump, and it never runs backwards.
+var _draw := 0.0
+var _need := 0.0
 var _last_arrival := 0.0
 var _starved := false
 var _worst_left := 0.0
@@ -68,6 +96,10 @@ func _record(moved: float) -> void:
 		return
 	arrivals += 1
 	last_gap = _clock - _last_arrival
+	# A queue shallower than the gaps the link actually produces runs dry, so
+	# take the worst one seen rather than the average. It is the outliers that
+	# park the puppet; the average never did.
+	_need = maxf(_need, last_gap)
 	if last_gap > worst_gap or _worst_left <= 0.0:
 		worst_gap = last_gap
 		_worst_left = WORST_HOLD
@@ -78,8 +110,9 @@ func _record(moved: float) -> void:
 ## A spawn or a seat change has no history worth keeping. Backdating the one
 ## snapshot by the delay puts the puppet on it now instead of easing toward it.
 func _restart_at(pose: Transform3D) -> void:
-	_times = [_clock - delay]
+	_times = [_clock - depth]
 	_poses = [pose]
+	_draw = _clock - depth
 	_last_arrival = _clock
 	_starved = false
 	_live = true
@@ -107,21 +140,37 @@ func reset_stats() -> void:
 func sample(delta: float) -> Transform3D:
 	_clock += delta
 	_worst_left = maxf(0.0, _worst_left - delta)
+	_need = maxf(0.0, _need - DEPTH_DECAY * delta)
+	depth = clampf(_need * DEPTH_MARGIN, delay, MAX_DEPTH)
 	if _poses.is_empty():
 		return Transform3D.IDENTITY
-	var at := _clock - delay
-	_drop_spent(at)
+	_advance(delta)
+	_drop_spent(_draw)
 	var newest := _poses.size() - 1
-	if at >= _times[newest]:
+	if _draw >= _times[newest]:
 		# One snapshot is the seeded state, not a queue that ran dry. There has
 		# to have been a pair to work through before running out means anything.
 		_starved = newest > 0
 		return _poses[newest]
-	if at <= _times[0]:
+	if _draw <= _times[0]:
 		return _poses[0]
 	var span := _times[1] - _times[0]
-	var reached := 1.0 if span <= 0.0 else (at - _times[0]) / span
+	var reached := 1.0 if span <= 0.0 else (_draw - _times[0]) / span
 	return _poses[0].interpolate_with(_poses[1], clampf(reached, 0.0, 1.0))
+
+
+## Walk the drawn moment forward, never past the newest snapshot. Stopping there
+## is what turns a dry queue into a pause instead of a jump: the draw picks up
+## where the data ran out rather than leaping to where the clock says it should
+## be. The ground that costs is made back a little at a time afterwards.
+func _advance(delta: float) -> void:
+	var behind := (_clock - depth) - _draw
+	var pace := 1.0
+	if behind > PACE_SLACK:
+		pace = CATCHUP
+	elif behind < -PACE_SLACK:
+		pace = EASE_OFF
+	_draw = minf(_draw + delta * pace, _times[_poses.size() - 1])
 
 
 ## Everything older than the moment being drawn is spent, bar the one on its near
@@ -141,6 +190,7 @@ func follow(
 	# There is nothing to draw from between two snapshots that have not both
 	# arrived, so the queue is never shorter than the gap between sends.
 	delay = maxf(p_delay, p_interval)
+	depth = maxf(depth, delay)
 	if not _live or not target.is_equal_approx(_newest()):
 		arrive(target)
 	node.global_transform = sample(delta)

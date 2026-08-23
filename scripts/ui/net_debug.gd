@@ -183,12 +183,16 @@ static func link_line(enet: ENetMultiplayerPeer, ids: PackedInt32Array) -> Strin
 	]
 
 
+## DEPTH is how far behind live this puppet is being drawn. It grows itself to
+## cover the gaps the link is making, so watching it climb is watching the wire
+## get worse.
 static func line_for(label: String, interp: NetInterp) -> String:
-	return "%s   gap %d ms   worst %d ms   stall %d%%   snap %d" % [
+	return "%s   gap %d ms   worst %d ms   stall %d%%   depth %d ms   snap %d" % [
 		label,
 		roundi(interp.last_gap * 1000.0),
 		roundi(interp.worst_gap * 1000.0),
 		roundi(interp.stall_percent()),
+		roundi(interp.depth * 1000.0),
 		interp.snaps,
 	]
 

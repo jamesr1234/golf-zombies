@@ -96,4 +96,5 @@ func test_line_for_a_puppet_reports_gap_and_stall() -> void:
 	var line := NetDebug.line_for("p2", interp)
 	assert_true(line.contains("p2"), line)
 	assert_true(line.contains("stall"), line)
+	assert_true(line.contains("depth"), "how far behind live it is drawing")
 	assert_gt(interp.stalls, 0)

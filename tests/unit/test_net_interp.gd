@@ -68,6 +68,44 @@ func test_the_puppet_parks_only_once_the_queue_is_spent() -> void:
 	assert_almost_eq(still.origin.x, run_dry.origin.x, 0.001, "nothing left to draw from")
 
 
+## A packet landing after the queue ran dry used to throw the puppet to wherever
+## the timeline said it should already have got to, so a long gap read as a
+## freeze and then a teleport. The draw keeping its own pace is what fixes it.
+func test_a_very_late_packet_does_not_jump_the_puppet_forward() -> void:
+	var interp := _started()
+	var x := _stream(interp, 0.0, 8)
+	var parked := _step(interp, DELAY + NOMINAL * 4.0).origin.x
+	interp.arrive(_at(x + 1.0))
+	var resumed := interp.sample(1.0 / 60.0).origin.x
+	assert_gt(resumed, parked, "it does start moving again")
+	assert_lt(resumed - parked, 0.5, "but carries on from where it stopped, not from the clock")
+
+
+func test_the_queue_deepens_when_the_link_makes_gaps_it_cannot_cover() -> void:
+	var interp := _started()
+	var x := _stream(interp, 0.0, 6)
+	assert_almost_eq(interp.depth, DELAY, 0.01, "a clean link sits at what was asked for")
+	for _i in 4:
+		_step(interp, DELAY * 2.5)
+		x += 1.0
+		interp.arrive(_at(x))
+	assert_gt(interp.depth, DELAY, "gaps this wide need more queue than that")
+	assert_lte(interp.depth, NetInterp.MAX_DEPTH, "though only so much is worth holding")
+
+
+func test_a_link_that_settles_earns_its_responsiveness_back() -> void:
+	var interp := _started()
+	var x := _stream(interp, 0.0, 4)
+	for _i in 3:
+		_step(interp, DELAY * 2.5)
+		x += 1.0
+		interp.arrive(_at(x))
+	var deep := interp.depth
+	assert_gt(deep, DELAY, "the bad patch bought depth")
+	_stream(interp, x, 400)
+	assert_lt(interp.depth, deep, "and clean play hands it back")
+
+
 func test_a_snapshot_after_the_queue_ran_dry_counts_a_stall() -> void:
 	var interp := _started()
 	var x := _stream(interp, 0.0, 8)
