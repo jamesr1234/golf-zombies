@@ -91,7 +91,7 @@ const REMOTE_POSE_EASE := 18.0
 @export var sync_xform := Transform3D.IDENTITY:
 	set(value):
 		sync_xform = value
-		if is_inside_tree() and not NetSession.should_simulate(self):
+		if is_inside_tree() and not NetSession.should_simulate(self) and not carried_by_cart():
 			_net_interp.arrive(value, global_transform)
 
 var peer_id := 0
@@ -228,8 +228,16 @@ func _physics_process(delta: float) -> void:
 ## Puppets move and pose on the rendered frame so the two never disagree.
 func _process(delta: float) -> void:
 	if not NetSession.should_simulate(self):
-		_net_interp.follow(self, sync_xform, delta, NetSync.PAWN_HZ)
+		if not carried_by_cart():
+			_net_interp.follow(self, sync_xform, delta, NetSync.PAWN_HZ)
 		_animate(delta)
+
+
+## A rider is placed by the cart it sits in, on every peer, so its own replicated
+## transform must not also steer it. Two owners fight over the same pose and the
+## body ends up snapping between the seat and whatever the rider last reported.
+func carried_by_cart() -> bool:
+	return state == State.RIDING and cart != null and cart.is_riding(self)
 
 
 func net_interp() -> NetInterp:

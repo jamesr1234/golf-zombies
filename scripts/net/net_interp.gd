@@ -12,7 +12,11 @@ const STRETCH := 1.15
 ## swing the window.
 const WINDOW_EASE := 0.25
 const WINDOW_MIN_SCALE := 0.5
-const WINDOW_MAX_SCALE := 3.0
+## Measured LAN gaps reach roughly seven times the send interval on a bad packet,
+## and a window shorter than that parks the puppet until the next one lands. The
+## ceiling only costs lag when the gaps are really that wide, because the window
+## eases toward what it measures rather than sitting at the limit.
+const WINDOW_MAX_SCALE := 7.0
 ## A puppet that moved less than this between snapshots was standing still, so
 ## the gap that preceded it says nothing about the connection.
 const STALL_METERS := 0.05

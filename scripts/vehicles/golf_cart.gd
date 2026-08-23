@@ -275,9 +275,12 @@ func _physics_process(delta: float) -> void:
 	sync_xform = global_transform
 
 
+## A watching peer glides the cart here rather than in physics, so its riders have
+## to be re-seated afterwards or they would trail a frame behind the seat.
 func _process(delta: float) -> void:
 	if not NetSession.should_simulate(self):
 		_net_interp.follow(self, sync_xform, delta, NetSync.CART_HZ)
+		_seat_riders()
 
 
 func net_interp() -> NetInterp:
