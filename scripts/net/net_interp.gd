@@ -20,6 +20,14 @@ const WINDOW_MAX_SCALE := 7.0
 ## A puppet that moved less than this between snapshots was standing still, so
 ## the gap that preceded it says nothing about the connection.
 const STALL_METERS := 0.05
+## A 30 Hz stream read on a 60 Hz frame lands a whole frame late whenever the two
+## beats drift apart, which is often. The puppet parks for less than one
+## displayed frame, which nobody can see, so counting it buries the real stalls.
+const FRAME_GRACE := 1.0 / 60.0
+## How long the worst gap stands before recent play can replace it. Without this
+## a single hiccup while the match was still settling reads as the state of the
+## connection for the rest of the round.
+const WORST_HOLD := 6.0
 
 var nominal := 0.05
 var window := 0.05
@@ -36,6 +44,7 @@ var arrivals := 0
 ## the park-then-jump the eye reads as a dropped frame.
 var stalls := 0
 var snaps := 0
+var _worst_left := 0.0
 
 
 ## A fresh snapshot. `age` still holds the real gap since the last one, which is
@@ -66,8 +75,10 @@ func _record(moved: float) -> void:
 		return
 	arrivals += 1
 	last_gap = age
-	worst_gap = maxf(worst_gap, age)
-	if age > window * STRETCH:
+	if age > worst_gap or _worst_left <= 0.0:
+		worst_gap = age
+		_worst_left = WORST_HOLD
+	if age > window * STRETCH + FRAME_GRACE:
 		stalls += 1
 
 
@@ -83,10 +94,12 @@ func reset_stats() -> void:
 	arrivals = 0
 	stalls = 0
 	snaps = 0
+	_worst_left = 0.0
 
 
 func sample(delta: float) -> Transform3D:
 	age += delta
+	_worst_left = maxf(0.0, _worst_left - delta)
 	var span := window * STRETCH
 	if span <= 0.0:
 		return to

@@ -80,6 +80,11 @@ func test_a_quiet_run_still_logs_on_the_slow_tick() -> void:
 	assert_true(NetDebug.due_to_log(false, NetDebug.LOG_EVERY))
 
 
+func test_the_link_reads_idle_when_there_is_no_one_on_the_other_end() -> void:
+	assert_eq(NetDebug.link_line(null, PackedInt32Array()), "link idle")
+	assert_eq(NetDebug.link_line(ENetMultiplayerPeer.new(), PackedInt32Array()), "link idle")
+
+
 func test_line_for_a_puppet_reports_gap_and_stall() -> void:
 	var interp := NetInterp.new()
 	interp.nominal = 0.05

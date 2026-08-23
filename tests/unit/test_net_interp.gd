@@ -110,6 +110,36 @@ func test_a_snapshot_that_lands_after_the_glide_counts_a_stall() -> void:
 	assert_gt(interp.worst_gap, NOMINAL * 3.0, "the gap it waited out is reported")
 
 
+## Sending at 30 Hz and reading at 60 Hz means the beats slip a whole frame
+## regularly. That slip was being counted, so a healthy connection reported a
+## double digit stall rate and the real stalls had nothing to stand out against.
+func test_a_gap_that_slips_one_render_frame_is_not_a_stall() -> void:
+	var interp := _started()
+	interp.arrive(Transform3D(Basis(), Vector3(1.0, 0.0, 0.0)), Transform3D.IDENTITY)
+	var slipped := _step(interp, NOMINAL * NetInterp.STRETCH + NetInterp.FRAME_GRACE * 0.5)
+	interp.arrive(Transform3D(Basis(), Vector3(2.0, 0.0, 0.0)), slipped)
+	assert_eq(interp.arrivals, 2, "both moves counted")
+	assert_gt(interp.last_gap, NOMINAL * NetInterp.STRETCH, "it did land past the glide")
+	assert_eq(interp.stalls, 0, "but by less than a frame, which nobody can see")
+
+
+func test_the_worst_gap_fades_so_one_bad_moment_does_not_stand_all_match() -> void:
+	var interp := _started()
+	interp.arrive(Transform3D(Basis(), Vector3(1.0, 0.0, 0.0)), Transform3D.IDENTITY)
+	_step(interp, NOMINAL * 4.0)
+	var x := 2.0
+	interp.arrive(Transform3D(Basis(), Vector3(x, 0.0, 0.0)), interp.sample(0.0))
+	var bad := interp.worst_gap
+	assert_gt(bad, NOMINAL * 3.0, "the hiccup is on the board")
+	var elapsed := 0.0
+	while elapsed < NetInterp.WORST_HOLD + NOMINAL:
+		_step(interp, NOMINAL)
+		x += 1.0
+		interp.arrive(Transform3D(Basis(), Vector3(x, 0.0, 0.0)), interp.sample(0.0))
+		elapsed += NOMINAL
+	assert_lt(interp.worst_gap, bad, "a clean run since then takes it back down")
+
+
 func test_a_puppet_standing_still_reports_no_gap() -> void:
 	var interp := _started()
 	_step(interp, 3.0)

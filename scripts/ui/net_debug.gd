@@ -158,12 +158,29 @@ func report(delta: float) -> String:
 		],
 		"hitch every %.2f s   %+d nodes on it" % [_spike_period, _spike_grew],
 	]
+	lines.append(link_line(multiplayer.multiplayer_peer as ENetMultiplayerPeer, multiplayer.get_peers()))
 	var remote := puppets()
 	if remote.is_empty():
 		lines.append("no remote puppets")
 	for label in remote:
 		lines.append(line_for(label, remote[label]))
 	return "\n".join(lines)
+
+
+## What the transport thinks of the link. JITTER is the one that matters here: a
+## puppet can only arrive as steadily as the wire delivers, so a jittery link
+## shows up as a stall no matter how good the frame rate is at either end.
+static func link_line(enet: ENetMultiplayerPeer, ids: PackedInt32Array) -> String:
+	if enet == null or ids.is_empty():
+		return "link idle"
+	var peer := enet.get_peer(ids[0])
+	if peer == null:
+		return "link idle"
+	return "ping %d ms   jitter %d ms   loss %.1f%%" % [
+		int(peer.get_statistic(ENetPacketPeer.PEER_ROUND_TRIP_TIME)),
+		int(peer.get_statistic(ENetPacketPeer.PEER_ROUND_TRIP_TIME_VARIANCE)),
+		peer.get_statistic(ENetPacketPeer.PEER_PACKET_LOSS) / 65536.0 * 100.0,
+	]
 
 
 static func line_for(label: String, interp: NetInterp) -> String:
