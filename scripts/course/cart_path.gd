@@ -33,13 +33,17 @@ var track_length := 0.0
 var centerline: Array[Vector3] = []
 var forest_height: HeightField
 var keep_out := Rect2()
+var woods_spots: Array[Dictionary] = []
+var woods_keep_out := Rect2()
+var woods_need_field := false
+var woods_cheap := false
 var _crash_cool := 0.0
 var _pending: Array[Dictionary] = []
 
 
 static func build(
 	cup: Vector3, along: Vector3, bounds: Rect2, height: HeightField, hole_node: Node3D,
-	green_radius := 10.0
+	green_radius := 10.0, spread := false, cheap := false
 ) -> CartPath:
 	var path := CartPath.new()
 	path.name = "CartPath"
@@ -55,7 +59,12 @@ static func build(
 	path.track_length = CartPathTrack.length_of(path.centerline)
 	path.tee = path.centerline[path.centerline.size() - 1]
 	path.heading = CartPathTrack.finish_heading(path.centerline)
-	_Forest.dress(path, bounds)
+	if spread:
+		_Forest.queue(path, bounds, cheap)
+		path.set_process(true)
+	else:
+		_Forest.dress(path, bounds)
+		path.set_process(false)
 	path._build_road()
 	_Boost.dress(path)
 	path._build_end_cap()
@@ -68,6 +77,11 @@ static func build(
 	_open_gate(hole_node, cup, along, exit_at)
 	_hide_old_pin(hole_node)
 	return path
+
+
+func _process(_delta: float) -> void:
+	if not _Forest.step(self):
+		set_process(false)
 
 
 func hide_arrows() -> void:

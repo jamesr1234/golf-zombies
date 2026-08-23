@@ -391,6 +391,36 @@ func test_the_track_opens_with_a_clubhouse_gate() -> void:
 	assert_gt(_Gate.PILLAR_H, 8.0, "tall enough to read as an entrance")
 
 
+func test_a_joining_client_does_not_plant_the_woods_in_one_shot() -> void:
+	var data := HoleGenerator.generate(0, SEED)
+	var hole := HoleBuilder.build(data)
+	add_child_autofree(hole)
+	var along := data.cup - data.tee
+	along.y = 0.0
+	var path := CartPath.build(
+		data.cup, along.normalized(), data.bounds, data.height, hole, data.green_radius,
+		true, true
+	)
+	hole.add_child(path)
+	assert_null(path.find_child("ForestGround", true, false), "no heightmap on Computer 2")
+	assert_eq(get_tree().get_nodes_in_group("forest_trees").size(), 0)
+	assert_true(_Forest.busy(path), "the trees are waiting")
+	_Forest.step(path)
+	var after_one := get_tree().get_nodes_in_group("forest_trees").size()
+	assert_gt(after_one, 0)
+	assert_lte(after_one, _Forest.CHEAP_BATCH)
+	_Forest.flush(path)
+	var trees := get_tree().get_nodes_in_group("forest_trees")
+	assert_gt(trees.size(), 20, "the drive still reads as woods")
+	assert_null(path.find_child("ForestGround", true, false))
+	for tree in trees:
+		assert_false(tree is StaticBody3D, "cheap trees are looks")
+		assert_gt(
+			_lane_offset(path, tree.global_position), CartPath.PATH_WIDTH * 0.5,
+			"trees stay off the racing line"
+		)
+
+
 func _path() -> CartPath:
 	var data := HoleGenerator.generate(0, SEED)
 	var hole := HoleBuilder.build(data)

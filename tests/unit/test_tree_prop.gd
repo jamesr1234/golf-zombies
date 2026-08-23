@@ -47,6 +47,21 @@ func test_foliage_uses_a_leaf_shader() -> void:
 	assert_gt(Palette.TREE_CANOPIES.size(), 4)
 
 
+func test_a_cheap_tree_is_a_look_not_a_body() -> void:
+	var tree := _Tree.create({
+		"kind": "tree",
+		"position": Vector3(2.0, 0.0, 4.0),
+		"size": Vector3(0.8, 8.0, 0.0),
+		"yaw": 10.0,
+		"cheap": true,
+	})
+	add_child_autofree(tree)
+	assert_false(tree is StaticBody3D, "the joiner does not need a collider per tree")
+	assert_not_null(tree.get_node_or_null("Trunk"))
+	assert_not_null(tree.get_node_or_null("Canopy"))
+	assert_eq(tree.get_child_count(), 2, "one trunk and one puff, not a crown of meshes")
+
+
 func _make(at: Vector3, size: Vector3) -> Node3D:
 	var tree := _Tree.create({
 		"kind": "tree",

@@ -10,7 +10,9 @@ const CART_GAP := 5.5
 const CART_ROW := 6.0
 const CART_COUNT := 8
 const TRANSIT_STAND := 2.4
+const CLUBHOUSE_WAIT := 0.4
 const _Music := preload("res://scripts/fx/music.gd")
+const _Forest := preload("res://scripts/course/cart_path_forest.gd")
 
 var hole: HoleData
 var hole_node: Node3D
@@ -18,6 +20,7 @@ var cart_path: CartPath
 var clubhouse: Clubhouse
 var cart_girl: CartGirl
 var shop: Shop
+var _clubhouse_wait := -1.0
 
 @onready var hole_root: Node3D = $"../HoleRoot"
 
@@ -191,15 +194,33 @@ func aim_play(sessions: Array) -> void:
 
 
 func begin_transit(carts: Array[GolfCart], players: Array[Player] = []) -> CartPath:
+	var spread := _Forest.should_spread(NetSession.is_active())
+	var cheap := NetSession.defers_world()
 	var forward := along_hole()
 	cart_path = CartPath.build(
-		hole.cup, forward, hole.bounds, hole.height, hole_node, hole.green_radius
+		hole.cup, forward, hole.bounds, hole.height, hole_node, hole.green_radius,
+		spread, cheap
 	)
 	hole_node.add_child(cart_path)
-	_open_clubhouse()
+	_clubhouse_wait = -1.0
+	if spread:
+		_clubhouse_wait = CLUBHOUSE_WAIT
+	else:
+		_open_clubhouse()
 	_park_carts_for_transit(carts)
 	place_players_at_carts(players, carts)
 	return cart_path
+
+
+func _process(delta: float) -> void:
+	if _clubhouse_wait < 0.0:
+		return
+	_clubhouse_wait -= delta
+	if _clubhouse_wait > 0.0:
+		return
+	_clubhouse_wait = -1.0
+	if clubhouse == null:
+		_open_clubhouse()
 
 
 func _park_carts_for_transit(carts: Array[GolfCart]) -> void:

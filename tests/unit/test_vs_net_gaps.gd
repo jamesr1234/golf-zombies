@@ -103,6 +103,14 @@ func test_a_watching_peer_does_not_bake_the_hole() -> void:
 	assert_false(HoleBuilder.should_bake(true), "Computer 2 does not path zombies")
 
 
+func test_the_joiner_spreads_and_cheaps_the_woods() -> void:
+	assert_false(CartPathForest.should_spread(false), "solo play can plant now")
+	assert_true(CartPathForest.should_spread(true), "online must not hitch the wire")
+	assert_false(CartPathForest.should_cheap(true, true), "the host keeps the full woods")
+	assert_true(CartPathForest.should_cheap(true, false), "Computer 2 only needs the look")
+	assert_false(CartPathForest.should_cheap(false, false), "offline stays full quality")
+
+
 func test_a_live_session_defers_only_when_not_the_server() -> void:
 	assert_false(NetSession.defers_world(), "GUT is offline, so fire stays local")
 	NetSession._active = true

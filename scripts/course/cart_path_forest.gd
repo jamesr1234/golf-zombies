@@ -9,19 +9,74 @@ const CELL := 3.0
 const ROAD_FLAT := 1.6
 const TEE_FLAT := 22.0
 const ROW_OFFSETS: Array[float] = [14.85, 22.25, 34.25, 46.25]
+const CHEAP_ROWS: Array[float] = [14.85, 34.25]
 const TREE_SPACING := 9.0
 const LANE_CLEAR := 13.9
 const START_CLEAR := 16.0
 const TEE_CLEAR := 20.0
+const HOST_BATCH := 4
+const CHEAP_BATCH := 12
+
+
+static func should_spread(active: bool) -> bool:
+	return active
+
+
+static func should_cheap(active: bool, is_server: bool) -> bool:
+	return active and not is_server
 
 
 static func dress(path: Node3D, keep_out: Rect2) -> void:
+	queue(path, keep_out, false)
+	flush(path)
+
+
+static func queue(path: Node3D, keep_out: Rect2, cheap: bool) -> void:
+	path.set("woods_keep_out", keep_out)
+	path.set("woods_cheap", cheap)
+	path.set("woods_need_field", not cheap)
+	if cheap:
+		path.set("woods_spots", _spots(path, keep_out, true))
+	else:
+		path.set("woods_spots", [] as Array[Dictionary])
+
+
+static func busy(path: Node3D) -> bool:
+	if bool(path.get("woods_need_field")):
+		return true
+	var spots: Array = path.get("woods_spots")
+	return spots != null and not spots.is_empty()
+
+
+static func flush(path: Node3D) -> void:
+	while step(path):
+		pass
+
+
+static func step(path: Node3D) -> bool:
+	if bool(path.get("woods_need_field")):
+		_lay_ground(path, path.get("woods_keep_out"))
+		path.set("woods_need_field", false)
+		path.set("woods_spots", _spots(path, path.get("woods_keep_out"), false))
+		return busy(path)
+	var spots: Array = path.get("woods_spots")
+	if spots == null or spots.is_empty():
+		return false
+	var cap := CHEAP_BATCH if bool(path.get("woods_cheap")) else HOST_BATCH
+	var n := 0
+	while n < cap and not spots.is_empty():
+		_plant_spot(path, spots.pop_back())
+		n += 1
+	path.set("woods_spots", spots)
+	return busy(path)
+
+
+static func _lay_ground(path: Node3D, keep_out: Rect2) -> void:
 	var field := _field(path, keep_out)
 	path.set("forest_height", field)
 	var ground := field.make_body()
 	ground.name = "ForestGround"
 	path.add_child(ground)
-	_plant(path, keep_out)
 
 
 static func _field(path: Node3D, keep_out: Rect2) -> HeightField:
@@ -97,7 +152,7 @@ static func _bounds(centerline: Array[Vector3]) -> Rect2:
 	return rect.grow(HALF_WIDTH)
 
 
-static func _plant(path: Node3D, keep_out: Rect2) -> void:
+static func _spots(path: Node3D, keep_out: Rect2, cheap: bool) -> Array[Dictionary]:
 	var centerline: Array[Vector3] = path.get("centerline")
 	var tee: Vector3 = path.get("tee")
 	var heading: Vector3 = path.get("heading")
@@ -105,8 +160,10 @@ static func _plant(path: Node3D, keep_out: Rect2) -> void:
 	var yaw := ClubhouseBuild.yaw_at_tee(tee, plaza)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 20260816 + int(centerline[0].x * 11.0) + int(centerline[0].z * 19.0)
+	var rows: Array[float] = CHEAP_ROWS if cheap else ROW_OFFSETS
 	var next := TREE_SPACING * 0.4
 	var travelled := 0.0
+	var spots: Array[Dictionary] = []
 	for i in range(1, centerline.size()):
 		var a := centerline[i - 1]
 		var b := centerline[i]
@@ -121,39 +178,50 @@ static func _plant(path: Node3D, keep_out: Rect2) -> void:
 		while next <= travelled + 0.01:
 			var t := 1.0 - (travelled - next) / span
 			var at := a.lerp(b, clampf(t, 0.0, 1.0))
-			for offset in ROW_OFFSETS:
+			for offset in rows:
 				for side in [-1.0, 1.0]:
 					if rng.randf() < 0.1:
 						continue
 					var spot := at + dir * rng.randf_range(-2.2, 2.2)
 					spot += right * side * (offset + rng.randf_range(-1.6, 1.6))
-					_try_tree(path, centerline, tee, plaza, yaw, keep_out, rng, spot)
+					var planted := _spot_at(path, centerline, tee, plaza, yaw, keep_out, rng, spot, cheap)
+					if not planted.is_empty():
+						spots.append(planted)
 			next += TREE_SPACING
+	return spots
 
 
-static func _try_tree(
+static func _spot_at(
 	path: Node3D, centerline: Array[Vector3], tee: Vector3, plaza: Vector3, yaw: float,
-	keep_out: Rect2, rng: RandomNumberGenerator, spot: Vector3
-) -> void:
+	keep_out: Rect2, rng: RandomNumberGenerator, spot: Vector3, cheap: bool
+) -> Dictionary:
 	if keep_out.has_point(Vector2(spot.x, spot.z)):
-		return
+		return {}
 	if CartPathTrack.distance_to(centerline, spot) < LANE_CLEAR:
-		return
+		return {}
 	if spot.distance_to(centerline[0]) < START_CLEAR:
-		return
+		return {}
 	if spot.distance_to(tee) < TEE_CLEAR:
-		return
+		return {}
 	if ClubhouseBuild.covers_ground(plaza, yaw, spot, 4.0):
-		return
+		return {}
 	var field: HeightField = path.get("forest_height")
 	if field != null:
 		spot.y = field.height_at(spot.x, spot.z)
-	var size := Vector3(rng.randf_range(0.55, 1.1), rng.randf_range(6.0, 11.0), 0.0)
-	var tree := HoleBuilder.create_prop({
+	elif not centerline.is_empty():
+		spot.y = CartPathTrack.closest(centerline, spot).y
+	return {
 		"kind": "tree",
 		"position": spot,
-		"size": size,
+		"size": Vector3(rng.randf_range(0.55, 1.1), rng.randf_range(6.0, 11.0), 0.0),
 		"yaw": rng.randf_range(0.0, 360.0),
-	})
+		"cheap": cheap,
+	}
+
+
+static func _plant_spot(path: Node3D, prop: Dictionary) -> void:
+	if prop.is_empty():
+		return
+	var tree := HoleBuilder.create_prop(prop)
 	tree.add_to_group("forest_trees")
 	path.add_child(tree)

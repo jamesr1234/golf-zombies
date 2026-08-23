@@ -12,7 +12,9 @@ var _canopy: Node3D
 var _phase := 0.0
 
 
-static func create(prop: Dictionary) -> StaticBody3D:
+static func create(prop: Dictionary) -> Node3D:
+	if bool(prop.get("cheap", false)):
+		return _cheap(prop)
 	var size: Vector3 = prop["size"]
 	var at: Vector3 = prop["position"]
 	var tree = _SCRIPT.new()
@@ -25,6 +27,31 @@ static func create(prop: Dictionary) -> StaticBody3D:
 	tree.add_child(tree._canopy)
 	tree.position = at + Vector3.UP * size.y * 0.5
 	tree.rotation.y = deg_to_rad(float(prop["yaw"]))
+	return tree
+
+
+## Watcher look: one trunk, one puff, no collider, no per-tree sway script.
+static func _cheap(prop: Dictionary) -> Node3D:
+	var size: Vector3 = prop["size"]
+	var at: Vector3 = prop["position"]
+	var tree := Node3D.new()
+	tree.position = at + Vector3.UP * size.y * 0.5
+	tree.rotation.y = deg_to_rad(float(prop["yaw"]))
+	tree.add_child(_trunk(size))
+	var tint := canopy_tint(at)
+	var phase := _phase_at(at)
+	if _is_pine(at):
+		var cone := MeshFactory.taper(size.y * 0.18, 0.02, size.y * 0.42, tint)
+		cone.position.y = size.y * 0.04
+		cone.material_override = _foliage(tint, phase)
+		cone.name = "Canopy"
+		tree.add_child(cone)
+	else:
+		var puff := MeshFactory.sphere(size.y * 0.18, tint)
+		puff.position.y = size.y * 0.08
+		puff.material_override = _foliage(tint, phase)
+		puff.name = "Canopy"
+		tree.add_child(puff)
 	return tree
 
 
