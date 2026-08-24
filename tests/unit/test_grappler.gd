@@ -75,11 +75,11 @@ func test_a_stretched_rope_adds_pull_toward_the_hook() -> void:
 
 
 func test_the_hook_mask_sees_carts_and_mechs() -> void:
-	assert_true(Grappler.HOOK_MASK & Layers.VEHICLE)
-	assert_true(Grappler.HOOK_MASK & Layers.MECH)
-	assert_true(Grappler.HOOK_MASK & Layers.WORLD)
-	assert_false(Grappler.HOOK_MASK & Layers.PLAYER)
-	assert_false(Grappler.HOOK_MASK & Layers.ZOMBIE)
+	assert_ne(Grappler.HOOK_MASK & Layers.VEHICLE, 0)
+	assert_ne(Grappler.HOOK_MASK & Layers.MECH, 0)
+	assert_ne(Grappler.HOOK_MASK & Layers.WORLD, 0)
+	assert_eq(Grappler.HOOK_MASK & Layers.PLAYER, 0)
+	assert_eq(Grappler.HOOK_MASK & Layers.ZOMBIE, 0)
 
 
 func test_firing_spawns_a_flying_claw() -> void:
