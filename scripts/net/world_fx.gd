@@ -120,6 +120,26 @@ static func announce_cart_girl(from: Node, kind: String) -> void:
 		fx._replicate_cart_girl.rpc(kind)
 
 
+static func announce_mech(
+	from: Node,
+	owner_peer: int,
+	origin: Vector3,
+	yaw: float,
+	stick: Vector2,
+	sprint: bool,
+	sealed: bool,
+	pilot_id: int,
+	reliable := false
+) -> void:
+	var fx := _broadcaster(from)
+	if fx == null:
+		return
+	if reliable:
+		fx._replicate_mech_seal.rpc(owner_peer, origin, yaw, stick, sprint, sealed, pilot_id)
+	else:
+		fx._replicate_mech.rpc(owner_peer, origin, yaw, stick, sprint, sealed, pilot_id)
+
+
 func apply_barrier(at: Vector3, yaw_deg: float) -> Node:
 	return HexBarrier.spawn(_fx_root(), at, yaw_deg)
 
@@ -270,6 +290,68 @@ func _replicate_fireworks(at: Vector3, color: Color) -> void:
 @rpc("authority", "call_remote", "reliable")
 func _replicate_cart_girl(kind: String) -> void:
 	apply_cart_girl(kind)
+
+
+@rpc("authority", "call_remote", "unreliable")
+func _replicate_mech(
+	owner_peer: int, origin: Vector3, yaw: float, stick: Vector2, sprint: bool, sealed: bool, pilot_id: int
+) -> void:
+	apply_mech(owner_peer, origin, yaw, stick, sprint, sealed, pilot_id)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _replicate_mech_seal(
+	owner_peer: int, origin: Vector3, yaw: float, stick: Vector2, sprint: bool, sealed: bool, pilot_id: int
+) -> void:
+	apply_mech(owner_peer, origin, yaw, stick, sprint, sealed, pilot_id)
+
+
+func apply_mech(
+	owner_peer: int, origin: Vector3, yaw: float, stick: Vector2, sprint: bool, sealed: bool, pilot_id: int
+) -> void:
+	var mech := _mech_for(owner_peer)
+	if mech == null:
+		mech = _spawn_watch_mech(owner_peer, origin, yaw)
+	elif owner_peer > 0 and int(mech.get("owner_peer")) <= 0:
+		mech.set("owner_peer", owner_peer)
+	if mech != null and mech.has_method("take_wire"):
+		var pose := Transform3D(Basis.from_euler(Vector3(0.0, yaw, 0.0)), origin)
+		mech.take_wire(pose, stick, sprint, sealed, pilot_id)
+
+
+func _mech_for(owner_peer: int) -> Node:
+	var unclaimed: Node
+	var loose := 0
+	for node in get_tree().get_nodes_in_group("mechs"):
+		var peer := int(node.get("owner_peer"))
+		if owner_peer > 0 and peer == owner_peer:
+			return node
+		if peer <= 0:
+			unclaimed = node
+			loose += 1
+	return unclaimed if loose == 1 else null
+
+
+func _spawn_watch_mech(owner_peer: int, origin: Vector3, yaw: float) -> Node:
+	var packed := load("res://scenes/course/items/mech_suit.tscn") as PackedScene
+	if packed == null:
+		return null
+	var mech: Node = packed.instantiate()
+	mech.set("owner_peer", owner_peer)
+	_mech_root().add_child(mech)
+	if mech is Node3D:
+		(mech as Node3D).global_position = origin
+		(mech as Node3D).rotation.y = yaw
+	return mech
+
+
+func _mech_root() -> Node:
+	var world := get_parent()
+	if world != null:
+		var mechs := world.get_node_or_null("Mechs")
+		if mechs != null:
+			return mechs
+	return _fx_root()
 
 
 static func _broadcaster(from: Node) -> WorldFx:

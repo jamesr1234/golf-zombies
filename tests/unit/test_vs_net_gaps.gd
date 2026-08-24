@@ -578,6 +578,28 @@ func test_ammo_drop_ids_count_up_on_the_host_copy() -> void:
 	assert_eq(WorldFxScript.take_ammo_id(world), 2)
 
 
+func test_apply_mech_moves_the_grouped_suit() -> void:
+	var world := _world_fx()
+	var mech: MechSuit = preload("res://scenes/course/items/mech_suit.tscn").instantiate()
+	add_child_autofree(mech)
+	mech.owner_peer = 1
+	await wait_physics_frames(1)
+	world.apply_mech(1, Vector3(16.0, 0.4, -10.0), 0.4, Vector2(0.0, -1.0), false, true, 0)
+	assert_true(mech.closed)
+	assert_false(mech.get_node("Visuals").get_node("Stairs").visible)
+	assert_almost_eq(mech.sync_xform.origin.x, 16.0, 0.05)
+
+
+func test_apply_mech_plants_a_suit_when_none_exists() -> void:
+	var world := _world_fx()
+	world.apply_mech(7, Vector3(10.0, 0.4, -4.0), 0.3, Vector2.ZERO, false, true, 0)
+	var found := MechSuit.find_net(get_tree(), 7)
+	assert_not_null(found)
+	assert_eq(found.owner_peer, 7)
+	assert_true(found.closed)
+	found.queue_free()
+
+
 func _world_fx() -> WorldFx:
 	var fx := Node3D.new()
 	fx.add_to_group("fx_root")

@@ -169,6 +169,16 @@ func test_hole_one_does_not_embed_a_mech() -> void:
 	)
 
 
+func test_a_baked_suit_is_stripped_before_the_hole_goes_live() -> void:
+	var overlay := Node3D.new()
+	add_child_autofree(overlay)
+	var suit: MechSuit = preload("res://scenes/course/items/mech_suit.tscn").instantiate()
+	overlay.add_child(suit)
+	assert_eq(_Overlay.strip_suits(overlay), 1)
+	assert_eq(overlay.find_children("*", "MechSuit", true, false).size(), 0)
+	assert_false(is_instance_valid(suit))
+
+
 func test_an_editor_preview_is_the_generated_hole() -> void:
 	var preview := _Overlay.preview(0, 20260816)
 	add_child_autofree(preview)

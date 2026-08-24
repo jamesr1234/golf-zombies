@@ -4,6 +4,7 @@ extends CharacterBody3D
 ## After that the pilot is in until it is wrecked or the hole ends.
 
 const SCENE := preload("res://scenes/course/items/mech_suit.tscn")
+const _WorldFx := preload("res://scripts/net/world_fx.gd")
 const WALK := 16.0
 const SPRINT := 24.0
 const JUMP := 10.0
@@ -47,7 +48,7 @@ var _wire_left := 0.0
 @export var sync_xform := Transform3D.IDENTITY:
 	set(value):
 		sync_xform = value
-		if is_inside_tree() and not NetSession.should_simulate(self):
+		if is_inside_tree() and _watching():
 			_net_interp.arrive(value)
 
 @onready var crush: Area3D = $Crush
@@ -65,10 +66,15 @@ func _ready() -> void:
 	_visuals = MechVisuals.attach(self)
 	_apply_closed()
 	_drawn_closed = closed
+	if NetSession.is_active():
+		NetSync.attach_mech(self)
+		set_multiplayer_authority(1)
 	if sync_xform == Transform3D.IDENTITY:
 		sync_xform = global_transform
 	if owner_player == null and owner_peer > 0:
-		bind_owner(_player_with_peer(owner_peer))
+		var who := _player_with_peer(owner_peer)
+		if who != null:
+			bind_owner(who)
 	crush.collision_layer = 0
 	crush.collision_mask = Layers.ZOMBIE | Layers.PLAYER
 	crush.body_exited.connect(func(body: Node): combat.forget(body))
@@ -134,15 +140,15 @@ func hp_fraction() -> float:
 
 
 func shells() -> int:
-	if NetSession.should_simulate(self):
-		return combat.mag
-	return sync_mag
+	if _watching():
+		return sync_mag
+	return combat.mag
 
 
 func is_reloading() -> bool:
-	if NetSession.should_simulate(self):
-		return combat.is_reloading()
-	return sync_reload
+	if _watching():
+		return sync_reload
+	return combat.is_reloading()
 
 
 func can_close(player: Player) -> bool:
@@ -265,13 +271,13 @@ func pilot_view_transform(pitch_deg: float) -> Transform3D:
 
 
 func _park_if_watched() -> void:
-	if NetSession.should_simulate(self):
+	if not _watching():
 		return
 	collision_mask = 0
 
 
 func _physics_process(delta: float) -> void:
-	if not NetSession.should_simulate(self):
+	if _watching():
 		return
 	combat.tick(delta)
 	sync_mag = combat.mag
@@ -294,7 +300,7 @@ func _physics_process(delta: float) -> void:
 ## that in physics is how a parked suit stayed glued to the plaza after the host
 ## walked away.
 func _process(delta: float) -> void:
-	if NetSession.should_simulate(self):
+	if not _watching():
 		return
 	_net_interp.follow(self, sync_xform, delta, NetSync.CART_HZ, NetSync.WATCH_DELAY)
 	_seat_pilot()
@@ -308,12 +314,11 @@ func net_interp() -> NetInterp:
 func take_wire(
 	pose: Transform3D, stick: Vector2, sprint: bool, sealed: bool, pilot_id: int
 ) -> void:
-	if NetSession.should_simulate(self):
-		return
 	sync_stick = stick
 	sync_sprint = sprint
 	sync_xform = pose
 	closed = sealed
+	_tick_visuals(0.0)
 	var next := _player_with_peer(pilot_id)
 	if next == null:
 		return
@@ -329,19 +334,31 @@ func _publish_pose(delta: float) -> void:
 	if _wire_left > 0.0:
 		return
 	_wire_left = NetSync.CART_HZ
-	var spawner := _online_spawner()
-	if spawner != null:
-		spawner.publish_mech(self)
+	_WorldFx.announce_mech(
+		self, owner_peer, global_position, rotation.y, sync_stick, sync_sprint, closed, _peer_of(pilot)
+	)
 
 
-func _online_spawner() -> VsSpawner:
-	if owner_player != null:
-		var found := _vs_spawner(owner_player)
-		if found != null:
-			return found
-	if is_inside_tree():
-		return get_tree().get_first_node_in_group("vs_spawner") as VsSpawner
-	return null
+func _watching() -> bool:
+	if not NetSession.is_active():
+		return false
+	if not multiplayer.is_server():
+		return true
+	return not is_multiplayer_authority()
+
+
+static func find_net(tree: SceneTree, owner_peer: int) -> MechSuit:
+	if tree == null:
+		return null
+	var fallback: MechSuit
+	for node in tree.get_nodes_in_group("mechs"):
+		var mech := node as MechSuit
+		if mech == null:
+			continue
+		if owner_peer > 0 and mech.owner_peer == owner_peer:
+			return mech
+		fallback = mech
+	return fallback
 
 
 func _tick_visuals(delta: float) -> void:
@@ -352,11 +369,11 @@ func _tick_visuals(delta: float) -> void:
 		_apply_closed()
 	var pace := 0.0
 	if closed:
-		if NetSession.should_simulate(self):
-			pace = Vector2(velocity.x, velocity.z).length() / SPRINT
-		else:
+		if _watching():
 			var stick := sync_stick.length()
 			pace = stick if sync_sprint else stick * (WALK / SPRINT)
+		else:
+			pace = Vector2(velocity.x, velocity.z).length() / SPRINT
 	_visuals.animate(delta, pace)
 
 
@@ -479,9 +496,9 @@ func _do_close(player: Player) -> void:
 	_seat_pilot()
 	Sfx.play("board", self)
 	_broadcast_pilot()
-	var spawner := _online_spawner()
-	if spawner != null:
-		spawner.publish_mech_seal(self)
+	_WorldFx.announce_mech(
+		self, owner_peer, global_position, rotation.y, sync_stick, sync_sprint, true, _peer_of(pilot), true
+	)
 
 
 func _apply_closed() -> void:

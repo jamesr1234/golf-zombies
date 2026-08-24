@@ -202,11 +202,19 @@ func test_a_wire_update_folds_the_stair_and_moves_the_suit() -> void:
 		true,
 		0
 	)
-	suit._tick_visuals(0.0)
 	suit._process(0.05)
 	assert_true(suit.closed)
 	assert_false(suit.get_node("Visuals").get_node("Stairs").visible)
 	assert_gt(suit.global_position.distance_to(Vector3.ZERO), 8.0)
+
+
+func test_find_net_prefers_the_owner() -> void:
+	var other: MechSuit = MECH.instantiate()
+	add_child_autofree(other)
+	other.owner_peer = 7
+	suit.owner_peer = 1
+	assert_eq(MechSuit.find_net(get_tree(), 1), suit)
+	assert_eq(MechSuit.find_net(get_tree(), 7), other)
 
 
 func test_a_remote_pilot_report_drives_the_suit() -> void:

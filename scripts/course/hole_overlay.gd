@@ -55,6 +55,7 @@ static func attach(host: Node3D, data: HoleData) -> void:
 		return
 	overlay.name = "Overlay"
 	apply_lifted(overlay, data)
+	strip_suits(overlay)
 	host.add_child(overlay)
 
 
@@ -92,8 +93,22 @@ static func apply_lifted(overlay: Node, data: HoleData) -> void:
 		node.rotation.y = deg_to_rad(float(jump["yaw"]))
 
 
+## A live suit in the overlay is a local body on every peer. Computer 2 then
+## simulates that copy and never sees the shop-spawned one walk.
+static func strip_suits(root: Node) -> int:
+	if root == null:
+		return 0
+	var stripped := 0
+	for node in root.find_children("*", "MechSuit", true, false):
+		node.free()
+		stripped += 1
+	return stripped
+
+
 static func _collect_node(data: HoleData, root: Node, node: Node) -> void:
 	if _is_preview(node):
+		return
+	if node is MechSuit:
 		return
 	if node is TreeProp:
 		return

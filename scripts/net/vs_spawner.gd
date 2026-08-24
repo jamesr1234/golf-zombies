@@ -26,6 +26,8 @@ func _ready() -> void:
 	if mech_spawner != null:
 		mech_spawner.spawn_function = _spawn_mech
 		mech_spawner.spawn_path = mech_spawner.get_path_to(mechs_root)
+	if mechs_root != null and not mechs_root.child_entered_tree.is_connected(_on_mech_entered):
+		mechs_root.child_entered_tree.connect(_on_mech_entered)
 	player_spawner.spawn_path = player_spawner.get_path_to(players_root)
 	ball_spawner.spawn_path = ball_spawner.get_path_to(balls_root)
 	zombie_spawner.spawn_path = zombie_spawner.get_path_to(zombies_root)
@@ -141,49 +143,8 @@ func _spawn_mech(data: Variant) -> Node:
 	return mech
 
 
-func publish_mech(mech: MechSuit) -> void:
-	if not multiplayer.is_server() or mech == null or not mech.is_inside_tree():
+func _on_mech_entered(node: Node) -> void:
+	if not (node is MechSuit):
 		return
-	_wire_mech.rpc(
-		mech.get_path(),
-		mech.global_transform,
-		mech.sync_stick,
-		mech.sync_sprint,
-		mech.closed,
-		0 if mech.pilot == null else mech.pilot.peer_id
-	)
-
-
-func publish_mech_seal(mech: MechSuit) -> void:
-	if not multiplayer.is_server() or mech == null or not mech.is_inside_tree():
-		return
-	_wire_mech_seal.rpc(
-		mech.get_path(),
-		mech.global_transform,
-		mech.sync_stick,
-		mech.sync_sprint,
-		mech.closed,
-		0 if mech.pilot == null else mech.pilot.peer_id
-	)
-
-
-@rpc("authority", "call_remote", "unreliable")
-func _wire_mech(
-	path: NodePath, pose: Transform3D, stick: Vector2, sprint: bool, sealed: bool, pilot_id: int
-) -> void:
-	_apply_wire(path, pose, stick, sprint, sealed, pilot_id)
-
-
-@rpc("authority", "call_remote", "reliable")
-func _wire_mech_seal(
-	path: NodePath, pose: Transform3D, stick: Vector2, sprint: bool, sealed: bool, pilot_id: int
-) -> void:
-	_apply_wire(path, pose, stick, sprint, sealed, pilot_id)
-
-
-func _apply_wire(
-	path: NodePath, pose: Transform3D, stick: Vector2, sprint: bool, sealed: bool, pilot_id: int
-) -> void:
-	var mech := get_tree().root.get_node_or_null(path) as MechSuit
-	if mech != null:
-		mech.take_wire(pose, stick, sprint, sealed, pilot_id)
+	node.set_multiplayer_authority(1)
+	NetSync.attach_mech(node)
