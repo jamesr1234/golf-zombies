@@ -5,6 +5,7 @@ extends StaticBody3D
 ## however many degrees you turn the stick, the blades and the stick both sit.
 
 const _SCRIPT := preload("res://scripts/course/windmill_control.gd")
+const _WorldFx := preload("res://scripts/net/world_fx.gd")
 
 const USE_RANGE := 2.4
 const FIND := 8.0
@@ -25,6 +26,7 @@ var _last := 0.0
 var _latched := false
 var _pivot: Node3D
 var _knob: Node3D
+var _wire_left := 0.0
 
 
 static func create(prop: Dictionary) -> WindmillControl:
@@ -91,6 +93,7 @@ func _ready() -> void:
 		collision_layer = Layers.PROP
 		collision_mask = 0
 		_build()
+	_wire_mill()
 	if not Engine.is_editor_hint() and NetSession.is_active():
 		NetSync.attach(self, PackedStringArray([":sync_stick"]))
 
@@ -159,6 +162,40 @@ func stand_at() -> Vector3:
 	return global_position + global_transform.basis.z * STAND_Z
 
 
+func take_wire(stick: Vector2, rotor: float, driven: bool) -> void:
+	sync_stick = stick
+	_angle = rotor
+	var mill := mill()
+	if mill != null:
+		mill.take_wire(rotor, driven)
+	_pose_joystick(stick, rotor)
+
+
+static func take_replicated(
+	tree: SceneTree, at: Vector3, stick: Vector2, rotor: float, driven: bool
+) -> WindmillControl:
+	var desk := nearest_at(tree, at)
+	if desk != null:
+		desk.take_wire(stick, rotor, driven)
+	return desk
+
+
+static func nearest_at(tree: SceneTree, at: Vector3) -> WindmillControl:
+	if tree == null:
+		return null
+	var best: WindmillControl
+	var best_d := INF
+	for node in tree.get_nodes_in_group("mill_controls"):
+		var desk := node as WindmillControl
+		if desk == null or not desk.is_inside_tree():
+			continue
+		var d := desk.global_position.distance_to(at)
+		if d < best_d:
+			best = desk
+			best_d = d
+	return best if best_d <= FIND * 8.0 else null
+
+
 func _claim(player: Node) -> void:
 	var mill := mill()
 	if mill == null or player == null:
@@ -174,6 +211,7 @@ func _claim(player: Node) -> void:
 		player.begin_mill(self)
 	_park(player)
 	_pose_joystick(Vector2.ZERO, _angle)
+	_publish_pose(0.0, true)
 
 
 func _clear() -> void:
@@ -187,6 +225,7 @@ func _clear() -> void:
 	if who != null and who.has_method("end_mill"):
 		who.end_mill(self)
 	_pose_joystick(Vector2.ZERO, _angle)
+	_publish_pose(0.0, true)
 
 
 func _steer(stick: Vector2) -> void:
@@ -201,13 +240,52 @@ func _steer(stick: Vector2) -> void:
 	_pose_joystick(stick, _angle)
 
 
-func _physics_process(_delta: float) -> void:
-	if operator != null:
+func _physics_process(delta: float) -> void:
+	if _watching():
+		var mill := mill()
+		if mill != null:
+			_angle = mill.rotor_rad()
+		_pose_joystick(sync_stick, _angle)
 		return
+	if operator == null:
+		var mill := mill()
+		if mill != null:
+			_angle = mill.rotor_rad()
+		_pose_joystick(sync_stick, _angle)
+	_publish_pose(delta)
+
+
+func _watching() -> bool:
+	return NetSession.is_active() and not multiplayer.is_server()
+
+
+func _publish_pose(delta: float, reliable := false) -> void:
+	if not NetSession.is_active() or not is_inside_tree():
+		return
+	if not multiplayer.is_server():
+		return
+	if reliable:
+		_wire_left = NetSync.CART_HZ
+	else:
+		_wire_left -= delta
+		if _wire_left > 0.0:
+			return
+		_wire_left = NetSync.CART_HZ
 	var mill := mill()
-	if mill != null:
-		_angle = mill.rotor_rad()
-	_pose_joystick(sync_stick, _angle)
+	var rotor := mill.rotor_rad() if mill != null else _angle
+	_WorldFx.announce_mill(
+		self, global_position, sync_stick, rotor, mill != null and mill.is_driven(), reliable
+	)
+
+
+func _wire_mill() -> void:
+	if mill_path != NodePath():
+		return
+	var parent := get_parent()
+	if parent == null:
+		return
+	if parent.get_node_or_null("Windmill") is CartPathWindmill:
+		mill_path = NodePath("../Windmill")
 
 
 func _pose_joystick(stick: Vector2, mill_rad: float) -> void:

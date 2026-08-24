@@ -140,6 +140,18 @@ static func announce_mech(
 		fx._replicate_mech.rpc(owner_peer, origin, yaw, stick, sprint, sealed, pilot_id)
 
 
+static func announce_mill(
+	from: Node, at: Vector3, stick: Vector2, rotor: float, driven: bool, reliable := false
+) -> void:
+	var fx := _broadcaster(from)
+	if fx == null:
+		return
+	if reliable:
+		fx._replicate_mill_latch.rpc(at, stick, rotor, driven)
+	else:
+		fx._replicate_mill.rpc(at, stick, rotor, driven)
+
+
 func apply_barrier(at: Vector3, yaw_deg: float) -> Node:
 	return HexBarrier.spawn(_fx_root(), at, yaw_deg)
 
@@ -304,6 +316,20 @@ func _replicate_mech_seal(
 	owner_peer: int, origin: Vector3, yaw: float, stick: Vector2, sprint: bool, sealed: bool, pilot_id: int
 ) -> void:
 	apply_mech(owner_peer, origin, yaw, stick, sprint, sealed, pilot_id)
+
+
+@rpc("authority", "call_remote", "unreliable")
+func _replicate_mill(at: Vector3, stick: Vector2, rotor: float, driven: bool) -> void:
+	apply_mill(at, stick, rotor, driven)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _replicate_mill_latch(at: Vector3, stick: Vector2, rotor: float, driven: bool) -> void:
+	apply_mill(at, stick, rotor, driven)
+
+
+func apply_mill(at: Vector3, stick: Vector2, rotor: float, driven: bool) -> WindmillControl:
+	return WindmillControl.take_replicated(get_tree(), at, stick, rotor, driven)
 
 
 func apply_mech(
