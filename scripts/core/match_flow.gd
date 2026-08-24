@@ -8,6 +8,7 @@ signal scorecard_changed()
 signal run_ended(won: bool)
 
 const _Music := preload("res://scripts/fx/music.gd")
+const _ClubhouseFlow := preload("res://scripts/core/match_clubhouse.gd")
 
 enum Phase { PREP, PLAYING, RETRIEVE, TRANSIT, SHOP }
 
@@ -51,6 +52,7 @@ var cart_girl: CartGirl
 var _players: Array[Player] = []
 var _hole_node: Node3D
 var _banner := 0
+var clubhouse_flow = _ClubhouseFlow.new()
 
 
 func _ready() -> void:
@@ -521,45 +523,13 @@ func _cheer_hole_out() -> void:
 
 
 func leave_clubhouse() -> void:
-	if finished:
-		return
-	if hole == null or hole.index != score.hole_index:
-		start_hole(score.hole_index)
-		return
-	if clubhouse != null and is_instance_valid(clubhouse):
-		clubhouse.open_exit()
-	phase = Phase.PREP
-	shop = null
-	for player in _players:
-		player.close_shop()
-		player.stop_talk()
-	_refresh_team()
-	_rally_cpus()
-	if cart_girl == null or not is_instance_valid(cart_girl):
-		_place_cart_girl()
-	_aim_at_practice()
-	scorecard_changed.emit()
-	_Music.follow_clubhouse(_clubhouse_fade_far())
-	_update_clubhouse_music()
+	clubhouse_flow.leave(self)
 
 
 ## First interact at the doors: they open, the swarm is gone, and the next hole
 ## is already waiting out the back.
 func arrive_at_clubhouse() -> void:
-	if phase != Phase.TRANSIT:
-		return
-	phase = Phase.SHOP
-	spawner.stop()
-	spawner.clear_zombies()
-	if cart_path != null:
-		cart_path.hide_arrows()
-	if clubhouse != null:
-		clubhouse.open_doors()
-	_cover_fade()
-	_attach_next_hole()
-	_reveal_fade()
-	scorecard_changed.emit()
-	_Music.enter_clubhouse()
+	clubhouse_flow.arrive(self)
 
 
 func _aim_at_practice() -> void:
@@ -577,131 +547,39 @@ func _reset_practice_ball() -> void:
 
 
 func _begin_transit() -> void:
-	_close_shop()
-	phase = Phase.TRANSIT
-	var forward := _along_hole()
-	cart_path = CartPath.build(
-		hole.cup, forward, hole.bounds, hole.height, _hole_node, hole.green_radius
-	)
-	_hole_node.add_child(cart_path)
-	_open_clubhouse()
-	spawner.begin_transit(score.hole_index, cart_path.spawn_points)
-	scorecard_changed.emit()
-	_flash_message(
-		"Next tee",
-		"Follow the arrows through the gate and run them down.\nOpen the clubhouse doors when you arrive."
-	)
+	clubhouse_flow.begin_transit(self)
 
 
 func _park_cart_for_transit() -> void:
-	var cup := hole.lift(hole.cup)
-	if cart.global_position.distance_to(cup) <= CART_RECALL_RANGE:
-		return
-	var forward := _along_hole()
-	var lateral := forward.cross(Vector3.UP).normalized()
-	var yaw := rad_to_deg(atan2(-forward.x, -forward.z))
-	var spot := hole.cup - forward * 6.0 + lateral * 5.5
-	cart.place_at(hole.lift(spot) + Vector3.UP * 0.4, yaw)
+	clubhouse_flow.park_cart_for_transit(self)
 
 
 func _place_cart_on_path() -> void:
-	if cart_path == null or cart_path.centerline.size() < 2:
-		_park_cart_for_transit()
-		return
-	var a: Vector3 = cart_path.centerline[0]
-	var b: Vector3 = cart_path.centerline[1]
-	var along := b - a
-	along.y = 0.0
-	if along.length_squared() < 0.0001:
-		along = cart_path.heading
-	along = along.normalized()
-	var yaw := rad_to_deg(atan2(-along.x, -along.z))
-	var spot := a + along * 10.0
-	spot.y = a.y
-	cart.place_at(spot + Vector3.UP * 0.4, yaw)
+	clubhouse_flow.place_cart_on_path(self)
 
 
 func _board_cart() -> void:
-	var yaw := rad_to_deg(cart.rotation.y)
-	var humans: Array[Player] = []
-	var cpus: Array[Player] = []
-	for player in _players:
-		if player.is_cpu():
-			cpus.append(player)
-		else:
-			humans.append(player)
-	for player in humans + cpus:
-		player.spawn_at(cart.global_position + Vector3.UP * 1.0, yaw)
-		cart.board(player)
+	clubhouse_flow.board_cart(self)
 
 
 func _open_clubhouse() -> void:
-	shop = Shop.new()
-	var forward := _along_hole()
-	if cart_path != null:
-		forward = cart_path.heading
-	var tee := hole.lift(hole.cup)
-	if cart_path != null:
-		tee = cart_path.tee
-	var spot := ClubhouseBuild.at_tee(tee, forward)
-	clubhouse = Clubhouse.create(spot, ClubhouseBuild.yaw_at_tee(tee, spot))
-	_hole_node.add_child(clubhouse)
-	scorecard_changed.emit()
+	clubhouse_flow.open_clubhouse(self)
 
 
 func _attach_next_hole() -> void:
-	if hole != null and hole.index == score.hole_index:
-		return
-	if cart != null:
-		cart.eject_all()
-	var snaps := _capture_in_clubhouse()
-	if clubhouse != null and is_instance_valid(clubhouse) and clubhouse.get_parent() != hole_root:
-		clubhouse.get_parent().remove_child(clubhouse)
-		hole_root.add_child(clubhouse)
-	cart_path = null
-	_rebuild_hole(score.hole_index)
-	hole_time_left = GameSettings.hole_seconds() + score.take_bonus_seconds()
-	freeze_left = score.take_freeze_seconds()
-	if clubhouse != null and is_instance_valid(clubhouse):
-		_place_clubhouse_at_exit()
-		_restore_in_clubhouse(snaps)
-	_place_cart()
-	_place_cart_girl()
-	spawner.clear_zombies()
+	clubhouse_flow.attach_next_hole(self)
 
 
 func _place_clubhouse_at_exit() -> void:
-	var forward := _along_hole()
-	clubhouse.global_position = ClubhouseBuild.at_exit(hole.practice_tee, forward)
-	clubhouse.rotation.y = deg_to_rad(ClubhouseBuild.yaw_at_exit(forward))
+	clubhouse_flow.place_at_exit(self)
 
 
 func _capture_in_clubhouse() -> Array[Dictionary]:
-	var snaps: Array[Dictionary] = []
-	if clubhouse == null or not is_instance_valid(clubhouse):
-		return snaps
-	var house_yaw := clubhouse.rotation.y
-	for player in _players:
-		snaps.append({
-			"local": clubhouse.to_local(player.global_position),
-			"yaw": player.rotation.y - house_yaw,
-		})
-	return snaps
+	return clubhouse_flow.capture_in_clubhouse(self)
 
 
 func _restore_in_clubhouse(snaps: Array[Dictionary]) -> void:
-	if clubhouse == null or not is_instance_valid(clubhouse) or snaps.is_empty():
-		return
-	_refresh_team()
-	var house_yaw := clubhouse.rotation.y
-	for i in mini(_players.size(), snaps.size()):
-		var local: Vector3 = snaps[i]["local"]
-		var yaw := house_yaw + float(snaps[i]["yaw"])
-		if not clubhouse.covers_local(local):
-			var side := -1.0 if i == 0 else 1.0
-			local = Vector3(side * 1.4, 1.2, ClubhouseBuild.DEPTH * 0.5 - 2.8)
-			yaw = house_yaw
-		_players[i].spawn_at(clubhouse.to_global(local), rad_to_deg(yaw))
+	clubhouse_flow.restore_in_clubhouse(self, snaps)
 
 
 func _refresh_team() -> void:
