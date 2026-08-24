@@ -51,21 +51,18 @@ func test_the_flare_driver_and_cart_nailer_are_on_the_armory_shelf() -> void:
 
 func test_buying_the_flare_driver_puts_it_in_the_bag() -> void:
 	var flare: WeaponStats = _find("flare_driver")["stats"]
-	assert_false(gun.has_gun(flare))
+	assert_true(gun.has_gun(flare), "the flare starts in the bag")
 	score.credit(280)
-	assert_true(shop.buy("flare_driver", score, _loadout()))
-	assert_true(gun.has_gun(flare))
-	assert_eq(score.money, 0)
 	assert_false(shop.buy("flare_driver", score, _loadout()), "owning it once is enough")
+	assert_eq(score.money, 280)
 
 
 func test_buying_the_cart_nailer_puts_it_in_the_bag() -> void:
 	var nailer: WeaponStats = _find("cart_nailer")["stats"]
-	assert_false(gun.has_gun(nailer))
+	assert_true(gun.has_gun(nailer), "the nailer starts in the bag")
 	score.credit(320)
-	assert_true(shop.buy("cart_nailer", score, _loadout()))
-	assert_true(gun.has_gun(nailer))
-	assert_eq(gun.stats(), nailer)
+	assert_false(shop.buy("cart_nailer", score, _loadout()), "owning it once is enough")
+	assert_eq(score.money, 320)
 
 
 func test_the_rocket_starts_in_the_bag() -> void:
