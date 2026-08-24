@@ -100,7 +100,7 @@ func test_the_held_sniper_clicks_through_its_zooms() -> void:
 	var player: Player = PLAYER_SCENE.instantiate()
 	add_child_autofree(player)
 	await wait_physics_frames(1)
-	assert_eq(player.weapon.stats().display_name, "Net")
+	assert_eq(player.weapon.stats().display_name, "Flare Driver")
 	player.weapon.index = player.weapon.loadout.find(GUN)
 	assert_eq(player.weapon.stats(), GUN)
 	assert_false(player.weapon.is_scoped())
