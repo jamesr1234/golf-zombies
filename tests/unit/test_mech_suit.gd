@@ -217,6 +217,22 @@ func test_find_net_prefers_the_owner() -> void:
 	assert_eq(MechSuit.find_net(get_tree(), 7), other)
 
 
+func test_a_hole_pad_plants_an_open_suit() -> void:
+	var hole := HoleData.new()
+	hole.mech_pad = Vector3(8.0, 0.4, -3.0)
+	hole.mech_yaw = 40.0
+	var planted := MechSuit.plant_on_hole(suit.get_parent(), hole)
+	assert_eq(planted, suit, "an existing suit is the hole's suit")
+	var empty := Node3D.new()
+	add_child_autofree(empty)
+	suit.remove_from_group("mechs")
+	var fresh := MechSuit.plant_on_hole(empty, hole)
+	assert_not_null(fresh)
+	assert_ne(fresh, suit)
+	assert_almost_eq(fresh.global_position.x, 8.0, 0.1)
+	assert_false(fresh.closed)
+
+
 func test_a_remote_pilot_report_drives_the_suit() -> void:
 	suit.apply_pilot_report(Vector2(1.0, -0.5), true, 45.0, -12.0, true)
 	assert_eq(suit.sync_stick, Vector2(1.0, -0.5))

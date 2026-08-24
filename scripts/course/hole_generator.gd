@@ -146,6 +146,8 @@ static func _lift(data: HoleData) -> void:
 		data.culvert = data.height.lift(data.culvert)
 	if data.has_cart_pad():
 		data.cart_pad = data.height.lift(data.cart_pad)
+	if data.has_mech_pad():
+		data.mech_pad = data.height.lift(data.mech_pad)
 
 
 ## Every hole opens with somewhere to warm up. It shares the flat shelf the tee

@@ -127,6 +127,16 @@ func spawn_mech(at: Vector3, yaw_deg: float, owner_peer: int) -> MechSuit:
 	}) as MechSuit
 
 
+func plant_hole_mech(hole: HoleData) -> MechSuit:
+	if not multiplayer.is_server() or hole == null or not hole.has_mech_pad():
+		return null
+	if mechs_root != null:
+		for child in mechs_root.get_children():
+			if child is MechSuit:
+				return child
+	return spawn_mech(hole.mech_pad + Vector3.UP * 0.05, hole.mech_yaw, 1)
+
+
 func _spawn_mech(data: Variant) -> Node:
 	var info: Dictionary = data
 	var mech: MechSuit = MECH_SCENE.instantiate()

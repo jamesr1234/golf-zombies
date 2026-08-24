@@ -6,6 +6,7 @@ extends Object
 const HOLE_DIR := "res://scenes/course/holes/"
 const PROP_DIR := "res://scenes/course/props/"
 const PREVIEW_NAME := "Preview"
+const PAD_NAME := "MechPad"
 const _Box := preload("res://scripts/course/box_prop.gd")
 const _MillDesk := preload("res://scripts/course/windmill_control.gd")
 
@@ -56,6 +57,7 @@ static func attach(host: Node3D, data: HoleData) -> void:
 	overlay.name = "Overlay"
 	apply_lifted(overlay, data)
 	strip_suits(overlay)
+	_strip_pads(overlay)
 	host.add_child(overlay)
 
 
@@ -105,10 +107,25 @@ static func strip_suits(root: Node) -> int:
 	return stripped
 
 
+static func _strip_pads(root: Node) -> void:
+	if root == null:
+		return
+	for node in root.find_children(PAD_NAME, "", true, false):
+		node.free()
+
+
+static func _collect_pad(data: HoleData, node: Node3D) -> void:
+	if data.has_mech_pad() or node == null:
+		return
+	data.mech_pad = node.position
+	data.mech_yaw = rad_to_deg(node.rotation.y)
+
+
 static func _collect_node(data: HoleData, root: Node, node: Node) -> void:
 	if _is_preview(node):
 		return
-	if node is MechSuit:
+	if node is MechSuit or (node is Node3D and String(node.name) == PAD_NAME):
+		_collect_pad(data, node as Node3D)
 		return
 	if node is TreeProp:
 		return

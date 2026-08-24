@@ -29,6 +29,9 @@ var culvert := Vector3.INF
 ## Carts wait here instead of beside the tee when set.
 var cart_pad := Vector3.INF
 var cart_yaw := 0.0
+## Open suit parked on this hole. INF means the overlay did not place one.
+var mech_pad := Vector3.INF
+var mech_yaw := 0.0
 ## Playable footprint on the XZ plane. Leaving it is out of bounds.
 var bounds := Rect2()
 ## Sampled ground. Null only before generation finishes.
@@ -49,6 +52,10 @@ func is_setpiece() -> bool:
 
 func has_cart_pad() -> bool:
 	return cart_pad != Vector3.INF
+
+
+func has_mech_pad() -> bool:
+	return mech_pad != Vector3.INF
 
 
 func lift(point: Vector3) -> Vector3:

@@ -117,6 +117,16 @@ static func spawn(parent: Node, at: Vector3, yaw_deg: float, buyer: Player = nul
 	return mech
 
 
+static func plant_on_hole(parent: Node, hole: HoleData) -> MechSuit:
+	if parent == null or hole == null or not hole.has_mech_pad():
+		return null
+	if parent.is_inside_tree():
+		for node in parent.get_tree().get_nodes_in_group("mechs"):
+			if node is MechSuit and parent.is_ancestor_of(node):
+				return node as MechSuit
+	return spawn(parent, hole.mech_pad + Vector3.UP * 0.05, hole.mech_yaw)
+
+
 static func release_all(tree: SceneTree) -> void:
 	if tree == null:
 		return

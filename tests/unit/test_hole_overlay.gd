@@ -167,6 +167,13 @@ func test_hole_one_does_not_embed_a_mech() -> void:
 		0,
 		"the overlay must not spawn a local unsynced suit"
 	)
+	assert_not_null(root.get_node_or_null("MechPad"), "hole 1 marks where the host plants the suit")
+
+
+func test_hole_one_harvests_a_mech_pad() -> void:
+	var hole := HoleGenerator.generate(0, 20260816)
+	assert_true(hole.has_mech_pad(), "Computer 2 has to receive a host-spawned suit on hole 1")
+	assert_lt(hole.mech_pad.x, -8.0, "the pad sits beside the mill desk, not on the tee")
 
 
 func test_a_baked_suit_is_stripped_before_the_hole_goes_live() -> void:

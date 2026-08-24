@@ -88,6 +88,8 @@ func start_hole(index: int) -> void:
 	phase = Phase.PREP
 	course.close_shop(_players)
 	hole = course.rebuild(index, course_seed)
+	if multiplayer.is_server():
+		vs_spawner.plant_hole_mech(hole)
 	for card in _scores.values():
 		(card as PlayerScore).advance_to(index)
 	_sync_local_score()

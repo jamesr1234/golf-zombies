@@ -9,9 +9,12 @@ script = ExtResource("1_root")
 
 [node name="Windmill" parent="." instance=ExtResource("2_mill")]
 transform = Transform3D(-1, 0, 1.509958e-07, 0, 1, 0, -1.509958e-07, 0, -1, -0.96033573, 0.5813871, -35.99988)
-sync_rotor = 21.223203704251816
+sync_rotor = 139.83112545845418
 
 [node name="WindmillControl" parent="." instance=ExtResource("3_desk")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -17.019766, 0.546164, -1.4227962)
 collision_layer = 32
 collision_mask = 0
+
+[node name="MechPad" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -19.293434, -0.4404421, 7.1928024)
