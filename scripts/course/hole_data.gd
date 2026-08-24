@@ -22,10 +22,33 @@ var props: Array[Dictionary] = []
 ## Each entry: {position, yaw, width, length, angle_deg, role}
 var jumps: Array[Dictionary] = []
 var spawn_points: Array[Vector3] = []
+## Mesa on hole 3. INF means this hole has no mountain.
+var mountain := Vector3.INF
+## Culvert mouth on hole 2. INF means this hole has no pipe.
+var culvert := Vector3.INF
+## Carts wait here instead of beside the tee when set.
+var cart_pad := Vector3.INF
+var cart_yaw := 0.0
 ## Playable footprint on the XZ plane. Leaving it is out of bounds.
 var bounds := Rect2()
 ## Sampled ground. Null only before generation finishes.
 var height: HeightField
+
+
+func has_mountain() -> bool:
+	return mountain != Vector3.INF
+
+
+func has_culvert() -> bool:
+	return culvert != Vector3.INF
+
+
+func is_setpiece() -> bool:
+	return has_mountain() or has_culvert()
+
+
+func has_cart_pad() -> bool:
+	return cart_pad != Vector3.INF
 
 
 func lift(point: Vector3) -> Vector3:

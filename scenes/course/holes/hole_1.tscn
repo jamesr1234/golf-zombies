@@ -1,0 +1,20 @@
+[gd_scene format=3 uid="uid://cbjqb288untf"]
+
+[ext_resource type="Script" uid="uid://bjyb7l8ptj88k" path="res://scripts/course/hole_overlay_root.gd" id="1_root"]
+[ext_resource type="PackedScene" path="res://scenes/course/props/windmill.tscn" id="2_mill"]
+[ext_resource type="PackedScene" path="res://scenes/course/props/windmill_control.tscn" id="3_desk"]
+[ext_resource type="PackedScene" path="res://scenes/course/items/mech_suit.tscn" id="4_a7uon"]
+
+[node name="Hole1" type="Node3D" unique_id=371585101]
+script = ExtResource("1_root")
+
+[node name="Windmill" parent="." unique_id=858742543 instance=ExtResource("2_mill")]
+transform = Transform3D(-1, 0, 1.509958e-07, 0, 1, 0, -1.509958e-07, 0, -1, -0.96033573, 0.5813871, -35.99988)
+sync_rotor = 21.223203704251816
+
+[node name="WindmillControl" parent="." unique_id=79480643 instance=ExtResource("3_desk")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -17.019766, 0.546164, -1.4227962)
+collision_layer = 32
+collision_mask = 0
+
+[node name="MechSuit" parent="." unique_id=780564485 instance=ExtResource("4_a7uon")]

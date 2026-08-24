@@ -112,7 +112,8 @@ func place_at(position: Vector3) -> void:
 
 
 func strike(
-	yaw_deg: float, deviation_deg: float, power: float, kit: ClubKit = null, green_span := 0.0
+	yaw_deg: float, deviation_deg: float, power: float, kit: ClubKit = null, green_span := 0.0,
+	loft_bias := 0.0
 ) -> void:
 	var surface := current_surface()
 	_putting = Shot.can_putt(surface)
@@ -120,7 +121,7 @@ func strike(
 	last_safe_position = global_position - Vector3.UP * RADIUS
 	sleeping = false
 	var launch := Shot.velocity(
-		yaw_deg, deviation_deg, power, surface, _putting, kit, green_span
+		yaw_deg, deviation_deg, power, surface, _putting, kit, green_span, loft_bias
 	)
 	if _putting:
 		launch.y = 0.0

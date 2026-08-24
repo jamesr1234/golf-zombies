@@ -15,11 +15,37 @@ const CHIP_BLEND := 0.4
 const PUTT_SPAN_MULT := 2.4
 const PUTT_MIN_SPEED := 0.9
 const GRAVITY := 9.8
+## Stick-up flop and stick-down punch, applied on top of the power loft.
+const MIN_LAUNCH_DEG := 4.0
+const MAX_LAUNCH_DEG := 52.0
+const LOFT_BIAS_MIN := -16.0
+const LOFT_BIAS_MAX := 32.0
+const FLIGHT_DT := 0.05
+const FLIGHT_MAX_TIME := 10.0
+const FLIGHT_MAX_POINTS := 200
 
 
 ## Flat-ground carry of a full swing off a clean lie, in metres.
 static func max_carry() -> float:
 	return MAX_SPEED * MAX_SPEED * sin(2.0 * deg_to_rad(LAUNCH_DEG)) / GRAVITY
+
+
+## Peak height of a swing in metres, vacuum flight.
+static func apex_height(power := 1.0, loft_bias := 0.0) -> float:
+	var speed := swing_speed(power)
+	var vy := speed * sin(deg_to_rad(launch_deg(power, loft_bias)))
+	return vy * vy / (2.0 * GRAVITY)
+
+
+## How far a swing travels before it falls back to `height` metres above the tee.
+static func carry_to_height(height: float, power := 1.0, loft_bias := 0.0) -> float:
+	var speed := swing_speed(power)
+	var launch := deg_to_rad(launch_deg(power, loft_bias))
+	var vy := speed * sin(launch)
+	var disc := vy * vy - 2.0 * GRAVITY * height
+	if disc <= 0.0:
+		return 0.0
+	return speed * cos(launch) / GRAVITY * (vy + sqrt(disc))
 
 
 static func default_green_span() -> float:
@@ -41,9 +67,10 @@ static func can_putt(surface: Surface.Type) -> bool:
 	return Surface.looks_like_green(surface)
 
 
-static func launch_deg(power: float) -> float:
+static func launch_deg(power: float, loft_bias := 0.0) -> float:
 	var t := clampf(power / CHIP_BLEND, 0.0, 1.0)
-	return lerpf(CHIP_LAUNCH_DEG, LAUNCH_DEG, t)
+	var base := lerpf(CHIP_LAUNCH_DEG, LAUNCH_DEG, t)
+	return clampf(base + loft_bias, MIN_LAUNCH_DEG, MAX_LAUNCH_DEG)
 
 
 static func swing_speed(power: float) -> float:
@@ -59,7 +86,8 @@ static func aim_direction(yaw_deg: float, deviation_deg: float) -> Vector3:
 
 static func velocity(
 	yaw_deg: float, deviation_deg: float, power: float,
-	surface: Surface.Type, putting: bool, kit: ClubKit = null, green_span := 0.0
+	surface: Surface.Type, putting: bool, kit: ClubKit = null, green_span := 0.0,
+	loft_bias := 0.0
 ) -> Vector3:
 	var clubs := kit if kit != null else ClubKit.starter()
 	var direction := aim_direction(yaw_deg, deviation_deg)
@@ -68,5 +96,40 @@ static func velocity(
 		var putt := lerpf(PUTT_MIN_SPEED, putt_max_speed(clubs, green_span), power)
 		return direction * putt * lie_mult
 	var speed := swing_speed(power) * lie_mult * clubs.speed_scale
-	var launch := deg_to_rad(launch_deg(power))
+	var launch := deg_to_rad(launch_deg(power, loft_bias))
 	return (direction * cos(launch) + Vector3.UP * sin(launch)) * speed
+
+
+## Perfect-contact flight, no slice. The aim line uses this so height you pick
+## is the height you see.
+static func flight_points(
+	origin: Vector3, yaw_deg: float, power: float, loft_bias := 0.0,
+	putting := false, kit: ClubKit = null, green_span := 0.0
+) -> PackedVector3Array:
+	var surface := Surface.Type.GREEN if putting else Surface.Type.FAIRWAY
+	var launch := velocity(
+		yaw_deg, 0.0, power, surface, putting, kit, green_span, loft_bias
+	)
+	var points := PackedVector3Array()
+	points.append(origin)
+	if putting:
+		var run := launch.length() / Surface.LINEAR_DAMP[Surface.Type.GREEN]
+		var along := aim_direction(yaw_deg, 0.0)
+		for i in range(1, 13):
+			points.append(origin + along * run * (float(i) / 12.0))
+		return points
+	var pos := origin
+	var vel := launch
+	var elapsed := 0.0
+	while elapsed < FLIGHT_MAX_TIME and points.size() < FLIGHT_MAX_POINTS:
+		var next := pos + vel * FLIGHT_DT + Vector3.DOWN * GRAVITY * 0.5 * FLIGHT_DT * FLIGHT_DT
+		vel.y -= GRAVITY * FLIGHT_DT
+		elapsed += FLIGHT_DT
+		if elapsed > FLIGHT_DT * 2.0 and next.y <= origin.y:
+			var drop := pos.y - next.y
+			var t := (pos.y - origin.y) / drop if drop > 0.001 else 1.0
+			points.append(pos.lerp(next, clampf(t, 0.0, 1.0)))
+			break
+		pos = next
+		points.append(pos)
+	return points

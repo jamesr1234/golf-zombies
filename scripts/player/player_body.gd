@@ -219,6 +219,18 @@ func swim(delta: float, pace: float, underwater: bool) -> void:
 	_show_arm_hands(true)
 
 
+## Reach for holds. A free hand points at the aimed spot until L1 or R1 plants it.
+func climb(left_to: Vector3, right_to: Vector3, _aim: Vector3, _left_on: bool, _right_on: bool) -> void:
+	hips.position.y = HIP_HEIGHT
+	torso.rotation.x = deg_to_rad(-8.0)
+	torso.rotation.y = 0.0
+	legs[0].rotation.x = deg_to_rad(18.0)
+	legs[1].rotation.x = deg_to_rad(-8.0)
+	_climb_arm(arms[FREE_ARM], left_to)
+	_climb_arm(arms[GUN_ARM], right_to)
+	_show_arm_hands(true)
+
+
 ## Folded into a cart seat. The driver reaches for the wheel; shotgun keeps the
 ## gun arm up. Goofy on purpose: the legs stick out and the chest leans back.
 func sit(driving: bool, wheel_deg := 0.0, grips: Array[Vector3] = []) -> void:
@@ -244,6 +256,14 @@ func sit(driving: bool, wheel_deg := 0.0, grips: Array[Vector3] = []) -> void:
 		arms[GUN_ARM].rotation.z = deg_to_rad(GUN_ARM_TUCK_DEG)
 	# Mittens on the rim are the fists, so the robot's own hands would double up.
 	_show_arm_hands(not driving)
+
+
+func _climb_arm(arm: Node3D, to: Vector3) -> void:
+	if to == Vector3.INF or to.is_equal_approx(Vector3.ZERO):
+		arm.rotation.x = deg_to_rad(110.0)
+		arm.rotation.z = 0.0
+		return
+	_reach(arm, to)
 
 
 ## Point an arm's -Y (the way the meshes hang) at a grip on the wheel.

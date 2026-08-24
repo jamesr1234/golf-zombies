@@ -45,6 +45,16 @@ func test_a_blast_drops_everyone_inside_the_radius() -> void:
 	assert_gt(far.hp, 0.0)
 
 
+func test_a_blast_also_chips_a_mech() -> void:
+	var mech: MechSuit = preload("res://scenes/course/items/mech_suit.tscn").instantiate()
+	add_child_autofree(mech)
+	await wait_physics_frames(1)
+	mech.global_position = Vector3.ZERO
+	var before := mech.hp
+	Rocket.detonate(get_tree(), Vector3(0.0, 1.0, 0.0), 110.0, 6.5, self)
+	assert_eq(mech.hp, before - 1)
+
+
 func test_firing_the_rocket_spends_the_shell_and_spawns_one() -> void:
 	var gun := Weapon.new()
 	add_child_autofree(gun)

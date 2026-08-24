@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/course/box_prop.gd" id="1_box"]
+
+[node name="Wall" type="StaticBody3D"]
+script = ExtResource("1_box")
+kind = "wall"
+size = Vector3(6, 2.4, 0.6)

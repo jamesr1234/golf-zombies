@@ -5,20 +5,26 @@ extends Node
 const PLAYER_SCENE := preload("res://scenes/players/player.tscn")
 const BALL_SCENE := preload("res://scenes/golf/ball.tscn")
 const ZOMBIE_SCENE := preload("res://scenes/zombies/zombie.tscn")
+const MECH_SCENE := preload("res://scenes/course/items/mech_suit.tscn")
 
 @onready var players_root: Node3D = $"../Players"
 @onready var balls_root: Node3D = $"../Balls"
 @onready var carts_root: Node3D = $"../Carts"
 @onready var zombies_root: Node3D = $"../Zombies"
+@onready var mechs_root: Node3D = $"../Mechs"
 @onready var player_spawner: MultiplayerSpawner = $"../PlayerSpawner"
 @onready var ball_spawner: MultiplayerSpawner = $"../BallSpawner"
 @onready var zombie_spawner: MultiplayerSpawner = $"../ZombieSpawner"
+@onready var mech_spawner: MultiplayerSpawner = $"../MechSpawner"
 
 
 func _ready() -> void:
 	player_spawner.spawn_function = _spawn_player
 	ball_spawner.spawn_function = _spawn_ball
 	zombie_spawner.spawn_function = _spawn_zombie
+	if mech_spawner != null:
+		mech_spawner.spawn_function = _spawn_mech
+		mech_spawner.spawn_path = mech_spawner.get_path_to(mechs_root)
 	player_spawner.spawn_path = player_spawner.get_path_to(players_root)
 	ball_spawner.spawn_path = ball_spawner.get_path_to(balls_root)
 	zombie_spawner.spawn_path = zombie_spawner.get_path_to(zombies_root)
@@ -30,6 +36,8 @@ func spawn_match(flow: VsMatchFlow) -> void:
 	player_spawner.spawn_path = player_spawner.get_path_to(players_root)
 	ball_spawner.spawn_path = ball_spawner.get_path_to(balls_root)
 	zombie_spawner.spawn_path = zombie_spawner.get_path_to(zombies_root)
+	if mech_spawner != null and mechs_root != null:
+		mech_spawner.spawn_path = mech_spawner.get_path_to(mechs_root)
 	var count := maxi(1, NetSession.player_count())
 	for peer_id in NetSession.peer_ids():
 		var seat := NetSession.seat_for(peer_id)
@@ -104,3 +112,24 @@ func _spawn_zombie(data: Variant) -> Node:
 	var at: Vector3 = info.get("at", Vector3.ZERO)
 	zombie.position = at
 	return zombie
+
+
+func spawn_mech(at: Vector3, yaw_deg: float, owner_peer: int) -> MechSuit:
+	if not multiplayer.is_server() or mech_spawner == null:
+		return null
+	return mech_spawner.spawn({
+		"at": at,
+		"yaw": yaw_deg,
+		"owner_peer": owner_peer,
+	}) as MechSuit
+
+
+func _spawn_mech(data: Variant) -> Node:
+	var info: Dictionary = data
+	var mech: MechSuit = MECH_SCENE.instantiate()
+	mech.set_multiplayer_authority(1)
+	NetSync.attach_mech(mech)
+	mech.global_position = info.get("at", Vector3.ZERO)
+	mech.rotation.y = deg_to_rad(float(info.get("yaw", 0.0)))
+	mech.owner_peer = int(info.get("owner_peer", 0))
+	return mech

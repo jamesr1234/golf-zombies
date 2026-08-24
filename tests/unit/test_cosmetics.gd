@@ -160,7 +160,7 @@ func test_the_items_wall_shows_kits_not_boxes() -> void:
 	assert_gte(counts["tilted"], 8, "a lid, a strap, clock hands and hex bars lean")
 	assert_gte(counts["cylinders"], 3, "clock faces and a revive mast")
 	assert_gte(counts["spheres"], 1, "the revive beacon")
-	assert_eq(_bobs(host), 6, "every kit turns on its hook")
+	assert_eq(_bobs(host), 7, "every kit turns on its hook")
 
 
 func test_the_cart_wall_shows_a_cart_not_boxes() -> void:

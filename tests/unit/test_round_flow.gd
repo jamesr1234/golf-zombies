@@ -89,6 +89,20 @@ func test_the_ball_is_waiting_to_be_played() -> void:
 	assert_false(golf.can_claim(players[0]), "the players start too far away to swing")
 
 
+func test_play_opens_on_hole_one() -> void:
+	var extra := WORLD.instantiate()
+	add_child_autofree(extra)
+	var other := extra.get_node("MatchFlow") as MatchFlow
+	assert_eq(other.starting_hole, 1)
+	assert_false(other.start_in_clubhouse)
+	other.begin()
+	await wait_physics_frames(6)
+	assert_eq(other.score.hole_index, 0)
+	assert_eq(other.hole.index, 0)
+	assert_false(other.hole.has_culvert())
+	assert_false(other.in_clubhouse())
+
+
 func test_play_can_open_on_hole_nine() -> void:
 	var extra := WORLD.instantiate()
 	add_child_autofree(extra)
@@ -109,6 +123,7 @@ func test_playtest_can_open_inside_the_clubhouse() -> void:
 	add_child_autofree(extra)
 	var other := extra.get_node("MatchFlow") as MatchFlow
 	var who := extra.get_node("Players/Player1") as Player
+	other.starting_hole = 1
 	other.start_in_clubhouse = true
 	other.start_on_cart_path = false
 	other.begin()

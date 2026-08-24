@@ -1,3 +1,4 @@
+@tool
 class_name SniperTower
 extends StaticBody3D
 ## Neon perch off the fairway. Built with the hole so it is already standing
@@ -11,18 +12,42 @@ const RAIL := 0.9
 const MIN_TEE := 64.0
 const SIDE_GAP := 22.0
 
+var height := HEIGHT
+var deck := DECK
+
 
 static func create(prop: Dictionary) -> SniperTower:
 	var tower := SniperTower.new()
 	tower.name = "SniperTower"
-	tower.collision_layer = Layers.PROP
-	tower.collision_mask = 0
-	tower.add_to_group("sniper_towers")
 	var size: Vector3 = prop["size"]
-	tower._build(size.y, size.x)
+	tower.height = size.y
+	tower.deck = size.x
 	tower.position = prop["position"]
 	tower.rotation.y = deg_to_rad(prop["yaw"])
+	tower._assemble()
 	return tower
+
+
+func to_prop() -> Dictionary:
+	return {
+		"kind": "tower",
+		"position": Vector3(position.x, 0.0, position.z),
+		"size": Vector3(deck, height, deck),
+		"yaw": rad_to_deg(rotation.y),
+	}
+
+
+func _ready() -> void:
+	add_to_group("sniper_towers")
+	if get_child_count() == 0:
+		_assemble()
+
+
+func _assemble() -> void:
+	collision_layer = Layers.PROP
+	collision_mask = 0
+	add_to_group("sniper_towers")
+	_build(height, deck)
 
 
 static func perch_of(prop: Dictionary) -> Vector3:

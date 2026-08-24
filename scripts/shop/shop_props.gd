@@ -39,12 +39,14 @@ static func items(root: Node3D) -> void:
 	_hex(_bob(root, Vector3(0.0, 2.12, 0.42), 0.85, 1.0))
 	_caption(root, "KIT", Vector3(2.45, 2.55, 0.78))
 	_medkit(_bob(root, Vector3(2.45, 2.12, 0.42), -0.45, 1.6))
-	_caption(root, "REVIVE", Vector3(-2.45, 1.15, 0.78))
-	_revive(_bob(root, Vector3(-2.45, 0.78, 0.42), 0.6, 2.2))
-	_caption(root, "+30", Vector3(0.0, 1.15, 0.78))
-	_clock(_bob(root, Vector3(0.0, 0.78, 0.42), 0.7, 2.7), Palette.AMBER, false)
-	_caption(root, "FREEZE", Vector3(2.45, 1.15, 0.78))
-	_clock(_bob(root, Vector3(2.45, 0.78, 0.42), -0.5, 3.3), Palette.ICE, true)
+	_caption(root, "REVIVE", Vector3(-2.45, 1.35, 0.78))
+	_revive(_bob(root, Vector3(-2.45, 0.98, 0.42), 0.6, 2.2))
+	_caption(root, "+30", Vector3(0.0, 1.35, 0.78))
+	_clock(_bob(root, Vector3(0.0, 0.98, 0.42), 0.7, 2.7), Palette.AMBER, false)
+	_caption(root, "FREEZE", Vector3(2.45, 1.35, 0.78))
+	_clock(_bob(root, Vector3(2.45, 0.98, 0.42), -0.5, 3.3), Palette.ICE, true)
+	_caption(root, "MECH", Vector3(0.0, 0.52, 0.78))
+	MechVisuals.mini(_bob(root, Vector3(0.0, 0.42, 0.42), 0.4, 3.8), 0.10)
 
 
 static func preview(parent: Node3D, item: Dictionary) -> void:
@@ -65,6 +67,8 @@ static func preview(parent: Node3D, item: Dictionary) -> void:
 			_clock(parent, Palette.AMBER, false)
 		"time_freeze":
 			_clock(parent, Palette.ICE, true)
+		"mech":
+			MechVisuals.mini(parent, 0.18)
 		"cart_turbo", "cart_ram", "cart_armor":
 			_cart_body(parent)
 			parent.scale = Vector3.ONE * 0.42

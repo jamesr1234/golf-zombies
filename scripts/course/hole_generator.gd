@@ -4,11 +4,12 @@ extends Object
 ## length is then drawn from the band that matches that par, so par always
 ## agrees with how far the one club can actually hit the ball.
 
-const PAR_TEMPLATE: PackedInt32Array = [4, 3, 4, 5, 4, 3, 4, 5, 4]
+const PAR_TEMPLATE: PackedInt32Array = [4, 4, 4, 5, 4, 3, 4, 5, 4]
 const BOUNDS_MARGIN := 58.0
 const PROP_KINDS: PackedStringArray = ["tree", "rock", "wall"]
 const _SniperTower := preload("res://scripts/course/sniper_tower.gd")
 const _Trees := preload("res://scripts/course/course_trees.gd")
+const _Overlay := preload("res://scripts/course/hole_overlay.gd")
 ## Six body-heights at the narrowest, so a pond is somewhere you swim rather than
 ## a puddle you step over.
 const WATER_MIN_SPAN := 1.8 * 6.0
@@ -16,6 +17,10 @@ const WATER_MIN_SPAN := 1.8 * 6.0
 const FRINGE_WIDTH := 3.0
 const GREEN_RADIUS_MIN := 8.0
 const GREEN_RADIUS_MAX := 11.0
+
+
+static func _setpiece(data: HoleData) -> bool:
+	return MountainHole.applies(data) or CulvertHole.applies(data)
 
 
 static func pars() -> PackedInt32Array:
@@ -55,7 +60,7 @@ static func generate(index: int, base_seed: int) -> HoleData:
 	data.par = PAR_TEMPLATE[index % PAR_TEMPLATE.size()]
 	var width := fairway_width(data.par)
 	var band := length_range(data.par)
-	var segment_count := 1 if data.par == 3 else (2 if data.par == 4 else 3)
+	var segment_count := 1 if data.par == 3 or CulvertHole.applies(data) else (2 if data.par == 4 else 3)
 	var headings := _headings(segment_count, rng)
 	var lengths := _split(rng.randf_range(band.x, band.y), segment_count, rng)
 
@@ -85,11 +90,19 @@ static func generate(index: int, base_seed: int) -> HoleData:
 		Vector2(data.green_radius * 2.0, data.green_radius * 2.0), 0.0, true
 	))
 	_add_practice_green(data, headings[0])
-	_add_hazards(data, rng, width, headings)
+	_add_climb_wall(data, headings[0])
+	if MountainHole.applies(data):
+		MountainHole.layout(data, headings, width)
+	elif CulvertHole.applies(data):
+		CulvertHole.layout(data, headings, width)
+	else:
+		_add_hazards(data, rng, width, headings)
 	data.bounds = _bounds(data)
-	_add_towers(data, width)
-	_add_props(data, rng, width)
-	_Trees.plant(data, rng, width, func(spot): return blocks_prop(data, spot, width))
+	_Overlay.harvest(data)
+	if not _setpiece(data):
+		_add_towers(data, width)
+		_add_props(data, rng, width)
+		_Trees.plant(data, rng, width, func(spot): return blocks_prop(data, spot, width))
 	_add_spawn_points(data, rng, width)
 	data.height = HeightField.generate(data, rng)
 	_lift(data)
@@ -108,7 +121,15 @@ static func _lift(data: HoleData) -> void:
 		patch["position"] = data.height.lift(position)
 	for prop in data.props:
 		var position: Vector3 = prop["position"]
-		prop["position"] = data.height.lift(position)
+		if String(prop.get("kind", "")) == "climb_wall":
+			var yaw := deg_to_rad(float(prop.get("yaw", 0.0)))
+			var face := Vector3(-sin(yaw), 0.0, -cos(yaw))
+			var foot := position + face * 2.0
+			prop["position"] = Vector3(
+				position.x, data.height.height_at(foot.x, foot.z), position.z
+			)
+		else:
+			prop["position"] = data.height.lift(position)
 	for jump in data.jumps:
 		var origin: Vector3 = jump["position"]
 		var rear := JumpRamp.rear_of(jump)
@@ -119,6 +140,12 @@ static func _lift(data: HoleData) -> void:
 		data.spawn_points[i] = data.height.lift(data.spawn_points[i])
 	data.practice_tee = data.height.lift(data.practice_tee)
 	data.practice_cup = data.height.lift(data.practice_cup)
+	if data.has_mountain():
+		data.mountain = data.height.lift(data.mountain)
+	if data.has_culvert():
+		data.culvert = data.height.lift(data.culvert)
+	if data.has_cart_pad():
+		data.cart_pad = data.height.lift(data.cart_pad)
 
 
 ## Every hole opens with somewhere to warm up. It shares the flat shelf the tee
@@ -139,6 +166,13 @@ static func _add_practice_green(data: HoleData, heading: float) -> void:
 		Vector2(PracticeGreen.WIDTH, PracticeGreen.LENGTH), heading
 	))
 	data.patches[-1]["practice"] = true
+
+
+## Hole 1 only: a climb wall beside the practice tee, before you start the hole.
+static func _add_climb_wall(data: HoleData, heading: float) -> void:
+	if data.index != 0:
+		return
+	data.props.append(ClimbingWall.at_practice(data.practice_tee, heading))
 
 
 static func _headings(count: int, rng: RandomNumberGenerator) -> Array[float]:
@@ -272,7 +306,7 @@ static func _add_spawn_points(data: HoleData, rng: RandomNumberGenerator, width:
 		for _i in 2:
 			var offset := rng.randf_range(-half * 0.72, half * 0.72)
 			_try_spawn_point(data, center + lateral * offset)
-		if i % 3 != 0:
+		if i % 3 != 0 or _setpiece(data):
 			continue
 		var side := 1.0 if rng.randf() < 0.5 else -1.0
 		_try_spawn_point(data, center + lateral * side * (half + rng.randf_range(10.0, 18.0)))
@@ -305,6 +339,10 @@ static func _bounds(data: HoleData) -> Rect2:
 
 static func _try_spawn_point(data: HoleData, spot: Vector3) -> void:
 	if not data.bounds.has_point(Vector2(spot.x, spot.z)):
+		return
+	if MountainHole.applies(data) and not MountainHole.keeps(data, spot):
+		return
+	if CulvertHole.applies(data) and not CulvertHole.keeps(data, spot):
 		return
 	if spot.distance_to(data.cup) < data.green_radius + 2.0:
 		return
@@ -346,9 +384,25 @@ static func blocks_prop(data: HoleData, spot: Vector3, width: float) -> bool:
 		return true
 	if _near_tower(data, spot):
 		return true
+	if _near_climb(data, spot):
+		return true
+	if MountainHole.covers(data, spot):
+		return true
+	if CulvertHole.covers(data, spot):
+		return true
 	if _Trees.in_exit_corridor(data, spot):
 		return true
 	return _in_a_pond(data, spot) or _on_a_jump(data, spot)
+
+
+static func _near_climb(data: HoleData, spot: Vector3) -> bool:
+	for prop in data.props:
+		if String(prop.get("kind", "")) != "climb_wall":
+			continue
+		var size: Vector3 = prop.get("size", Vector3(ClimbingWall.WIDTH, 1.0, 1.0))
+		if spot.distance_to(prop["position"]) < size.x * 0.5 + 5.0:
+			return true
+	return false
 
 
 static func _near_tower(data: HoleData, spot: Vector3) -> bool:
@@ -383,6 +437,10 @@ static func _try_tower(data: HoleData, width: float, t: float, side: float) -> b
 	if ClubhouseBuild.covers_exit_ground(data.practice_tee, data.cup - data.tee, spot, 8.0):
 		return false
 	if _in_a_pond(data, spot) or _on_a_jump(data, spot):
+		return false
+	if MountainHole.covers(data, spot, 8.0):
+		return false
+	if CulvertHole.covers(data, spot, 8.0):
 		return false
 	var to_tee := data.tee - spot
 	to_tee.y = 0.0
@@ -439,6 +497,10 @@ static func _point_along(data: HoleData, t: float) -> Vector3:
 			return data.centerline[i - 1].lerp(data.centerline[i], (target - travelled) / step)
 		travelled += step
 	return data.cup
+
+
+static func point_along(data: HoleData, t: float) -> Vector3:
+	return _point_along(data, t)
 
 
 static func distance_to_centerline(data: HoleData, point: Vector3) -> float:

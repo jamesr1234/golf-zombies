@@ -89,6 +89,8 @@ directional_shadow_max_distance = 120.0
 
 [node name="Zombies" type="Node3D" parent="."]
 
+[node name="Mechs" type="Node3D" parent="."]
+
 [node name="PlayerSpawner" type="MultiplayerSpawner" parent="."]
 _spawnable_scenes = PackedStringArray("res://scenes/players/player.tscn")
 spawn_path = NodePath("../Players")
@@ -100,6 +102,10 @@ spawn_path = NodePath("../Balls")
 [node name="ZombieSpawner" type="MultiplayerSpawner" parent="."]
 _spawnable_scenes = PackedStringArray("res://scenes/zombies/zombie.tscn")
 spawn_path = NodePath("../Zombies")
+
+[node name="MechSpawner" type="MultiplayerSpawner" parent="."]
+_spawnable_scenes = PackedStringArray("res://scenes/course/items/mech_suit.tscn")
+spawn_path = NodePath("../Mechs")
 
 [node name="SpawnDirector" type="Node" parent="."]
 script = ExtResource("4_spawn")

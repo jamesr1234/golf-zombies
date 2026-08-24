@@ -12,8 +12,16 @@ var max_range := 90.0
 var direction := Vector3.FORWARD
 
 var visual_only := false
+var shooter: Player
+var _exclude: Array[RID] = []
 var _travelled := 0.0
 var _dead := false
+
+
+func ignore_body(body: Node) -> void:
+	var solid := body as CollisionObject3D
+	if solid != null:
+		_exclude.append(solid.get_rid())
 
 
 static func spawn(
@@ -48,7 +56,8 @@ static func spawn_flight(
 ## Full damage to every living zombie inside the sphere. Kept as a static so
 ## the blast can be checked without waiting on a flying shell.
 static func detonate(
-	tree: SceneTree, at: Vector3, amount: float, radius: float, fx: Node = null
+	tree: SceneTree, at: Vector3, amount: float, radius: float, fx: Node = null,
+	shooter: Player = null
 ) -> int:
 	var hits := 0
 	if tree == null:
@@ -71,6 +80,13 @@ static func detonate(
 		hits += 1
 	for trap in nets:
 		trap.burst()
+	for node in tree.get_nodes_in_group("mechs"):
+		var mech := node as MechSuit
+		if mech == null or not is_instance_valid(mech):
+			continue
+		var hull := mech.blast_point()
+		if in_blast(hull.distance_to(at), radius + MechVisuals.WIDTH * 0.35):
+			mech.take_rocket(shooter)
 	HitFx.blast(fx, at, radius, COLOR)
 	Sfx.play("rocket_explode")
 	return hits
@@ -103,6 +119,7 @@ func _physics_process(delta: float) -> void:
 	var from := global_position
 	var to := from + direction * step
 	var query := PhysicsRayQueryParameters3D.create(from, to, Layers.BULLET_MASK)
+	query.exclude = _exclude
 	var hit := get_world_3d().direct_space_state.intersect_ray(query)
 	if not hit.is_empty():
 		_explode(hit["position"])
@@ -122,5 +139,5 @@ func _explode(at: Vector3) -> void:
 		HitFx.blast(root, at, blast_radius, COLOR)
 		Sfx.play("rocket_explode")
 	else:
-		detonate(get_tree(), at, damage, blast_radius, root)
+		detonate(get_tree(), at, damage, blast_radius, root, shooter)
 	queue_free()

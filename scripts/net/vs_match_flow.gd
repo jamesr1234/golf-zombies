@@ -323,6 +323,8 @@ func buy_shop_item(item_id: String, buyer: Player = null) -> bool:
 		_broadcast_scores()
 		_broadcast_loadout(buyer)
 		_broadcast_look(buyer)
+		if item_id == "mech":
+			MechSuit.spawn_near(buyer)
 		_WorldFx.announce_sfx(self, "purchase")
 	return ok
 
@@ -842,6 +844,7 @@ func _apply_scores(payload: Dictionary, clock: float, phase_value: int) -> void:
 		card.done_this_hole = bool(row.get("done", false))
 		card.club_id = String(row.get("club_id", ClubKit.STARTER_ID))
 		card.barrier_charges = int(row.get("barrier", card.barrier_charges))
+		card.mech_bought = bool(row.get("mech", card.mech_bought))
 		var packed: PackedInt32Array = row.get("results", PackedInt32Array())
 		if packed.size() == card.results.size():
 			card.results = packed
@@ -864,6 +867,7 @@ func _broadcast_scores() -> void:
 			"results": card.results,
 			"seat": card.seat,
 			"barrier": card.barrier_charges,
+			"mech": card.mech_bought,
 		}
 	_apply_scores.rpc(payload, hole_time_left, int(phase))
 

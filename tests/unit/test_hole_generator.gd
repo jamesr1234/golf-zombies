@@ -163,7 +163,10 @@ func test_every_hole_has_a_green_and_some_sand() -> void:
 				bunkers += 1
 		assert_eq(greens, 2, "hole %d should have a green and a practice green" % (index + 1))
 		assert_eq(fringes, 2, "hole %d should have a collar around each" % (index + 1))
-		assert_gt(bunkers, 0, "hole %d should have sand" % (index + 1))
+		if hole.is_setpiece():
+			assert_eq(bunkers, 0, "a set-piece strip has no side sand")
+		else:
+			assert_gt(bunkers, 0, "hole %d should have sand" % (index + 1))
 
 
 func test_green_is_centred_on_the_cup() -> void:
@@ -324,6 +327,9 @@ func test_every_hole_has_gentle_ground() -> void:
 		var hole := HoleGenerator.generate(index, SEED)
 		var relief := hole.height.max_height - hole.height.min_height
 		assert_gt(relief, 0.6, "hole %d should not be a slab" % (index + 1))
+		if hole.is_setpiece():
+			assert_gt(relief, 20.0, "hole %d falls away beside the fairway" % (index + 1))
+			continue
 		assert_lt(relief, 20.0, "hole %d should still be a golf course" % (index + 1))
 
 
@@ -454,7 +460,7 @@ func test_a_downhill_profile_drops_from_tee_to_cup() -> void:
 
 
 func test_par_three_holes_are_straight() -> void:
-	var hole := HoleGenerator.generate(1, SEED)
+	var hole := HoleGenerator.generate(5, SEED)
 	assert_eq(hole.par, 3)
 	assert_eq(hole.centerline.size(), 2, "a par three should not dogleg")
 
@@ -478,6 +484,82 @@ func test_water_hazards_fit_a_swimming_player() -> void:
 				"and deep in the middle so you can actually dive"
 			)
 	assert_gt(found, 0, "the nine-hole template should include a water hazard")
+
+
+func test_hole_three_is_a_mountain_you_climb_then_jump() -> void:
+	var hole := HoleGenerator.generate(2, SEED)
+	assert_eq(hole.par, 4)
+	assert_true(hole.has_mountain(), "the fairway climbs a mesa")
+	assert_true(hole.has_cart_pad(), "carts wait on the summit")
+	var peak := hole.height.height_at(hole.mountain.x, hole.mountain.z)
+	assert_gt(peak, hole.tee.y + 3.5, "you have to climb, not walk up a mound")
+	assert_gt(peak, hole.cup.y + 1.5, "the green sits below the jump")
+	assert_gt(
+		hole.height.height_at(hole.cart_pad.x, hole.cart_pad.z), hole.tee.y + 3.5,
+		"the carts are on top of the mountain"
+	)
+	var wall := {}
+	for prop in hole.props:
+		if String(prop.get("kind", "")) == "climb_wall":
+			wall = prop
+	assert_false(wall.is_empty())
+	assert_eq(hole.props.size(), 1, "the strip is the whole map")
+	var wall_size: Vector3 = wall["size"]
+	assert_almost_eq(wall_size.x, HoleGenerator.fairway_width(hole.par), 0.01)
+	assert_almost_eq(wall_size.y, MountainHole.RISE, 0.01)
+	assert_almost_eq(
+		(wall["position"] as Vector3).y, hole.tee.y, 0.45,
+		"the climb wall stands on the tee shelf, not on the summit"
+	)
+	assert_lt(
+		(wall["position"] as Vector3).distance_to(hole.tee), 18.0,
+		"the climb starts just past the tee"
+	)
+	var launch := Shot.velocity(0.0, 0.0, 1.0, Surface.Type.TEE, false)
+	var wall_d := Vector2(
+		wall["position"].x - hole.tee.x, wall["position"].z - hole.tee.z
+	).length()
+	var fly_t := wall_d / maxf(Vector2(launch.x, launch.z).length(), 0.01)
+	var fly_h := launch.y * fly_t - 0.5 * Shot.GRAVITY * fly_t * fly_t
+	assert_lt(fly_h, peak - hole.tee.y, "a drive cannot clear the face")
+	assert_eq(hole.jumps.size(), 1)
+	assert_lt(
+		(hole.jumps[0]["position"] as Vector3).distance_to(hole.mountain),
+		(hole.jumps[0]["position"] as Vector3).distance_to(hole.tee),
+		"the takeoff is on the mesa, not the tee"
+	)
+	var water := {}
+	for patch in hole.patches:
+		if patch["type"] == Surface.Type.WATER:
+			water = patch
+			break
+	assert_false(water.is_empty(), "the jump needs a gap")
+	assert_gt(
+		(water["position"] as Vector3).distance_to(hole.tee),
+		hole.mountain.distance_to(hole.tee) - 8.0,
+		"the pond sits past the mountain, in front of the green"
+	)
+	var jump: Dictionary = hole.jumps[0]
+	assert_eq(jump["length"], MountainHole.RAMP_LENGTH)
+	var water_along: float = (water["size"] as Vector2).y
+	var range := JumpRamp.flight_distance(
+		GolfCart.MAX_SPEED,
+		jump["angle_deg"],
+		JumpRamp.lip_height(jump["length"], jump["angle_deg"]) + MountainHole.RISE
+	)
+	assert_gt(range, water_along, "a full-speed launch has to clear the water")
+	var along := hole.cup - hole.tee
+	along.y = 0.0
+	along = along.normalized()
+	var side := along.cross(Vector3.UP).normalized()
+	var mid := hole.tee.lerp(hole.cup, 0.45)
+	var off := mid + side * (HoleGenerator.fairway_width(hole.par) * 0.5 + 8.0)
+	assert_lt(
+		hole.height.height_at(off.x, off.z), hole.tee.y - 16.0,
+		"the map ends at the fairway"
+	)
+	assert_false(HoleGenerator.generate(0, SEED).has_mountain())
+	assert_false(HoleGenerator.generate(1, SEED).has_mountain())
 
 
 func test_hole_one_always_has_water_and_a_cart_jump() -> void:

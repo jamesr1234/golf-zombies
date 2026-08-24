@@ -12,6 +12,7 @@ const ROCKET_PRICE := 400
 const AMMO_PRICE := 60
 const AMMO_AMOUNT := 40
 const BARRIER_PRICE := 150
+const MECH_PRICE := 500
 const BARRIER_AMOUNT := 2
 const TIME_BONUS_SECONDS := 30
 const FREEZE_SECONDS := 15.0
@@ -72,6 +73,8 @@ func is_owned(item_id: String, weapons: Array[Weapon], score: GameState = null, 
 			return cart != null and cart.ram_plate
 		"cart_armor":
 			return cart != null and cart.armored
+		"mech":
+			return score != null and score.mech_bought
 		_:
 			return false
 
@@ -228,6 +231,8 @@ func _grant(
 			score.add_bonus_seconds(TIME_BONUS_SECONDS)
 		"time_freeze":
 			score.add_freeze_seconds(FREEZE_SECONDS)
+		"mech":
+			score.mech_bought = true
 
 
 func _grant_revive(buyer: Player) -> void:

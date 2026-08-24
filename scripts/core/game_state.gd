@@ -34,6 +34,8 @@ var strokes := 0
 var money := 0
 ## Shared deployable stock. Survives hole changes; placed forts do not.
 var barrier_charges := 0
+## One mech per round. The placed suit lasts only the hole it was bought on.
+var mech_bought := false
 var club_id := ClubKit.STARTER_ID
 ## Added onto the next hole's clock, then cleared.
 var bonus_seconds := 0

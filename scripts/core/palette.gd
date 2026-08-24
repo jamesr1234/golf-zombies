@@ -73,6 +73,8 @@ const TREE_CANOPIES: Array[Color] = [
 ]
 const ROCK := Color(0.1, 0.13, 0.18)
 const ROCK_TRIM := CYAN
+const MECH := Color(0.95, 0.55, 0.12)
+const MECH_FRAME := Color(0.16, 0.1, 0.05)
 const WALL := Color(0.12, 0.06, 0.14)
 const WALL_TRIM := MAGENTA
 

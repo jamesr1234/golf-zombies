@@ -85,6 +85,109 @@ func test_the_aim_arrow_follows_world_yaw_when_the_parent_has_spun() -> void:
 	assert_almost_eq(golf._arrow.global_position.distance_to(golf._lie), 0.0, 0.01)
 
 
+func test_the_stick_raises_shot_height_until_the_swing_starts() -> void:
+	var golf := GolfController.new()
+	add_child_autofree(golf)
+	golf.golfer = Node.new()
+	add_child_autofree(golf.golfer)
+	golf.aim_height_by(12.0)
+	assert_almost_eq(golf.aim_loft, 12.0, 0.01)
+	golf.aim_height_by(100.0)
+	assert_almost_eq(golf.aim_loft, Shot.LOFT_BIAS_MAX, 0.01)
+	golf.meter.state = SwingMeter.State.BACKSWING
+	golf.aim_height_by(-8.0)
+	assert_almost_eq(golf.aim_loft, Shot.LOFT_BIAS_MAX, 0.01, "height locks once the meter is moving")
+
+
+func test_putting_ignores_shot_height() -> void:
+	var ball := GolfBall.new()
+	add_child_autofree(ball)
+	ball.enter_surface(Surface.Type.GREEN)
+	var golf := GolfController.new()
+	add_child_autofree(golf)
+	golf.ball = ball
+	golf.golfer = Node.new()
+	add_child_autofree(golf.golfer)
+	golf.aim_height_by(20.0)
+	assert_almost_eq(golf.aim_loft, 0.0, 0.01)
+
+
+func test_the_white_line_follows_a_perfect_hit() -> void:
+	var golf := GolfController.new()
+	add_child_autofree(golf)
+	await get_tree().process_frame
+	golf.golfer = Node.new()
+	add_child_autofree(golf.golfer)
+	golf._lie = Vector3(1.0, 0.15, -2.0)
+	golf.aim_yaw = 0.0
+	golf.aim_loft = 20.0
+	golf._pose_preview()
+	assert_true(golf._preview.visible)
+	var expected := Shot.flight_points(golf._lie, 0.0, 1.0, 20.0)
+	var drawn := _preview_points(golf._preview)
+	assert_eq(drawn.size(), expected.size())
+	assert_almost_eq(drawn[0].distance_to(expected[0]), 0.0, 0.01)
+	assert_gt(_peak_y(drawn), golf._lie.y + 4.0)
+	assert_gt(
+		golf._preview.landing.distance_to(golf._lie), 40.0,
+		"the landing mark has to sit out at the carry, not on the ball"
+	)
+
+
+func test_the_landing_mark_moves_when_loft_changes() -> void:
+	var golf := GolfController.new()
+	add_child_autofree(golf)
+	await get_tree().process_frame
+	golf.golfer = Node.new()
+	add_child_autofree(golf.golfer)
+	golf._lie = Vector3.ZERO
+	golf.aim_yaw = 0.0
+	golf.aim_loft = Shot.LOFT_BIAS_MIN
+	golf._pose_preview()
+	var punch := golf._preview.landing.distance_to(golf._lie)
+	golf.aim_loft = Shot.LOFT_BIAS_MAX
+	golf._pose_preview()
+	var flop := golf._preview.landing.distance_to(golf._lie)
+	assert_gt(flop, punch + 20.0, "raising loft has to push the landing farther out")
+	assert_true(golf._preview.spot_visible())
+
+
+func test_the_camera_looks_farther_for_a_longer_carry() -> void:
+	var golf := GolfController.new()
+	add_child_autofree(golf)
+	var ball := GolfBall.new()
+	add_child_autofree(ball)
+	golf.ball = ball
+	golf.golfer = Node.new()
+	add_child_autofree(golf.golfer)
+	ball.global_position = Vector3.ZERO
+	golf.aim_yaw = 0.0
+	golf.aim_loft = Shot.LOFT_BIAS_MIN
+	var punch_look := golf.get_camera_transform().origin.distance_to(Vector3.ZERO)
+	golf.aim_loft = Shot.LOFT_BIAS_MAX
+	var flop_look := golf.get_camera_transform().origin.distance_to(Vector3.ZERO)
+	assert_gt(flop_look, punch_look, "a longer carry has to pull the camera back to show the landing")
+
+
+func _preview_points(preview: ShotPreview) -> PackedVector3Array:
+	var immediate := preview.mesh as ImmediateMesh
+	var arrays := immediate.surface_get_arrays(0)
+	var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var points := PackedVector3Array()
+	var i := 0
+	while i < verts.size():
+		points.append((verts[i] + verts[i + 1]) * 0.5)
+		i += 2
+	return points
+
+
+func _peak_y(points: PackedVector3Array) -> float:
+	var peak := -INF
+	for point in points:
+		peak = maxf(peak, point.y)
+	return peak
+
+
 ## The shaft is built from this gap, so if the grip drifts off the stance the head
 ## stops meeting the ball.
 func test_the_grip_sits_above_the_golfer() -> void:

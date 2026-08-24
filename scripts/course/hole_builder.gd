@@ -6,6 +6,9 @@ extends Object
 const TeeMarker := preload("res://scripts/course/tee_sign.gd")
 const _SniperTower := preload("res://scripts/course/sniper_tower.gd")
 const _Tree := preload("res://scripts/course/tree_prop.gd")
+const _Overlay := preload("res://scripts/course/hole_overlay.gd")
+const _Box := preload("res://scripts/course/box_prop.gd")
+const _MillDesk := preload("res://scripts/course/windmill_control.gd")
 
 const BARRIER_HEIGHT := 9.0
 const BARRIER_THICKNESS := 1.5
@@ -27,9 +30,14 @@ static func build(data: HoleData) -> Node3D:
 	root.add_child(region)
 	region.add_child(_ground(data))
 	for prop in data.props:
+		if bool(prop.get("authored", false)):
+			continue
 		region.add_child(create_prop(prop))
 	for jump in data.jumps:
+		if bool(jump.get("authored", false)):
+			continue
 		region.add_child(JumpRamp.create(jump))
+	_Overlay.attach(region, data)
 	for patch in data.patches:
 		root.add_child(SurfacePatch.create(patch, data.height))
 	root.add_child(Cup.create(data.cup))
@@ -97,34 +105,23 @@ static func _ground(data: HoleData) -> StaticBody3D:
 
 static func create_prop(prop: Dictionary) -> Node3D:
 	var kind: String = prop["kind"]
-	var size: Vector3 = prop["size"]
-	var position: Vector3 = prop["position"]
-	var body: StaticBody3D
 	match kind:
 		"tree":
 			return _Tree.create(prop)
-		"rock":
-			body = MeshFactory.box_body(size, Palette.ROCK, Layers.PROP)
-			body.add_child(_trim(Vector3(size.x, size.y * 0.12, size.z), Palette.ROCK_TRIM, size.y))
-			body.position = position + Vector3.UP * size.y * 0.5
+		"rock", "wall":
+			return _Box.create(prop)
 		"tower":
 			return _SniperTower.create(prop)
+		"climb_wall":
+			return ClimbingWall.create(prop)
+		"culvert":
+			return Culvert.create(prop)
+		"mill_control":
+			return _MillDesk.create(prop)
 		_:
-			body = MeshFactory.box_body(size, Palette.WALL, Layers.PROP)
-			body.add_child(_trim(Vector3(size.x, size.y * 0.1, size.z), Palette.WALL_TRIM, size.y))
-			body.position = position + Vector3.UP * size.y * 0.5
-	body.rotation.y = deg_to_rad(prop["yaw"])
-	return body
-
-
-## A glowing strip along the top edge of a prop, so obstacles read as shapes in
-## the dark instead of black blobs.
-static func _trim(size: Vector3, color: Color, host_height: float) -> MeshInstance3D:
-	var strip := MeshFactory.box(
-		Vector3(size.x * 1.04, size.y, size.z * 1.04), color, Palette.GLOW_MEDIUM
-	)
-	strip.position.y = host_height * 0.5 - size.y * 0.5
-	return strip
+			var wall := prop.duplicate()
+			wall["kind"] = "wall"
+			return _Box.create(wall)
 
 
 static func _tee_sign(data: HoleData) -> Node3D:

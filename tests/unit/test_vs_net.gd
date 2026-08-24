@@ -287,8 +287,9 @@ func test_a_remote_aim_turns_the_arrow() -> void:
 	golf._show_club(0.016)
 	var start := golf.aim_yaw
 	var start_facing := -golf._arrow.global_transform.basis.z
-	golf.apply_remote_aim(2, start + 45.0)
+	golf.apply_remote_aim(2, start + 45.0, 14.0)
 	assert_almost_eq(golf.aim_yaw, start + 45.0, 0.01)
+	assert_almost_eq(golf.aim_loft, 14.0, 0.01)
 	golf._show_club(0.016)
 	var facing := -golf._arrow.global_transform.basis.z
 	assert_gt(facing.angle_to(start_facing), 0.5, "the other screen has to see the turn")

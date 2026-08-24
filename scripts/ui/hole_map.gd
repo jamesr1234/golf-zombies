@@ -186,6 +186,8 @@ func _draw_prop(prop: Dictionary) -> void:
 		"tower":
 			var reach := Vector2(_prop_radius(size.x * 0.7), _prop_radius(size.z * 0.7))
 			draw_rect(Rect2(center - reach, reach * 2.0), Palette.TOWER_TRIM)
+		"culvert":
+			draw_colored_polygon(_wall_polygon(prop), Palette.AMBER)
 		_:
 			draw_colored_polygon(_wall_polygon(prop), Palette.WALL_TRIM)
 

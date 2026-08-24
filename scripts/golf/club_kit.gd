@@ -71,6 +71,19 @@ static func by_id(kit_id: String) -> ClubKit:
 	return kit
 
 
+static func mech() -> ClubKit:
+	var kit := ClubKit.new()
+	kit.id = "mech"
+	kit.display_name = "Mech"
+	kit.deviation_scale = 0.2
+	kit.contact_scale = 2.0
+	kit.speed_scale = 1.4
+	kit.putt_speed_scale = 0.45
+	kit.mishit_power_scale = 0.25
+	kit.color = Palette.MECH
+	return kit
+
+
 static func shop_ids() -> PackedStringArray:
 	return PackedStringArray([TOUR_ID, PRO_ID, FORGED_ID])
 
@@ -95,6 +108,6 @@ func scaled_carry() -> float:
 func boosted(mult: float) -> ClubKit:
 	if is_equal_approx(mult, 1.0):
 		return self
-	var copy := ClubKit.by_id(id)
+	var copy := ClubKit.mech() if id == "mech" else ClubKit.by_id(id)
 	copy.speed_scale *= mult
 	return copy

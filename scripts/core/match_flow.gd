@@ -217,6 +217,8 @@ func buy_shop_item(item_id: String, buyer: Player = null) -> bool:
 	var ok := shop.buy(item_id, score, weapons(), buyer, cart)
 	if ok:
 		golf.club_kit = score.club_kit()
+		if item_id == "mech":
+			MechSuit.spawn_near(buyer)
 		scorecard_changed.emit()
 	return ok
 
@@ -313,15 +315,21 @@ func start_hole(index: int) -> void:
 	hole_time_left = GameSettings.hole_seconds() + score.take_bonus_seconds()
 	freeze_left = score.take_freeze_seconds()
 	scorecard_changed.emit()
-	_flash_message(
-		"Hole %d   Par %d" % [index + 1, hole.par],
-		"Warm up on the practice green.\nStep onto the tee and interact when you are ready."
-	)
+	_flash_message("Hole %d   Par %d" % [index + 1, hole.par], _warmup_copy(index))
 	Sfx.play("hole_start", self)
 	_Music.play_lounge()
 
 
+func _warmup_copy(index: int) -> String:
+	if index == 1:
+		return "The hill blocks the drive.\nTake the cart through the culvert."
+	if index == 2:
+		return "Climb the wall onto the fairway.\nThen jump the cart to the green."
+	return "Warm up on the practice green or the climb wall.\nStep onto the tee and interact when you are ready."
+
+
 func _rebuild_hole(index: int) -> void:
+	MechSuit.release_all(get_tree())
 	cart_girl = null
 	if _hole_node != null:
 		hole_root.remove_child(_hole_node)
@@ -379,6 +387,9 @@ func _place_players() -> void:
 ## The cart waits behind the tee, off to one side so it is never in the way of the
 ## first shot. Anyone still riding is put out first, since the old hole is gone.
 func _place_cart() -> void:
+	if hole != null and hole.has_cart_pad():
+		cart.place_at(hole.lift(hole.cart_pad) + Vector3.UP * 0.4, hole.cart_yaw)
+		return
 	var forward := _along_hole()
 	var lateral := forward.cross(Vector3.UP).normalized()
 	var yaw := rad_to_deg(atan2(-forward.x, -forward.z))

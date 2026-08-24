@@ -15,6 +15,9 @@ func test_every_hole_has_towers_off_the_fairway() -> void:
 	assert_eq(_towers(hole0).size(), 2, "the first tee has to already have both perches")
 	for index in 9:
 		var hole := HoleGenerator.generate(index, SEED)
+		if hole.is_setpiece():
+			assert_eq(_towers(hole).size(), 0, "a set-piece strip has no side perches")
+			continue
 		var towers := _towers(hole)
 		assert_gt(towers.size(), 0, "hole %d should have a perch" % (index + 1))
 		var half := HoleGenerator.fairway_width(hole.par) * 0.5

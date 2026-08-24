@@ -25,6 +25,15 @@ func test_a_fairway_strike_still_has_loft_and_bounce() -> void:
 	assert_false(ball.is_on_green())
 
 
+func test_a_raised_strike_leaves_the_ground_steeper() -> void:
+	var stock := _ball_on(Surface.Type.FAIRWAY)
+	stock.strike(0.0, 0.0, 1.0)
+	var high := _ball_on(Surface.Type.FAIRWAY)
+	high.strike(0.0, 0.0, 1.0, null, 0.0, 24.0)
+	assert_gt(high.linear_velocity.y, stock.linear_velocity.y)
+	assert_almost_eq(high.linear_velocity.length(), stock.linear_velocity.length(), 0.001)
+
+
 func test_a_fringe_strike_is_a_putt_too() -> void:
 	var ball := _ball_on(Surface.Type.FRINGE)
 	ball.strike(0.0, 0.0, 0.5)

@@ -77,6 +77,10 @@ static func items() -> Array[Dictionary]:
 			"id": "time_freeze", "name": "Clock Freeze", "price": 80, "kind": "time_freeze",
 			"info": "Freezes the next hole's clock for fifteen seconds.",
 		},
+		{
+			"id": "mech", "name": "Mech Suit", "price": Shop.MECH_PRICE, "kind": "mech",
+			"info": "One giant suit for this hole. Climb in, press Circle to seal. Eight rockets, then reload. One per round.",
+		},
 	]
 
 

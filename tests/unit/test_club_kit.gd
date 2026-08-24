@@ -51,6 +51,17 @@ func test_a_beer_boost_hits_the_ball_harder() -> void:
 	assert_gt(smashed.length(), sober.length())
 
 
+func test_the_mech_kit_is_straighter_and_longer_than_forged() -> void:
+	var forged := ClubKit.by_id(ClubKit.FORGED_ID)
+	var mech := ClubKit.mech()
+	assert_lt(mech.deviation_scale, forged.deviation_scale)
+	assert_gt(mech.contact_scale, forged.contact_scale)
+	assert_gt(mech.speed_scale, forged.speed_scale)
+	var forged_ball := Shot.velocity(0.0, 0.0, 1.0, Surface.Type.FAIRWAY, false, forged)
+	var mech_ball := Shot.velocity(0.0, 0.0, 1.0, Surface.Type.FAIRWAY, false, mech)
+	assert_gt(mech_ball.length(), forged_ball.length())
+
+
 func test_forged_swings_launch_faster() -> void:
 	var fairway := Shot.velocity(0.0, 0.0, 1.0, Surface.Type.FAIRWAY, false)
 	var forged := Shot.velocity(

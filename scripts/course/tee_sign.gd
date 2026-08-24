@@ -190,8 +190,30 @@ func _prop(
 			_disk(root, "", at, radius, Palette.ROCK_TRIM)
 		"tower":
 			_disk(root, "", at, radius * 1.35, Palette.TOWER_TRIM)
+		"culvert":
+			_culvert_mark(root, data, prop, bounds, scale, origin)
+		"mill_control":
+			_disk(root, "", at, radius, Palette.CYAN)
 		_:
 			_disk(root, "", at, radius, Palette.WALL_TRIM)
+
+
+func _culvert_mark(
+	root: Node3D, data: HoleData, prop: Dictionary, bounds: Rect2, scale: float, origin: Vector2
+) -> void:
+	var size: Vector3 = prop["size"]
+	var position: Vector3 = prop["position"]
+	var yaw := deg_to_rad(float(prop.get("yaw", 0.0)))
+	var points := PackedVector2Array()
+	for local in [
+		Vector3(-size.x * 0.5, 0.0, -size.z * 0.5),
+		Vector3(size.x * 0.5, 0.0, -size.z * 0.5),
+		Vector3(size.x * 0.5, 0.0, size.z * 0.5),
+		Vector3(-size.x * 0.5, 0.0, size.z * 0.5),
+	]:
+		var at := _on_face(data, local.rotated(Vector3.UP, yaw) + position, bounds, scale, origin)
+		points.append(Vector2(at.x, at.y))
+	root.add_child(_poly(points, Palette.AMBER, FACE_Z + 0.012))
 
 
 func _path(

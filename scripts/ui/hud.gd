@@ -106,7 +106,10 @@ func _process(_delta: float) -> void:
 
 func _update_vitals() -> void:
 	var health := player.health
-	health_bar.value = health.fraction() * 100.0
+	if player.is_in_mech() and player.mech != null:
+		health_bar.value = player.mech.hp_fraction() * 100.0
+	else:
+		health_bar.value = health.fraction() * 100.0
 	if health.is_downed():
 		status_bar.visible = true
 		if health.revive_progress > 0.0:
@@ -134,6 +137,15 @@ func _update_vitals() -> void:
 
 
 func _update_weapon() -> void:
+	if player.is_in_mech() and player.mech != null and not player.is_golfing():
+		var suit: MechSuit = player.mech
+		if suit.is_reloading():
+			ammo_label.text = HudStyle.chrome("Mech   reloading   HP %d/8" % suit.hp)
+		else:
+			ammo_label.text = HudStyle.chrome("Mech   %d / 8   HP %d/8" % [
+				suit.shells(), suit.hp
+			])
+		return
 	if player.is_placing():
 		var held := 0
 		var card = player.wallet() if player.has_method("wallet") else flow.score

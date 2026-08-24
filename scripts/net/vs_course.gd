@@ -26,6 +26,7 @@ var _clubhouse_wait := -1.0
 
 
 func rebuild(index: int, seed: int) -> HoleData:
+	MechSuit.release_all(get_tree())
 	cart_girl = null
 	cart_path = null
 	if hole_node != null:
@@ -111,11 +112,17 @@ func place_carts(carts: Array[GolfCart]) -> void:
 	var forward := along_hole()
 	var lateral := forward.cross(Vector3.UP).normalized()
 	var yaw := rad_to_deg(atan2(-forward.x, -forward.z))
+	var origin := hole.tee
+	if hole.has_cart_pad():
+		origin = hole.cart_pad
+		yaw = hole.cart_yaw
+		forward = Vector3.FORWARD.rotated(Vector3.UP, deg_to_rad(yaw))
+		lateral = forward.cross(Vector3.UP).normalized()
 	for i in carts.size():
 		if carts[i] == null:
 			continue
 		var slot := cart_slot(carts[i], i)
-		var spot := cart_spot(hole.tee, forward, lateral, slot, CART_BACK)
+		var spot := cart_spot(origin, forward, lateral, slot, CART_BACK)
 		carts[i].place_at(hole.lift(spot) + Vector3.UP * 0.4, yaw)
 
 

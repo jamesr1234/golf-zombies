@@ -272,6 +272,19 @@ func test_time_items_wait_for_the_next_hole() -> void:
 	assert_almost_eq(score.freeze_seconds, Shop.FREEZE_SECONDS, 0.001)
 
 
+func test_the_mech_is_one_per_round() -> void:
+	score.credit(Shop.MECH_PRICE * 2)
+	var item := _find("mech")
+	assert_eq(String(item["kind"]), "mech")
+	assert_eq(int(item["price"]), Shop.MECH_PRICE)
+	assert_string_contains(shop.info(item), "One giant")
+	assert_true(shop.buy("mech", score, _loadout(), buyer))
+	assert_true(score.mech_bought)
+	assert_eq(score.money, Shop.MECH_PRICE)
+	assert_false(shop.buy("mech", score, _loadout(), buyer), "one per round even after it is gone")
+	assert_eq(score.money, Shop.MECH_PRICE)
+
+
 func test_every_shelf_item_has_a_blurb() -> void:
 	for dept in [Shop.Dept.APPAREL, Shop.Dept.CLUBS, Shop.Dept.WEAPONS, Shop.Dept.ITEMS, Shop.Dept.CART]:
 		for item in shop.catalog(dept):

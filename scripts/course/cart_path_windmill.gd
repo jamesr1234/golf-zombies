@@ -1,3 +1,4 @@
+@tool
 class_name CartPathWindmill
 extends Node3D
 ## Giant windmills on the racing line. The sails are thick pillars; get clipped
@@ -51,6 +52,45 @@ static func create(at: Vector3, along: Vector3) -> CartPathWindmill:
 	return mill
 
 
+func to_prop() -> Dictionary:
+	return {
+		"kind": "windmill",
+		"position": Vector3(position.x, 0.0, position.z),
+		"size": Vector3(TOWER_R * 2.0, TOWER_H, TOWER_R * 2.0),
+		"yaw": rad_to_deg(rotation.y),
+	}
+
+
+## Radians around the hub. Auto-spin writes this; a control unit can take over.
+@export var sync_rotor := 0.0
+@export var sync_driven := false
+
+
+func _ready() -> void:
+	add_to_group("cart_path_windmills")
+	if get_child_count() == 0:
+		_build()
+	if not Engine.is_editor_hint() and NetSession.is_active():
+		NetSync.attach(self, PackedStringArray([":sync_rotor", ":sync_driven"]))
+
+
+func rotor_rad() -> float:
+	return sync_rotor
+
+
+func set_rotor_rad(rad: float) -> void:
+	sync_rotor = rad
+	_apply_rotor()
+
+
+func drive(on: bool) -> void:
+	sync_driven = on
+
+
+func is_driven() -> bool:
+	return sync_driven
+
+
 static func shove_from(path: Node3D, body: Node3D, from: Vector3) -> Vector3:
 	var at := body.global_position if body.is_inside_tree() else body.position
 	var line: Array = path.get("centerline")
@@ -97,12 +137,22 @@ func _build() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if not sync_driven and (Engine.is_editor_hint() or NetSession.should_simulate(self)):
+		sync_rotor += deg_to_rad(SPIN_DEG) * delta
+	_apply_rotor()
+	if Engine.is_editor_hint():
+		return
 	var rotor := get_node_or_null("Rotor") as Node3D
 	if rotor != null:
-		rotor.rotate_z(deg_to_rad(SPIN_DEG) * delta)
 		for child in rotor.get_children():
 			_scan(child as Area3D)
 	_scan(get_node_or_null("MastHit") as Area3D)
+
+
+func _apply_rotor() -> void:
+	var rotor := get_node_or_null("Rotor") as Node3D
+	if rotor != null:
+		rotor.rotation.z = sync_rotor
 
 
 func _scan(area: Area3D) -> void:

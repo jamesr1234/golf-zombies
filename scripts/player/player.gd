@@ -3,7 +3,7 @@ extends CharacterBody3D
 ## One script for both players. The only difference between them is the input
 ## prefix and whether they steer with a trackpad or a right stick.
 
-enum State { NORMAL, GOLFING, RIDING, SWIMMING, SHIELDING, PLACING }
+enum State { NORMAL, GOLFING, RIDING, SWIMMING, SHIELDING, PLACING, CLIMBING, MECH }
 
 const WALK_SPEED := 5.4
 const SPRINT_SPEED := 8.2
@@ -61,6 +61,7 @@ const _ThrownBeer := preload("res://scripts/player/thrown_beer.gd")
 const _Boost := preload("res://scripts/course/cart_path_boost.gd")
 const _ShopInspect := preload("res://scripts/shop/shop_inspect.gd")
 const _WorldFx := preload("res://scripts/net/world_fx.gd")
+const _MillDesk := preload("res://scripts/course/windmill_control.gd")
 const PLACE_WATER := 0.3
 const CPU_SHOT_HOLD := 0.45
 const CHEER_CAM_BACK := 3.6
@@ -105,7 +106,7 @@ const REMOTE_POSE_EASE := 18.0
 		sync_xform = value
 		if (
 			is_inside_tree() and not NetSession.should_simulate(self)
-			and not carried_by_cart() and not predicts_locally()
+			and not carried_by_cart() and not is_in_mech() and not predicts_locally()
 		):
 			_net_interp.arrive(value)
 
@@ -123,6 +124,7 @@ var score
 var input: PlayerInput
 var golf: GolfController
 var cart: GolfCart
+var mech: MechSuit
 ## Filled in by MatchFlow. Left untyped so Player and MatchFlow are not a
 ## class cycle (MatchFlow already holds the players).
 var flow
@@ -147,7 +149,7 @@ var _yaw := 0.0
 var _pitch := 0.0
 var _mouse_delta := Vector2.ZERO
 var _view_kick := 0.0
-## Driver-only: L1 pulls the camera out behind the cart.
+## Driver and mech: L1 pulls the camera out behind the vehicle.
 var _cart_chase := false
 var _underwater := false
 var _shield: _Shield
@@ -165,6 +167,8 @@ var _flash_material: StandardMaterial3D
 var wants_cover := false
 var _cheer_left := 0.0
 var _fling_left := 0.0
+var climber := Climber.new()
+var mill_desk
 
 @onready var head: Node3D = $Head
 @onready var health: Health = $Health
@@ -209,6 +213,12 @@ func _physics_process(delta: float) -> void:
 		and (not net_driven or is_multiplayer_authority())
 	):
 		_drop_from_lost_ride()
+	if (
+		state == State.MECH
+		and (mech == null or mech.pilot != self)
+		and (not net_driven or is_multiplayer_authority())
+	):
+		eject_from_mech(global_position + Vector3.UP * 0.4, _yaw)
 	if net_driven and not is_multiplayer_authority():
 		_tick_watched_combat(delta)
 		_walk_as_watched(delta)
@@ -218,6 +228,20 @@ func _physics_process(delta: float) -> void:
 	if is_driving() and NetSession.is_active() and not multiplayer.is_server() and cart != null:
 		cart.report_drive.rpc_id(1, input.move_vector(), input.pressed("shoot"))
 	_apply_look(delta)
+	if is_in_mech() and NetSession.is_active() and not multiplayer.is_server() and mech != null:
+		mech.report_pilot.rpc_id(
+			1,
+			input.move_vector(),
+			input.pressed("sprint"),
+			look_yaw(),
+			look_pitch(),
+			input.just_pressed("jump")
+		)
+		if not is_golfing():
+			if input.just_pressed("shoot"):
+				mech.report_fire.rpc_id(1)
+			if input.just_pressed("reload"):
+				mech.report_reload.rpc_id(1)
 	_update_shield()
 	if health.is_downed():
 		head.position.y = DOWNED_HEAD_HEIGHT
@@ -252,7 +276,7 @@ func _process(delta: float) -> void:
 	if not NetSession.should_simulate(self):
 		if predicts_locally():
 			_predict.correct(self, sync_xform, delta)
-		elif not carried_by_cart():
+		elif not carried_by_cart() and not is_in_mech():
 			_net_interp.follow(self, sync_xform, delta, NetSync.PAWN_HZ, NetSync.WATCH_DELAY)
 		_animate(delta)
 
@@ -332,6 +356,14 @@ func is_placing() -> bool:
 	return state == State.PLACING
 
 
+func is_climbing() -> bool:
+	return state == State.CLIMBING
+
+
+func is_milling() -> bool:
+	return mill_desk != null
+
+
 func is_celebrating() -> bool:
 	return _cheer_left > 0.0
 
@@ -340,7 +372,7 @@ func is_celebrating() -> bool:
 func celebrate() -> void:
 	if is_cpu() or not health.is_alive():
 		return
-	if is_riding() or is_swimming() or is_golfing():
+	if is_riding() or is_swimming() or is_golfing() or is_in_mech():
 		return
 	_cancel_place()
 	if state == State.SHIELDING:
@@ -449,10 +481,16 @@ func _receive_knockback(from: Vector3, speed: float) -> void:
 
 
 func get_view_transform() -> Transform3D:
+	if is_climbing():
+		return climber.view_transform(self)
 	if is_celebrating():
 		return _cheer_view()
 	if state == State.GOLFING and golf != null:
 		return golf.get_camera_transform()
+	if is_in_mech() and mech != null:
+		if _cart_chase:
+			return mech.chase_view_transform()
+		return _drunk_view(mech.pilot_view_transform(_pitch))
 	if is_driving():
 		if _cart_chase:
 			return cart.chase_view_transform()
@@ -478,8 +516,16 @@ func _drunk_view(xform: Transform3D) -> Transform3D:
 
 func get_view_fov() -> float:
 	var bump := buzz.fov_bump() if wants_drunk_fx() else 0.0
+	if is_climbing():
+		return Climber.CAM_FOV
 	if is_celebrating():
 		return CHEER_FOV
+	if is_in_mech():
+		if _cart_chase:
+			return MechSuit.CHASE_FOV + bump
+		if aiming:
+			return ADS_FOV + bump
+		return BASE_FOV + bump
 	if is_driving():
 		return (GolfCart.CHASE_FOV if _cart_chase else DRIVER_FOV) + bump
 	if is_shielding():
@@ -510,7 +556,7 @@ func view_cull_mask() -> int:
 
 
 func _hides_own_cabin() -> bool:
-	if is_underwater():
+	if is_underwater() or is_in_mech():
 		return true
 	return is_driving() and not _cart_chase
 
@@ -526,6 +572,9 @@ func add_mouse_look(relative: Vector2) -> void:
 ## every frame to keep the golfer at address, which is also why it leaves pitch
 ## alone: only a fresh spawn should reset where you are looking.
 func stand_at(position: Vector3, facing_yaw: float) -> void:
+	if mech != null and mech.pilot == self:
+		mech.stand_at(position, facing_yaw)
+		return
 	global_position = position
 	_yaw = facing_yaw
 	rotation.y = deg_to_rad(_yaw)
@@ -534,6 +583,10 @@ func stand_at(position: Vector3, facing_yaw: float) -> void:
 
 
 func spawn_at(position: Vector3, facing_yaw: float) -> void:
+	if state == State.GOLFING and golf != null:
+		golf.release()
+	if mech != null:
+		mech.release_pilot()
 	if cart != null and cart.is_riding(self):
 		cart.eject(self)
 	elif state == State.RIDING:
@@ -550,11 +603,15 @@ func spawn_at(position: Vector3, facing_yaw: float) -> void:
 	stand_at(position, facing_yaw)
 	_pitch = 0.0
 	_underwater = false
-	if state == State.SWIMMING:
+	if state == State.SWIMMING or state == State.CLIMBING:
+		_drop_climb()
 		state = State.NORMAL
+	if is_milling():
+		mill_desk.release(self)
 
 
 func enter_golf_mode() -> void:
+	_drop_climb()
 	_cancel_place()
 	state = State.GOLFING
 	velocity = Vector3.ZERO
@@ -566,10 +623,14 @@ func enter_golf_mode() -> void:
 
 
 func exit_golf_mode() -> void:
+	if mech != null and mech.pilot == self:
+		state = State.MECH
+		return
 	state = State.NORMAL
 
 
 func enter_ride() -> void:
+	_drop_climb()
 	_cancel_place()
 	state = State.RIDING
 	velocity = Vector3.ZERO
@@ -583,6 +644,76 @@ func exit_ride() -> void:
 	state = State.NORMAL
 	_cart_chase = false
 	_set_solid(true)
+
+
+func is_in_mech() -> bool:
+	return mech != null and mech.pilot == self
+
+
+func look_yaw() -> float:
+	return _yaw
+
+
+func look_pitch() -> float:
+	return _pitch
+
+
+func golf_claim_origin() -> Vector3:
+	if is_in_mech():
+		return mech.golf_claim_origin()
+	return global_position
+
+
+func golf_claim_range() -> float:
+	if is_in_mech():
+		return mech.golf_claim_range()
+	return GolfController.CLAIM_RANGE
+
+
+func golf_stance_point(lie: Vector3, aim_yaw_deg: float) -> Vector3:
+	if is_in_mech():
+		return mech.golf_stance_point(lie, aim_yaw_deg)
+	return GolfClub.stance_point(lie, aim_yaw_deg)
+
+
+func enter_mech(suit: MechSuit) -> void:
+	_drop_climb()
+	_cancel_place()
+	mech = suit
+	state = State.MECH
+	velocity = Vector3.ZERO
+	_set_solid(false)
+	_set_hidden_in_mech(true)
+	_cart_chase = false
+	if _shield != null:
+		_shield.set_raised(false)
+
+
+func eject_from_mech(at: Vector3, facing_yaw: float) -> void:
+	mech = null
+	_cart_chase = false
+	_set_hidden_in_mech(false)
+	_set_solid(true)
+	if state == State.MECH or state == State.GOLFING:
+		state = State.NORMAL
+	stand_at(at, facing_yaw)
+
+
+func sit_in_mech(sit_at: Vector3, facing_yaw: float, pitch_deg: float) -> void:
+	global_position = sit_at
+	velocity = Vector3.ZERO
+	if is_multiplayer_authority():
+		return
+	_yaw = facing_yaw
+	rotation.y = deg_to_rad(_yaw)
+	head.rotation.x = deg_to_rad(pitch_deg)
+
+
+func _set_hidden_in_mech(on: bool) -> void:
+	if body != null:
+		body.visible = not on
+	if raygun != null:
+		raygun.visible = not on
 
 
 func _set_solid(on: bool) -> void:
@@ -635,6 +766,23 @@ func sit_as_passenger(sit_at: Vector3) -> void:
 func get_prompt() -> String:
 	if talking:
 		return "%s to move on" % input.hint("interact")
+	if is_climbing():
+		return "hold %s left   hold %s right   sticks reach   jump drop" % [
+			input.hint("melee"), input.hint("shield")
+		]
+	if is_in_mech() and state != State.GOLFING:
+		if mech != null and mech.is_reloading():
+			return "Mech   reloading   %s camera   %s to golf" % [
+				input.hint("melee"), input.hint("interact")
+			]
+		var shells := 0 if mech == null else mech.shells()
+		return "Mech   %d / 8   %s rockets   %s camera   %s to golf" % [
+			shells, input.hint("shoot"), input.hint("melee"), input.hint("interact")
+		]
+	if is_milling():
+		return "Rotate %s   %s to step away" % [
+			input.hint("move"), input.hint("interact")
+		]
 	if shopping:
 		return _shop_prompt()
 	if is_cpu() and health.is_alive() and state == State.NORMAL:
@@ -650,7 +798,9 @@ func get_prompt() -> String:
 	if state == State.SWIMMING:
 		return _swim_prompt()
 	if state == State.GOLFING:
-		return "%s to swing   %s to leave the ball" % [input.hint("swing"), input.hint("interact")]
+		return "%s to swing   stick up/down for height   %s to leave the ball" % [
+			input.hint("swing"), input.hint("interact")
+		]
 	if state == State.SHIELDING:
 		return "Shield up   look to cover   release %s to drop" % input.hint("shield")
 	if state == State.PLACING:
@@ -666,6 +816,10 @@ func get_prompt() -> String:
 				input.hint("interact")
 			]
 		return "Riding along   %s to hop out" % input.hint("interact")
+	if _can_latch_climb():
+		return "%s or %s to climb" % [input.hint("melee"), input.hint("shield")]
+	if _mill_control() != null:
+		return "%s to run the mill" % input.hint("interact")
 	if _can_start_play():
 		return "%s to start the hole" % input.hint("interact")
 	if _can_open_doors():
@@ -688,6 +842,8 @@ func get_prompt() -> String:
 		return "%s to play the ball" % input.hint("interact")
 	if _active_cart() != null and _active_cart().can_board(self):
 		return "%s to hop in the cart" % input.hint("interact")
+	if _ready_mech() != null:
+		return "%s to seal the mech" % input.hint("interact")
 	if _orders_cpu_shots() and golf != null and golf.is_available():
 		return "Hold %s for CPU to take the shot" % input.hint("interact")
 	if is_holding_beer():
@@ -728,8 +884,12 @@ func _apply_look(delta: float) -> void:
 			_cart_chase = not _cart_chase
 		_mouse_delta = Vector2.ZERO
 		return
+	if is_in_mech() and input.just_pressed("melee"):
+		_cart_chase = not _cart_chase
 	if is_celebrating():
 		_mouse_delta = Vector2.ZERO
+		return
+	if is_climbing():
 		return
 	var look := Vector2.ZERO
 	if uses_mouse:
@@ -746,6 +906,7 @@ func _apply_look(delta: float) -> void:
 		look /= zoom
 	if state == State.GOLFING:
 		golf.aim_by(-look.x)
+		golf.aim_height_by(-look.y - input.move_vector().y * STICK_DEG_PER_SEC * delta)
 		return
 	if shopping:
 		_turn_shop(look, delta)
@@ -757,7 +918,7 @@ func _apply_look(delta: float) -> void:
 
 
 func _update_shield() -> void:
-	if is_placing():
+	if is_placing() or is_climbing() or is_milling() or is_in_mech():
 		return
 	var was_up := state == State.SHIELDING
 	if state == State.SHIELDING and not _wants_shield():
@@ -782,6 +943,9 @@ func _wants_shield() -> bool:
 		and not talking
 		and not _in_clubhouse()
 		and not is_carrying_ball()
+		and not is_climbing()
+		and not is_milling()
+		and not _can_latch_climb()
 	)
 
 
@@ -892,7 +1056,17 @@ func _place_in_water(at: Vector3) -> bool:
 func _move(delta: float) -> void:
 	# Riders are carried by the cart. Golfers are planted at address. Either one
 	# calling move_and_slide inside the heightmap is how a seat can freeze.
-	if state == State.RIDING or state == State.GOLFING:
+	if state == State.RIDING or state == State.GOLFING or state == State.MECH:
+		return
+	if is_climbing():
+		if not climber.tick(self, delta):
+			_drop_climb()
+		return
+	if is_milling():
+		mill_desk.tick(self, delta)
+		velocity = Vector3.ZERO
+		return
+	if _try_latch_climb():
 		return
 	if _fling_left > 0.0:
 		_fling_left = maxf(0.0, _fling_left - delta)
@@ -988,8 +1162,17 @@ func _fight(delta: float) -> void:
 	var can_fight := (
 		health.is_alive() and state != State.GOLFING and not is_driving()
 		and not is_swimming() and not is_carrying_ball() and not is_shielding()
+		and not is_climbing()
+		and not is_milling()
+		and not is_in_mech()
 		and not _in_clubhouse() and not is_celebrating()
 	)
+	if is_in_mech() and not is_golfing():
+		aiming = input.pressed("aim")
+		if weapon != null:
+			weapon.zoom_step = -1
+			weapon.tick(delta, head.global_transform, false, false, false)
+		return
 	if not can_fight:
 		aiming = false
 		if weapon != null:
@@ -1140,6 +1323,11 @@ func _animate(delta: float) -> void:
 		body.swim(delta, pace(), _underwater)
 	elif is_celebrating():
 		body.cheer(delta, _cheer_left)
+	elif is_climbing():
+		body.climb(
+			climber.pose_left(), climber.pose_right(), climber.left_aim,
+			climber.left != Vector3.INF, climber.right != Vector3.INF
+		)
 	elif is_shielding():
 		body.guard()
 	else:
@@ -1153,6 +1341,9 @@ func _animate(delta: float) -> void:
 	var show_gun := (
 		health.is_alive() and state != State.GOLFING and not is_driving()
 		and not is_swimming() and not is_shielding() and not is_placing()
+		and not is_climbing()
+		and not is_milling()
+		and not is_in_mech()
 		and not is_holding_beer() and not weapon.is_scoped() and not is_celebrating()
 		and not shopping
 	)
@@ -1174,6 +1365,12 @@ func _orders_cpu_shots() -> bool:
 
 
 func _interact(delta: float) -> void:
+	if is_climbing():
+		return
+	if is_milling():
+		if input.just_pressed("interact"):
+			mill_desk.try_toggle(self)
+		return
 	if shopping and _station() == null:
 		close_shop()
 	if talking and _npc() == null:
@@ -1238,13 +1435,15 @@ func _tick_cpu_shot_command(delta: float) -> void:
 ## Hold vs tap is only for "you take this shot or the CPU does". Cart, shop,
 ## retrieve, and hop-out stay on press so a release cannot undo them.
 func _cpu_shot_hold_applies() -> bool:
-	if state != State.NORMAL or shopping or talking:
+	if state != State.NORMAL or shopping or talking or is_milling():
 		return false
 	if _can_open_doors() or _can_open_exit() or _station() != null or _npc() != null or _can_retrieve_ball():
 		return false
-	if _can_start_play() or _beer_cart() != null:
+	if _can_start_play() or _beer_cart() != null or _mill_control() != null:
 		return false
 	if _active_cart() != null and _active_cart().can_board(self) and (golf == null or not golf.can_claim(self)):
+		return false
+	if _ready_mech() != null:
 		return false
 	return true
 
@@ -1253,12 +1452,17 @@ func _cpu_shot_hold_applies() -> bool:
 ## riding; shop if the pavilion is open; pick the ball out of the cup after a
 ## hole-out; else play the ball; else climb in.
 func _use_interact() -> void:
+	if is_climbing():
+		return
 	if shopping:
 		_shop_confirm()
 	elif talking:
 		stop_talk()
 	elif state == State.RIDING:
 		cart.eject(self)
+	elif is_in_mech():
+		if golf != null and (golf.golfer == self or golf.can_claim(self)):
+			golf.try_toggle(self)
 	elif _can_open_doors():
 		open_doors()
 	elif _station() != null:
@@ -1273,8 +1477,12 @@ func _use_interact() -> void:
 		_use_beer_cart()
 	elif _can_retrieve_ball():
 		flow.retrieve_ball(self)
+	elif _mill_control() != null:
+		_mill_control().try_toggle(self)
 	elif golf != null and (golf.golfer == self or golf.can_claim(self)):
 		golf.try_toggle(self)
+	elif _ready_mech() != null:
+		_ready_mech().try_close(self)
 	elif _active_cart() != null and _active_cart().can_board(self):
 		_active_cart().board(self)
 	elif is_holding_beer():
@@ -1340,6 +1548,8 @@ func close_shop() -> void:
 
 
 func incoming_damage(amount: float) -> float:
+	if is_in_mech():
+		return 0.0
 	if is_riding() and cart != null and cart.armored:
 		return amount * GolfCart.ARMOR_SCALE
 	return amount
@@ -1525,6 +1735,16 @@ func _active_cart() -> GolfCart:
 	return cart
 
 
+func _ready_mech() -> MechSuit:
+	if not is_inside_tree() or not health.is_alive():
+		return null
+	for node in get_tree().get_nodes_in_group("mechs"):
+		var suit := node as MechSuit
+		if suit != null and suit.can_close(self):
+			return suit
+	return null
+
+
 func _beer_prompt() -> String:
 	var girl = _beer_cart()
 	if girl == null:
@@ -1679,6 +1899,8 @@ func wants_drunk_fx() -> bool:
 		return false
 	if is_driving() and _cart_chase:
 		return false
+	if is_in_mech() and _cart_chase:
+		return false
 	return true
 
 
@@ -1688,6 +1910,61 @@ func _can_retrieve_ball() -> bool:
 
 func _can_start_play() -> bool:
 	return flow != null and flow.has_method("can_start_play") and flow.can_start_play(self)
+
+
+func _can_latch_climb() -> bool:
+	if state != State.NORMAL or shopping or talking or is_milling():
+		return false
+	if health == null or not health.is_alive():
+		return false
+	var wall := ClimbingWall.nearest(self)
+	return wall != null and wall.can_latch(self)
+
+
+func _try_latch_climb() -> bool:
+	if not _can_latch_climb():
+		return false
+	if not input.just_pressed("melee") and not input.just_pressed("shield"):
+		return false
+	return _start_climb()
+
+
+func _start_climb() -> bool:
+	var wall := ClimbingWall.nearest(self)
+	if wall == null or not climber.latch(self, wall):
+		return false
+	state = State.CLIMBING
+	if _shield != null:
+		_shield.set_raised(false)
+	return true
+
+
+func _drop_climb() -> void:
+	climber.drop()
+	if state == State.CLIMBING:
+		state = State.NORMAL
+
+
+func _mill_control():
+	return _MillDesk.nearest(self)
+
+
+func begin_mill(desk) -> void:
+	mill_desk = desk
+	if _shield != null:
+		_shield.set_raised(false)
+
+
+func end_mill(desk) -> void:
+	if mill_desk == desk:
+		mill_desk = null
+
+
+func face_mill(at: Vector3, yaw: float) -> void:
+	global_position = at
+	_yaw = rad_to_deg(yaw)
+	rotation.y = yaw
+	velocity = Vector3.ZERO
 
 
 func _cycle_shop(step := 1) -> void:
@@ -1757,7 +2034,7 @@ func _distance_to(other: Node3D) -> float:
 ## once it is over your chest do you start treading, and only your own dive takes
 ## you under from there.
 func _should_swim(water_depth: float) -> bool:
-	if not health.is_alive() or state == State.GOLFING or state == State.RIDING:
+	if not health.is_alive() or state == State.GOLFING or state == State.RIDING or state == State.MECH:
 		return false
 	if state == State.SWIMMING and _underwater:
 		return true
@@ -1983,6 +2260,9 @@ func _on_downed() -> void:
 		golf.release()
 	if state == State.SWIMMING:
 		_leave_water()
+	_drop_climb()
+	if is_milling():
+		mill_desk.release(self)
 	# Dumped out of the cart, so your partner has to come and pick you up.
 	if state == State.RIDING:
 		cart.eject(self)

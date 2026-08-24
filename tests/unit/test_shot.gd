@@ -84,6 +84,11 @@ func test_full_power_matches_the_old_full_swing() -> void:
 	assert_almost_eq(Shot.swing_speed(1.0), Shot.MAX_SPEED, 0.001)
 	var expected := Shot.MAX_SPEED * Shot.MAX_SPEED * sin(2.0 * deg_to_rad(Shot.LAUNCH_DEG)) / Shot.GRAVITY
 	assert_almost_eq(Shot.max_carry(), expected, 0.001)
+	var vy := Shot.MAX_SPEED * sin(deg_to_rad(Shot.LAUNCH_DEG))
+	assert_almost_eq(Shot.apex_height(), vy * vy / (2.0 * Shot.GRAVITY), 0.001)
+	assert_almost_eq(Shot.carry_to_height(0.0), Shot.max_carry(), 0.001)
+	assert_lt(Shot.carry_to_height(Shot.apex_height() * 0.5), Shot.max_carry())
+	assert_eq(Shot.carry_to_height(Shot.apex_height() + 1.0), 0.0)
 
 
 func test_the_chip_curve_meets_the_full_swing() -> void:
@@ -105,3 +110,63 @@ func test_an_unspecified_kit_is_the_starter() -> void:
 	var with_kit := Shot.velocity(0.0, 0.0, 1.0, Surface.Type.FAIRWAY, false, ClubKit.starter())
 	var without := Shot.velocity(0.0, 0.0, 1.0, Surface.Type.FAIRWAY, false)
 	assert_almost_eq(with_kit.length(), without.length(), 0.001)
+
+
+func test_loft_bias_raises_and_lowers_launch() -> void:
+	var stock := Shot.velocity(0.0, 0.0, 1.0, Surface.Type.FAIRWAY, false)
+	var high := Shot.velocity(0.0, 0.0, 1.0, Surface.Type.FAIRWAY, false, null, 0.0, 20.0)
+	var low := Shot.velocity(0.0, 0.0, 1.0, Surface.Type.FAIRWAY, false, null, 0.0, -12.0)
+	assert_gt(high.y, stock.y)
+	assert_lt(low.y, stock.y)
+	assert_almost_eq(high.length(), stock.length(), 0.001)
+	assert_almost_eq(Shot.launch_deg(1.0, 0.0), Shot.LAUNCH_DEG, 0.001)
+	assert_almost_eq(Shot.launch_deg(1.0, -100.0), Shot.MIN_LAUNCH_DEG, 0.001)
+	assert_almost_eq(Shot.launch_deg(1.0, 100.0), Shot.MAX_LAUNCH_DEG, 0.001)
+
+
+func test_max_carry_ignores_the_stick_so_holes_stay_put() -> void:
+	var expected := Shot.MAX_SPEED * Shot.MAX_SPEED * sin(2.0 * deg_to_rad(Shot.LAUNCH_DEG)) / Shot.GRAVITY
+	assert_almost_eq(Shot.max_carry(), expected, 0.001)
+	assert_gt(Shot.apex_height(1.0, 20.0), Shot.apex_height())
+
+
+func test_a_higher_loft_draws_a_taller_perfect_flight() -> void:
+	var low := Shot.flight_points(Vector3.ZERO, 0.0, 1.0, -12.0)
+	var high := Shot.flight_points(Vector3.ZERO, 0.0, 1.0, 24.0)
+	assert_gt(_peak_y(high), _peak_y(low) + 2.0, "stick up has to show a taller arc")
+	for point in high:
+		assert_almost_eq(point.x, 0.0, 0.001, "a perfect hit stays on the aim line")
+
+
+func test_loft_moves_how_far_a_perfect_hit_lands() -> void:
+	var punch := Shot.carry_to_height(0.0, 1.0, Shot.LOFT_BIAS_MIN)
+	var stock := Shot.carry_to_height(0.0, 1.0, 0.0)
+	var flop := Shot.carry_to_height(0.0, 1.0, Shot.LOFT_BIAS_MAX)
+	assert_lt(punch, stock - 20.0, "a punch has to land well short of a stock swing")
+	assert_gt(flop, stock + 10.0, "more loft toward 45 has to carry further")
+	var punch_flight := Shot.flight_points(Vector3.ZERO, 0.0, 1.0, Shot.LOFT_BIAS_MIN)
+	var flop_flight := Shot.flight_points(Vector3.ZERO, 0.0, 1.0, Shot.LOFT_BIAS_MAX)
+	assert_almost_eq(_carry_xz(punch_flight), punch, 1.5)
+	assert_almost_eq(_carry_xz(flop_flight), flop, 1.5)
+
+
+func test_a_putt_preview_stays_on_the_ground() -> void:
+	var origin := Vector3(0.0, 0.15, 0.0)
+	var points := Shot.flight_points(origin, 90.0, 1.0, 24.0, true)
+	assert_gt(points.size(), 2)
+	for point in points:
+		assert_almost_eq(point.y, origin.y, 0.001)
+		assert_almost_eq(point.z, origin.z, 0.001, "yaw 90 is a roll along +X")
+
+
+func _peak_y(points: PackedVector3Array) -> float:
+	var peak := -INF
+	for point in points:
+		peak = maxf(peak, point.y)
+	return peak
+
+
+func _carry_xz(points: PackedVector3Array) -> float:
+	var start: Vector3 = points[0]
+	var land: Vector3 = points[points.size() - 1]
+	return Vector2(land.x - start.x, land.z - start.z).length()

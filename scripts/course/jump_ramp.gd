@@ -1,3 +1,4 @@
+@tool
 class_name JumpRamp
 extends StaticBody3D
 ## A takeoff the cart can launch from. The heightmap is the driving surface
@@ -10,6 +11,11 @@ const ANGLE_DEG := 20.0
 ## Deep enough to reach a pond floor, so the cart cannot drive the bowl under the
 ## slope. Boxes, not convex hulls: Jolt's character body ignores those.
 const FILL := 8.0
+
+var width := WIDTH
+var length := LENGTH
+var angle_deg := ANGLE_DEG
+var role := "takeoff"
 
 
 static func lip_height(length := LENGTH, angle_deg := ANGLE_DEG) -> float:
@@ -95,22 +101,43 @@ static func flight_distance(
 static func create(jump: Dictionary) -> JumpRamp:
 	var ramp := JumpRamp.new()
 	ramp.name = "JumpRamp"
-	ramp.collision_layer = Layers.WORLD
-	ramp.collision_mask = 0
-	var width: float = jump.get("width", WIDTH)
-	var length: float = jump.get("length", LENGTH)
-	var angle_deg: float = jump.get("angle_deg", ANGLE_DEG)
-	ramp.add_child(_shape(width, length, angle_deg))
-	var deck := _wedge(width, length, angle_deg)
-	MeshFactory.apply_grid(deck, Surface.LOOK[Surface.Type.FAIRWAY])
-	ramp.add_child(deck)
-	ramp.add_child(_lip(width, length, angle_deg))
-	if jump.get("role", "takeoff") == "takeoff":
-		for mark in _chevrons(length, angle_deg):
-			ramp.add_child(mark)
+	ramp.width = float(jump.get("width", WIDTH))
+	ramp.length = float(jump.get("length", LENGTH))
+	ramp.angle_deg = float(jump.get("angle_deg", ANGLE_DEG))
+	ramp.role = String(jump.get("role", "takeoff"))
 	ramp.rotation.y = deg_to_rad(jump["yaw"])
 	ramp.position = jump["position"]
+	ramp._assemble()
 	return ramp
+
+
+func to_jump() -> Dictionary:
+	return {
+		"position": Vector3(position.x, 0.0, position.z),
+		"yaw": rad_to_deg(rotation.y),
+		"width": width,
+		"length": length,
+		"angle_deg": angle_deg,
+		"role": role,
+	}
+
+
+func _ready() -> void:
+	if get_child_count() == 0:
+		_assemble()
+
+
+func _assemble() -> void:
+	collision_layer = Layers.WORLD
+	collision_mask = 0
+	add_child(_shape(width, length, angle_deg))
+	var deck := _wedge(width, length, angle_deg)
+	MeshFactory.apply_grid(deck, Surface.LOOK[Surface.Type.FAIRWAY])
+	add_child(deck)
+	add_child(_lip(width, length, angle_deg))
+	if role == "takeoff":
+		for mark in _chevrons(length, angle_deg):
+			add_child(mark)
 
 
 static func _thickness(length: float, angle_deg: float) -> float:

@@ -25,6 +25,8 @@ const BODY_TURN_RATIO := 0.22
 var ball: GolfBall
 var golfer: Node = null
 var aim_yaw := 0.0
+## Extra launch degrees on top of the power loft. Stick up raises the shot.
+var aim_loft := 0.0
 var meter := SwingMeter.new()
 var club_kit: ClubKit = ClubKit.starter()
 ## Diameter of the green this stroke is playing to. A stuffed putt runs 2.4x this.
@@ -32,6 +34,7 @@ var green_span := 0.0
 
 var _cup := Vector3.ZERO
 var _arrow: Node3D
+var _preview: ShotPreview
 var _club: GolfClub
 var _shot_eye := Vector3.ZERO
 ## Where the ball was addressed. Held while the ball is in the air so the golfer
@@ -46,6 +49,9 @@ func _ready() -> void:
 	_arrow = _build_arrow()
 	add_child(_arrow)
 	_arrow.visible = false
+	_preview = ShotPreview.new()
+	add_child(_preview)
+	_preview.visible = false
 	_club = GolfClub.new()
 	add_child(_club)
 	_club.visible = false
@@ -87,7 +93,10 @@ func can_claim(player: Node) -> bool:
 		return false
 	if player.has_method("is_swimming") and player.is_swimming():
 		return false
-	return _horizontal_distance(player) <= CLAIM_RANGE
+	var reach := CLAIM_RANGE
+	if player.has_method("golf_claim_range"):
+		reach = player.golf_claim_range()
+	return _horizontal_distance(player) <= reach
 
 
 func try_toggle(player: Node) -> void:
@@ -104,7 +113,10 @@ func release() -> void:
 	var previous := golfer
 	golfer = null
 	meter.reset()
+	aim_loft = 0.0
 	_arrow.visible = false
+	if _preview != null:
+		_preview.visible = false
 	_club.visible = false
 	if previous.has_method("exit_golf_mode"):
 		previous.exit_golf_mode()
@@ -136,16 +148,29 @@ func aim_by(degrees: float) -> void:
 	aim_yaw = wrapf(aim_yaw + degrees, -180.0, 180.0)
 
 
+func aim_height_by(degrees: float) -> void:
+	if golfer == null or meter.is_swinging() or _is_putting():
+		return
+	aim_loft = clampf(aim_loft + degrees, Shot.LOFT_BIAS_MIN, Shot.LOFT_BIAS_MAX)
+
+
 func get_camera_transform() -> Transform3D:
 	var pivot := ball.global_position if ball != null else global_position
 	if _is_watching_shot():
 		return _look_from(_shot_eye, pivot)
 	var forward := Shot.aim_direction(aim_yaw, 0.0)
+	var look_along := _preview_look_along()
+	var back := CAMERA_DISTANCE
+	var height := CAMERA_HEIGHT
+	if golfer is Player and (golfer as Player).is_in_mech():
+		back += 16.0
+		height += 10.0
 	var eye := (
-		pivot - forward * CAMERA_DISTANCE + Vector3.UP * CAMERA_HEIGHT
+		pivot - forward * (back + look_along * 0.18)
+		+ Vector3.UP * (height + look_along * 0.035)
 		+ forward.cross(Vector3.UP) * CAMERA_SIDE
 	)
-	return _look_from(eye, pivot + Vector3.UP * CAMERA_LOOK_HEIGHT)
+	return _look_from(eye, pivot + forward * look_along + Vector3.UP * CAMERA_LOOK_HEIGHT)
 
 
 func _process(delta: float) -> void:
@@ -157,6 +182,7 @@ func _process(delta: float) -> void:
 			_strike()
 	_refresh_lie()
 	_pose_arrow()
+	_pose_preview()
 	_pose_swing(delta)
 
 
@@ -168,14 +194,36 @@ func _pose_arrow() -> void:
 	)
 
 
+func _pose_preview() -> void:
+	if _preview == null:
+		return
+	if golfer == null or _is_watching_shot():
+		_preview.visible = false
+		return
+	_preview.visible = true
+	_preview.draw(Shot.flight_points(
+		_lie, aim_yaw, 1.0, aim_loft, _is_putting(), club_kit, green_span
+	))
+
+
+func _preview_look_along() -> float:
+	var carry := Shot.putt_run(club_kit, green_span) if _is_putting() else Shot.carry_to_height(
+		0.0, 1.0, aim_loft
+	)
+	return clampf(carry * 0.3, 0.0, 28.0)
+
+
 ## Holds the golfer at address beside the ball and swings the club through it.
 ## Standing them there is what makes the swing land on the ball at all: the claim
 ## can be made from a few metres out.
 func _pose_swing(delta: float) -> void:
 	_club.pose(_lie, aim_yaw, meter.value, delta, _is_putting())
 	if golfer.has_method("stand_at"):
+		var stance := GolfClub.stance_point(_lie, aim_yaw)
+		if golfer.has_method("golf_stance_point"):
+			stance = golfer.golf_stance_point(_lie, aim_yaw)
 		golfer.stand_at(
-			GolfClub.stance_point(_lie, aim_yaw), aim_yaw + _club.angle * BODY_TURN_RATIO
+			stance, aim_yaw + _club.angle * BODY_TURN_RATIO
 		)
 
 
@@ -186,6 +234,7 @@ func _claim(player: Node) -> void:
 	_lie_locked = false
 	_lie = ball.global_position
 	aim_yaw = _yaw_towards(_cup)
+	aim_loft = 0.0
 	_arrow.visible = true
 	_club.visible = true
 	if player.has_method("enter_golf_mode"):
@@ -197,9 +246,11 @@ func _claim(player: Node) -> void:
 func _strike() -> void:
 	_lock_lie()
 	_apply_kit()
-	ball.strike(aim_yaw, meter.deviation_deg, meter.power, _shot_kit(), green_span)
+	ball.strike(aim_yaw, meter.deviation_deg, meter.power, _shot_kit(), green_span, aim_loft)
 	meter.reset()
 	_arrow.visible = false
+	if _preview != null:
+		_preview.visible = false
 	_club.start_follow_through()
 	stroke_taken.emit()
 	Sfx.play("putt" if _is_putting() else "club_hit", self)
@@ -208,17 +259,21 @@ func _strike() -> void:
 func _shot_kit() -> ClubKit:
 	var kit := club_kit if club_kit != null else ClubKit.starter()
 	var who := golfer as Player
+	if who != null and who.is_in_mech():
+		kit = ClubKit.mech()
 	if who == null:
 		return kit
 	return kit.boosted(who.buzz.strength_mult())
 
 
 func _apply_kit() -> void:
-	if club_kit == null:
-		club_kit = ClubKit.starter()
-	meter.kit = club_kit
+	var kit := club_kit if club_kit != null else ClubKit.starter()
+	var who := golfer as Player
+	if who != null and who.is_in_mech():
+		kit = ClubKit.mech()
+	meter.kit = kit
 	if _club != null:
-		_club.apply_kit(club_kit)
+		_club.apply_kit(kit)
 
 
 func _lock_lie() -> void:
@@ -252,7 +307,10 @@ func _yaw_towards(target: Vector3) -> float:
 
 
 func _horizontal_distance(player: Node) -> float:
-	var offset: Vector3 = (player as Node3D).global_position - ball.global_position
+	var from: Vector3 = (player as Node3D).global_position
+	if player.has_method("golf_claim_origin"):
+		from = player.golf_claim_origin()
+	var offset: Vector3 = from - ball.global_position
 	offset.y = 0.0
 	return offset.length()
 

@@ -129,10 +129,16 @@ static func generate(data: HoleData, rng: RandomNumberGenerator) -> HeightField:
 			# Shorter mounds only in the rough, so the fairway does not inherit them.
 			h += noise.get_noise_2d(wx * 2.3, wz * 2.3) * NOISE_OFF_FAIRWAY * 0.55 * hill
 			field.samples[z * field.width + x] = _flatten(h, point, data, tee_h, cup_h)
+	MountainHole.raise(field, data)
+	CulvertHole.raise(field, data)
+	CulvertHole.cut(field, data)
 	field._sink_ponds(data)
 	field._raise_jumps(data)
-	field._pave_exit(data)
+	if not MountainHole.applies(data) and not CulvertHole.applies(data):
+		field._pave_exit(data)
 	field._pave_clubhouse(data)
+	MountainHole.clip(field, data)
+	CulvertHole.clip(field, data)
 	field._measure()
 	return field
 

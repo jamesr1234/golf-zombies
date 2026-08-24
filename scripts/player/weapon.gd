@@ -306,6 +306,7 @@ func _launch_rocket(view: Transform3D, current: WeaponStats) -> void:
 	var origin := view.origin + direction * 0.9
 	var rocket := Rocket.spawn(_fx_root(), origin, direction, current)
 	if rocket != null:
+		rocket.shooter = get_parent() as Player
 		_WorldFx.announce_rocket(
 			self, origin, direction, rocket.damage, rocket.blast_radius, rocket.max_range
 		)
