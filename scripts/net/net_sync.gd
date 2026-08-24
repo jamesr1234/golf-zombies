@@ -94,7 +94,7 @@ static func attach_mech(node: Node) -> MultiplayerSynchronizer:
 	return attach(node, PackedStringArray([
 		":sync_xform", ":sync_stick", ":sync_sprint", ":sync_jumps",
 		":closed", ":hp", ":sync_mag", ":sync_reload", ":sync_pitch",
-	]), CART_HZ)
+	]), CART_HZ, 1)
 
 
 static func attach_cart_girl(node: Node) -> MultiplayerSynchronizer:

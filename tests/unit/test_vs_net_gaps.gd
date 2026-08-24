@@ -82,6 +82,7 @@ func test_zombie_and_cart_sync_carry_the_look_flags() -> void:
 	assert_true(mech_sync.replication_config.has_property(NodePath(":closed")))
 	assert_true(mech_sync.replication_config.has_property(NodePath(":sync_mag")))
 	assert_true(mech_sync.replication_config.has_property(NodePath(":sync_reload")))
+	assert_eq(mech_sync.get_multiplayer_authority(), 1, "Computer 2 must receive the host's suit")
 	var girl := Node3D.new()
 	add_child_autofree(girl)
 	var girl_sync := NetSync.attach_cart_girl(girl)

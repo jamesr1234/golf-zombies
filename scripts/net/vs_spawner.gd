@@ -19,6 +19,7 @@ const MECH_SCENE := preload("res://scenes/course/items/mech_suit.tscn")
 
 
 func _ready() -> void:
+	add_to_group("vs_spawner")
 	player_spawner.spawn_function = _spawn_player
 	ball_spawner.spawn_function = _spawn_ball
 	zombie_spawner.spawn_function = _spawn_zombie
@@ -127,12 +128,62 @@ func spawn_mech(at: Vector3, yaw_deg: float, owner_peer: int) -> MechSuit:
 func _spawn_mech(data: Variant) -> Node:
 	var info: Dictionary = data
 	var mech: MechSuit = MECH_SCENE.instantiate()
-	mech.set_multiplayer_authority(1)
-	NetSync.attach_mech(mech)
+	var owner_peer := int(info.get("owner_peer", 0))
+	mech.name = "Mech%d" % owner_peer
+	mech.owner_peer = owner_peer
 	var at: Vector3 = info.get("at", Vector3.ZERO)
 	var yaw := deg_to_rad(float(info.get("yaw", 0.0)))
 	var pose := Transform3D(Basis.from_euler(Vector3(0.0, yaw, 0.0)), at)
 	mech.transform = pose
 	mech.sync_xform = pose
-	mech.owner_peer = int(info.get("owner_peer", 0))
+	NetSync.attach_mech(mech)
+	mech.set_multiplayer_authority(1)
 	return mech
+
+
+func publish_mech(mech: MechSuit) -> void:
+	if not multiplayer.is_server() or mech == null or not mech.is_inside_tree():
+		return
+	_wire_mech.rpc(
+		mech.get_path(),
+		mech.global_transform,
+		mech.sync_stick,
+		mech.sync_sprint,
+		mech.closed,
+		0 if mech.pilot == null else mech.pilot.peer_id
+	)
+
+
+func publish_mech_seal(mech: MechSuit) -> void:
+	if not multiplayer.is_server() or mech == null or not mech.is_inside_tree():
+		return
+	_wire_mech_seal.rpc(
+		mech.get_path(),
+		mech.global_transform,
+		mech.sync_stick,
+		mech.sync_sprint,
+		mech.closed,
+		0 if mech.pilot == null else mech.pilot.peer_id
+	)
+
+
+@rpc("authority", "call_remote", "unreliable")
+func _wire_mech(
+	path: NodePath, pose: Transform3D, stick: Vector2, sprint: bool, sealed: bool, pilot_id: int
+) -> void:
+	_apply_wire(path, pose, stick, sprint, sealed, pilot_id)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _wire_mech_seal(
+	path: NodePath, pose: Transform3D, stick: Vector2, sprint: bool, sealed: bool, pilot_id: int
+) -> void:
+	_apply_wire(path, pose, stick, sprint, sealed, pilot_id)
+
+
+func _apply_wire(
+	path: NodePath, pose: Transform3D, stick: Vector2, sprint: bool, sealed: bool, pilot_id: int
+) -> void:
+	var mech := get_tree().root.get_node_or_null(path) as MechSuit
+	if mech != null:
+		mech.take_wire(pose, stick, sprint, sealed, pilot_id)

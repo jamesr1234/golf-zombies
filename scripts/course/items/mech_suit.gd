@@ -33,11 +33,10 @@ var _seen_jumps := 0
 var _net_yaw := 0.0
 var _want_fire := false
 var _want_reload := false
+var _drawn_closed := false
+var _wire_left := 0.0
 
-@export var closed := false:
-	set(value):
-		closed = value
-		_apply_closed()
+@export var closed := false
 @export var hp := MAX_HP
 @export var sync_stick := Vector2.ZERO
 @export var sync_sprint := false
@@ -65,6 +64,7 @@ func _ready() -> void:
 	add_to_group("mechs")
 	_visuals = MechVisuals.attach(self)
 	_apply_closed()
+	_drawn_closed = closed
 	if sync_xform == Transform3D.IDENTITY:
 		sync_xform = global_transform
 	if owner_player == null and owner_peer > 0:
@@ -280,12 +280,14 @@ func _physics_process(delta: float) -> void:
 		velocity = Vector3.ZERO
 		_tick_visuals(delta)
 		sync_xform = global_transform
+		_publish_pose(delta)
 		return
 	_drive(delta)
 	combat.stomp(self, crush, allies())
 	_seat_pilot()
 	_tick_visuals(delta)
 	sync_xform = global_transform
+	_publish_pose(delta)
 
 
 ## Watchers draw here so the capsule is never slid across the heightmap. Doing
@@ -303,9 +305,51 @@ func net_interp() -> NetInterp:
 	return _net_interp
 
 
+func take_wire(
+	pose: Transform3D, stick: Vector2, sprint: bool, sealed: bool, pilot_id: int
+) -> void:
+	if NetSession.should_simulate(self):
+		return
+	sync_stick = stick
+	sync_sprint = sprint
+	sync_xform = pose
+	closed = sealed
+	var next := _player_with_peer(pilot_id)
+	if next == null:
+		return
+	pilot = next
+	if not next.is_in_mech():
+		next.enter_mech(self)
+
+
+func _publish_pose(delta: float) -> void:
+	if not NetSession.is_active():
+		return
+	_wire_left -= delta
+	if _wire_left > 0.0:
+		return
+	_wire_left = NetSync.CART_HZ
+	var spawner := _online_spawner()
+	if spawner != null:
+		spawner.publish_mech(self)
+
+
+func _online_spawner() -> VsSpawner:
+	if owner_player != null:
+		var found := _vs_spawner(owner_player)
+		if found != null:
+			return found
+	if is_inside_tree():
+		return get_tree().get_first_node_in_group("vs_spawner") as VsSpawner
+	return null
+
+
 func _tick_visuals(delta: float) -> void:
 	if _visuals == null:
 		return
+	if _drawn_closed != closed:
+		_drawn_closed = closed
+		_apply_closed()
 	var pace := 0.0
 	if closed:
 		if NetSession.should_simulate(self):
@@ -427,12 +471,17 @@ func _do_close(player: Player) -> void:
 		return
 	closed = true
 	pilot = player
+	_apply_closed()
+	_drawn_closed = true
 	_net_yaw = player.look_yaw()
 	sync_pitch = player.look_pitch()
 	player.enter_mech(self)
 	_seat_pilot()
 	Sfx.play("board", self)
 	_broadcast_pilot()
+	var spawner := _online_spawner()
+	if spawner != null:
+		spawner.publish_mech_seal(self)
 
 
 func _apply_closed() -> void:

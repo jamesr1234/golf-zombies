@@ -157,6 +157,7 @@ func test_closed_sync_folds_the_hatch_for_watchers() -> void:
 	var hatch := suit.find_child("Hatch", true, false) as Node3D
 	assert_lt(hatch.rotation.x, deg_to_rad(-45.0))
 	suit.closed = true
+	suit._tick_visuals(0.0)
 	assert_gt(hatch.rotation.x, deg_to_rad(-20.0), "the replicated closed flag folds the hatch")
 	assert_false(suit.get_node("Visuals").get_node("Stairs").visible)
 
@@ -188,6 +189,24 @@ func test_a_watched_suit_glides_to_the_replicated_pose() -> void:
 		suit.global_position.distance_to(Vector3.ZERO), 8.0,
 		"the replicated pose is drawn on the render frame, not left at spawn"
 	)
+
+
+func test_a_wire_update_folds_the_stair_and_moves_the_suit() -> void:
+	NetSession._active = true
+	suit.set_multiplayer_authority(99)
+	suit._park_if_watched()
+	suit.take_wire(
+		Transform3D(Basis(), Vector3(16.0, 0.4, -10.0)),
+		Vector2(0.0, -1.0),
+		false,
+		true,
+		0
+	)
+	suit._tick_visuals(0.0)
+	suit._process(0.05)
+	assert_true(suit.closed)
+	assert_false(suit.get_node("Visuals").get_node("Stairs").visible)
+	assert_gt(suit.global_position.distance_to(Vector3.ZERO), 8.0)
 
 
 func test_a_remote_pilot_report_drives_the_suit() -> void:
