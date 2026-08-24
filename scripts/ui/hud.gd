@@ -170,8 +170,13 @@ func _update_weapon() -> void:
 	if weapon.is_reloading():
 		ammo_label.text = HudStyle.chrome("%s   reloading%s" % [weapon.stats().display_name, extra])
 	else:
-		ammo_label.text = HudStyle.chrome("%s   %d / %d%s" % [
-			weapon.stats().display_name, weapon.mag(), weapon.reserve(), extra
+		ammo_label.text = HudStyle.chrome("%s %d/%d   %d / %d%s" % [
+			weapon.stats().display_name,
+			weapon.index + 1,
+			weapon.loadout.size(),
+			weapon.mag(),
+			weapon.reserve(),
+			extra,
 		])
 
 

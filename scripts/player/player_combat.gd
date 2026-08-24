@@ -102,6 +102,15 @@ func tick(player: Player, delta: float) -> void:
 		if player.weapon != null:
 			player.weapon.zoom_step = -1
 		player.weapon.tick(delta, player.head.global_transform, false, false, false)
+		# Clubhouse still lets you flip the bag so new guns are visible at the armory.
+		if (
+			player._in_clubhouse() and not player.shopping and player.health.is_alive()
+			and not player.is_celebrating()
+		):
+			if player.input.just_pressed("swap_weapon"):
+				player.beer.cycle_held(player, 1)
+			elif player.input.just_pressed("swap_weapon_prev"):
+				player.beer.cycle_held(player, -1)
 		if player.is_carrying_ball() and not player.is_underwater() and player.input.just_pressed("shoot"):
 			player.swim.throw_ball(player)
 		return

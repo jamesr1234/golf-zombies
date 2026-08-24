@@ -13,16 +13,16 @@ const DUST_COLOR := Palette.HIT_WORLD
 const _WorldFx := preload("res://scripts/net/world_fx.gd")
 const CART_GROUP := "golf_carts"
 
-## Net and rocket lead the bag so hole one can test the trap combo. Flare and
-## nailer ride along from the start so the new toys are in hand on hole one.
+## Flare and nailer lead so hole one starts with the new toys in hand. Net and
+## rocket follow for the trap combo.
 var loadout: Array[WeaponStats] = [
+	preload("res://resources/weapons/flare_driver.tres"),
+	preload("res://resources/weapons/cart_nailer.tres"),
 	preload("res://resources/weapons/net.tres"),
 	preload("res://resources/weapons/rocket.tres"),
 	preload("res://resources/weapons/rifle.tres"),
 	preload("res://resources/weapons/shotgun.tres"),
 	preload("res://resources/weapons/sniper.tres"),
-	preload("res://resources/weapons/flare_driver.tres"),
-	preload("res://resources/weapons/cart_nailer.tres"),
 ]
 
 var index := 0
