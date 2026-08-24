@@ -590,6 +590,25 @@ func test_apply_mech_moves_the_grouped_suit() -> void:
 	assert_almost_eq(mech.sync_xform.origin.x, 16.0, 0.05)
 
 
+func test_apply_mill_poses_the_desk_and_the_blades() -> void:
+	var world := _world_fx()
+	var mill := CartPathWindmill.create(Vector3(8.0, 0.0, 12.0), Vector3.FORWARD)
+	add_child_autofree(mill)
+	var desk := WindmillControl.create({
+		"position": Vector3(6.0, 0.0, 12.0),
+		"yaw": 0.0,
+	})
+	add_child_autofree(desk)
+	await wait_physics_frames(1)
+	var found := world.apply_mill(desk.global_position, Vector2(0.0, -1.0), 0.7, true)
+	assert_eq(found, desk)
+	assert_true(mill.is_driven())
+	assert_almost_eq(mill.rotor_rad(), 0.7, 0.001)
+	assert_almost_eq(desk.sync_stick.y, -1.0, 0.001)
+	var pivot := desk.get_node("StickPivot") as Node3D
+	assert_almost_eq(pivot.rotation.x, -WindmillControl.MAX_TILT, 0.001)
+
+
 func test_apply_mech_plants_a_suit_when_none_exists() -> void:
 	var world := _world_fx()
 	world.apply_mech(7, Vector3(10.0, 0.4, -4.0), 0.3, Vector2.ZERO, false, true, 0)

@@ -83,6 +83,11 @@ func set_rotor_rad(rad: float) -> void:
 	_apply_rotor()
 
 
+func take_wire(rad: float, driven: bool) -> void:
+	sync_driven = driven
+	set_rotor_rad(rad)
+
+
 func drive(on: bool) -> void:
 	sync_driven = on
 

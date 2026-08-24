@@ -155,6 +155,53 @@ func test_the_builder_makes_a_desk_from_hole_data() -> void:
 	assert_almost_eq(rad_to_deg(desk.rotation.y), 25.0, 0.001)
 
 
+func test_a_replicated_stick_turns_the_mill_and_the_knob() -> void:
+	var mill := _mill()
+	add_child_autofree(mill)
+	var desk := _Desk.create({
+		"position": Vector3(0.0, 0.0, 2.0),
+		"yaw": 0.0,
+	})
+	add_child_autofree(desk)
+	desk.take_wire(Vector2(1.0, 0.0), 1.25, true)
+	assert_true(mill.is_driven())
+	assert_almost_eq(mill.rotor_rad(), 1.25, 0.001)
+	var pivot := desk.get_node("StickPivot") as Node3D
+	assert_almost_eq(pivot.rotation.z, -_Desk.MAX_TILT, 0.001, "the shaft leans with the analog")
+	var knob := desk.get_node("StickPivot/Shaft/Knob") as Node3D
+	assert_almost_eq(knob.rotation.y, 1.25, 0.001, "the ball marker sits on the mill")
+
+
+func test_offline_physics_does_not_touch_the_net() -> void:
+	var mill := _mill()
+	add_child_autofree(mill)
+	var desk := _Desk.create({
+		"position": Vector3(0.0, 0.0, 2.0),
+		"yaw": 0.0,
+	})
+	add_child_autofree(desk)
+	assert_false(NetSession.is_active())
+	assert_false(desk._watching(), "solo play is not a client watch")
+	desk._publish_pose(1.0, true)
+	desk._physics_process(STEP)
+	assert_eq(desk.sync_stick, Vector2.ZERO)
+
+
+func test_a_desk_beside_a_named_mill_wires_itself() -> void:
+	var overlay := Node3D.new()
+	add_child_autofree(overlay)
+	var mill := CartPathWindmill.create(Vector3(8.0, 0.0, 12.0), Vector3.FORWARD)
+	mill.name = "Windmill"
+	overlay.add_child(mill)
+	var desk := _Desk.create({
+		"position": Vector3(6.0, 0.0, 12.0),
+		"yaw": 90.0,
+	})
+	overlay.add_child(desk)
+	assert_eq(desk.mill_path, NodePath("../Windmill"))
+	assert_eq(desk.mill(), mill)
+
+
 func test_overlay_collect_reads_the_desk() -> void:
 	var overlay := Node3D.new()
 	add_child_autofree(overlay)

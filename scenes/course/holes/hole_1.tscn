@@ -13,6 +13,7 @@ sync_rotor = 139.83112545845418
 
 [node name="WindmillControl" parent="." instance=ExtResource("3_desk")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -17.019766, 0.546164, -1.4227962)
+mill_path = NodePath("../Windmill")
 collision_layer = 32
 collision_mask = 0
 

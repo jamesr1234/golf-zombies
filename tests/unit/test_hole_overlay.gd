@@ -158,6 +158,17 @@ func test_collect_skips_the_editor_preview() -> void:
 	assert_almost_eq(data.jumps[0]["position"].x, 12.0, 0.001)
 
 
+func test_hole_one_wires_the_desk_to_the_mill() -> void:
+	var packed := load("res://scenes/course/holes/hole_1.tscn") as PackedScene
+	var root: Node = packed.instantiate()
+	add_child_autofree(root)
+	var desk := root.get_node_or_null("WindmillControl") as WindmillControl
+	var mill := root.get_node_or_null("Windmill") as CartPathWindmill
+	assert_not_null(desk)
+	assert_not_null(mill)
+	assert_eq(desk.mill(), mill, "Computer 2 has to turn the same mill the host is steering")
+
+
 func test_hole_one_does_not_embed_a_mech() -> void:
 	var packed := load("res://scenes/course/holes/hole_1.tscn") as PackedScene
 	var root: Node = packed.instantiate()
