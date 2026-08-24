@@ -94,7 +94,12 @@ func _ready() -> void:
 		collision_mask = 0
 		_build()
 	_wire_mill()
-	if not Engine.is_editor_hint() and NetSession.is_active():
+	if Engine.is_editor_hint():
+		# Pose once for the overlay; do not tick NetSession every physics frame.
+		set_physics_process(false)
+		_pose_from_sync()
+		return
+	if NetSession.is_active():
 		NetSync.attach(self, PackedStringArray([":sync_stick"]))
 
 
@@ -267,7 +272,9 @@ func _watching() -> bool:
 
 
 func _publish_pose(delta: float, reliable := false) -> void:
-	if Engine.is_editor_hint() or not NetSession.is_active() or not is_inside_tree():
+	if Engine.is_editor_hint():
+		return
+	if not is_inside_tree() or not NetSession.is_active():
 		return
 	if not multiplayer.is_server():
 		return
