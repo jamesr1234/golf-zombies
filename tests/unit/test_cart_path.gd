@@ -320,7 +320,7 @@ func test_the_swarm_walks_the_middle_of_the_tarmac() -> void:
 
 func test_large_windmills_stand_in_the_middle_of_the_circuit() -> void:
 	var path := _path()
-	var mills := get_tree().get_nodes_in_group("cart_path_windmills")
+	var mills := _path_mills(path)
 	assert_gte(mills.size(), 2, "the clubhouse drive needs more than one mill")
 	assert_eq(_Windmill.PILLAR_COUNT, 4)
 	assert_gt(_Windmill.PILLAR_LEN, CartPath.PATH_WIDTH * 0.45, "sails have to sweep the lane")
@@ -337,7 +337,7 @@ func test_large_windmills_stand_in_the_middle_of_the_circuit() -> void:
 
 func test_a_windmill_pillar_throws_you_off_then_explodes_a_second_later() -> void:
 	var path := _path()
-	var mill: Node3D = get_tree().get_nodes_in_group("cart_path_windmills")[0]
+	var mill: Node3D = _path_mills(path)[0]
 	var cart := GolfCart.new()
 	cart.position = mill.position + Vector3(3.0, 0.4, 0.0)
 	cart.drive_speed = 16.0
@@ -486,6 +486,15 @@ func _path() -> CartPath:
 	path.set_meta("hole_data", data)
 	hole.add_child(path)
 	return path
+
+
+## Hole one also authors a mill on the overlay, so the group is wider than the circuit.
+func _path_mills(path: CartPath) -> Array:
+	var mills: Array = []
+	for child in path.get_children():
+		if child.is_in_group("cart_path_windmills"):
+			mills.append(child)
+	return mills
 
 
 func _arrow_copy(arrow: Node) -> Label3D:

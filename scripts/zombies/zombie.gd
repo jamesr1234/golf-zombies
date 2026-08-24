@@ -34,6 +34,7 @@ const FLARE_LIGHT_RANGE := 9.0
 const _ZombieShot := preload("res://scripts/zombies/zombie_shot.gd")
 const _BeerCan := preload("res://scripts/player/beer_can.gd")
 const _WorldFx := preload("res://scripts/net/world_fx.gd")
+const _ZombieAI := preload("res://scripts/zombies/zombie_ai.gd")
 const DRINK_TIME := 1.8
 
 @export var stats: ZombieStats
@@ -52,14 +53,30 @@ var move_speed := 3.4
 			_net_interp.arrive(value)
 var last_hit_by: Player
 var _net_interp := NetInterp.new()
+var ai = _ZombieAI.new()
 
 @onready var agent: NavigationAgent3D = $Agent
 @onready var shape: CollisionShape3D = $Shape
 @onready var visual: ZombieBody = $Visual
 
-var _target: Node3D
-var _attack_timer := 0.0
-var _repath_timer := 0.0
+var _target: Node3D:
+	get:
+		return ai.target
+	set(value):
+		ai.target = value
+
+var _attack_timer: float:
+	get:
+		return ai.attack_timer
+	set(value):
+		ai.attack_timer = value
+
+var _repath_timer: float:
+	get:
+		return ai.repath_timer
+	set(value):
+		ai.repath_timer = value
+
 var _stagger := Vector3.ZERO
 var _flash_left := 0.0
 var _flash_material: StandardMaterial3D
@@ -74,7 +91,11 @@ var _spin := Vector3.ZERO
 var _drink_left := 0.0
 var _beer_prop: Node3D
 var _melee: Melee
-var _melee_pending := false
+var _melee_pending: bool:
+	get:
+		return ai.melee_pending
+	set(value):
+		ai.melee_pending = value
 var _trap
 var _shown_ally := false
 var _shown_beer := false
@@ -630,217 +651,77 @@ func _explode() -> void:
 
 
 func _steer() -> Vector3:
-	if stats.stationary:
-		return Vector3.ZERO
-	var direct := _target.global_position - global_position
-	direct.y = 0.0
-	var span := direct.length()
-	if allied:
-		if span <= Melee.RANGE * 0.75:
-			return Vector3.ZERO
-		return _path_dir(direct)
-	if stats.ranged:
-		return _range_steer(direct, span)
-	if span <= stats.attack_range:
-		return Vector3.ZERO
-	return _path_dir(direct)
+	return ai.steer(self)
 
 
 func _range_steer(direct: Vector3, span: float) -> Vector3:
-	if span > stats.attack_range:
-		return _path_dir(direct)
-	return range_steer(stats, direct, span)
+	return ai.range_steer_for(self, direct, span)
 
 
 ## Close in outside shot range, back up if the target is in their face, hold
 ## the rest of the time so they actually fire.
 static func range_steer(stats: ZombieStats, direct: Vector3, span: float) -> Vector3:
-	if span > stats.attack_range:
-		return direct.normalized()
-	if span < stats.preferred_range * 0.75 and span > 0.2:
-		return -direct.normalized()
-	return Vector3.ZERO
+	return _ZombieAI.range_steer(stats, direct, span)
 
 
 func _path_dir(direct: Vector3) -> Vector3:
-	var next := agent.get_next_path_position()
-	var to_next := next - global_position
-	to_next.y = 0.0
-	# A missing or unbaked navigation mesh returns our own position; walk
-	# straight at the target instead of standing still.
-	if to_next.length() < 0.2:
-		return direct.normalized()
-	return to_next.normalized()
+	return ai.path_dir(self, direct)
 
 
 func _face(direction: Vector3, delta: float) -> void:
-	if direction.length_squared() < 0.01:
-		return
-	var wanted := atan2(-direction.x, -direction.z)
-	visual.rotation.y = lerp_angle(visual.rotation.y, wanted, TURN_SPEED * delta)
+	ai.face(self, direction, delta)
 
 
 func _bash_fort() -> bool:
-	if allied or _attack_timer > 0.0 or stats.ranged:
-		return false
-	for i in get_slide_collision_count():
-		var col := get_slide_collision(i)
-		var body := col.get_collider()
-		if body == null or not body.has_method("take_hit"):
-			continue
-		_begin_melee()
-		return true
-	return false
+	return ai.bash_fort(self)
 
 
 func _try_attack() -> void:
-	if allied:
-		_ally_shove()
-		return
-	if _attack_timer > 0.0 or _target == null:
-		return
-	var offset := _target.global_position - global_position
-	offset.y = 0.0
-	if offset.length() > stats.attack_range:
-		return
-	_attack_timer = stats.attack_cooldown
-	if stats.ranged:
-		_fire_at(_target)
-		return
-	_begin_melee()
+	ai.try_attack(self)
 
 
 func _begin_melee() -> void:
-	_attack_timer = stats.attack_cooldown
-	_melee_pending = true
-	visual.start_melee()
-	_sfx("zombie_attack")
+	ai.begin_melee(self)
 
 
 func _resolve_melee_contact() -> void:
-	if not _melee_pending:
-		return
-	if visual.melee_progress() < Melee.CONTACT_T:
-		return
-	_melee_pending = false
-	_land_melee()
+	ai.resolve_melee_contact(self)
 
 
 func _land_melee() -> void:
-	if _try_bash_fort():
-		return
-	if _target == null:
-		return
-	var offset := _target.global_position - global_position
-	offset.y = 0.0
-	if offset.length() > stats.attack_range * 1.35:
-		return
-	var player := _target as Player
-	if player != null:
-		var at := Melee.hit_point(
-			global_position + Vector3.UP * stats.height * 0.7,
-			player.global_position, 1.8, Player.BODY_RADIUS
-		)
-		player.apply_hit(stats.damage, global_position, at)
-		return
-	var foe := _target as Zombie
-	if foe != null:
-		foe.take_damage(stats.damage, offset.normalized())
+	ai.land_melee(self)
 
 
 func _try_bash_fort() -> bool:
-	for i in get_slide_collision_count():
-		var col := get_slide_collision(i)
-		var body := col.get_collider()
-		if body == null or not body.has_method("take_hit"):
-			continue
-		body.take_hit(col.get_position())
-		return true
-	return false
+	return ai.try_bash_fort(self)
 
 
 func _ally_shove() -> void:
-	if _melee == null or _target == null:
-		return
-	var offset := _target.global_position - global_position
-	offset.y = 0.0
-	if offset.length() > Melee.RANGE:
-		return
-	var origin := global_position + Vector3.UP * stats.height * 0.72
-	var forward := offset
-	if forward.length_squared() < 0.0001:
-		forward = -visual.global_transform.basis.z
-	if not _melee.shove(origin, forward):
-		return
-	visual.start_melee()
-	_sfx("melee_swing")
+	ai.ally_shove(self)
 
 
 func _fire_at(target: Node3D) -> void:
-	var aim := target.global_position + Vector3.UP * 1.1
-	var muzzle := global_position + Vector3.UP * stats.height * 0.72
-	var fly := aim - muzzle
-	if fly.length_squared() < 0.01:
-		return
-	var root := get_tree().get_first_node_in_group("fx_root")
-	if root == null:
-		root = get_parent()
-	_ZombieShot.spawn(
-		root, muzzle, fly, stats.damage, stats.projectile_speed, stats.attack_range + 8.0, allied,
-		_shot_color(), _shot_radius(), _shot_streak(), stats.stationary
-	)
-	_sfx("zombie_shot" if not stats.stationary else "sniper_fire")
+	ai.fire_at(self, target)
 
 
 func _shot_color() -> Color:
-	return Palette.SNIPER if stats.stationary else _ZombieShot.COLOR
+	return ai.shot_color(self)
 
 
 func _shot_radius() -> float:
-	return 0.045 if stats.stationary else _ZombieShot.RADIUS
+	return ai.shot_radius(self)
 
 
 func _shot_streak() -> float:
-	return 3.4 if stats.stationary else 0.0
+	return ai.shot_streak(self)
 
 
 func _nearest_player() -> Player:
-	var best: Player = null
-	var best_distance := INF
-	for node in get_tree().get_nodes_in_group("players"):
-		var player := node as Player
-		if player == null or not player.health.is_alive():
-			continue
-		var distance := global_position.distance_to(player.global_position)
-		if distance < best_distance:
-			best_distance = distance
-			best = player
-	return best
+	return ai.nearest_player(self)
 
 
 func _pick_target() -> Node3D:
-	var best: Node3D
-	var best_d := INF
-	if hunts(allied, true, false):
-		for node in get_tree().get_nodes_in_group("players"):
-			var player := node as Player
-			if player == null or not player.health.is_alive():
-				continue
-			var dist := global_position.distance_to(player.global_position)
-			if dist < best_d:
-				best = player
-				best_d = dist
-	for node in get_tree().get_nodes_in_group("zombies"):
-		var zombie := node as Zombie
-		if zombie == null or zombie == self or zombie.is_dying():
-			continue
-		if not hunts(allied, false, zombie.is_allied()):
-			continue
-		var dist := global_position.distance_to(zombie.global_position)
-		if dist < best_d:
-			best = zombie
-			best_d = dist
-	return best
+	return ai.pick_target(self)
 
 
 func _hold_in_net(delta: float) -> void:

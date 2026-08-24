@@ -28,6 +28,10 @@ func test_an_invite_survives_until_a_screen_picks_it_up() -> void:
 
 func test_a_session_starts_on_enet() -> void:
 	assert_eq(NetSession.backend, NetSession.Backend.ENET)
+	assert_true(
+		(NetSession.get_script() as GDScript).is_tool(),
+		"@tool course props must be able to call is_active in the editor"
+	)
 	assert_false(NetSession.is_steam())
 	assert_false(NetSession.is_active())
 

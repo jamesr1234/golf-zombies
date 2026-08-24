@@ -91,7 +91,7 @@ func tick(player: Player, delta: float) -> bool:
 		return false
 	if player.input.just_pressed("jump") or player.input.just_pressed("grapple"):
 		return false
-	if player._sprinting():
+	if player.motion.sprinting(player):
 		slack = move_toward(slack, MIN_SLACK, REEL * delta)
 	var hook := attach_world()
 	var ride_vel := _ride_velocity()
@@ -174,10 +174,10 @@ static func muzzle_of(player: Player) -> Vector3:
 
 
 func _swing(player: Player) -> Vector3:
-	var stick := player._walk_stick()
+	var stick: Vector2 = player.motion.walk_stick(player)
 	if stick.length_squared() < 0.04:
 		return Vector3.ZERO
-	var side := player.transform.basis.x * stick.x - player.transform.basis.z * stick.y
+	var side: Vector3 = player.transform.basis.x * stick.x - player.transform.basis.z * stick.y
 	side.y = 0.0
 	if side.length_squared() < 0.001:
 		return Vector3.ZERO
