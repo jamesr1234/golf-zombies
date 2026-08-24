@@ -57,7 +57,7 @@ static func play(track: int, fade_sec: float = 0.0) -> AudioStreamPlayer:
 		var existing := player()
 		if existing != null:
 			if not existing.playing:
-				existing.play()
+				_play_when_ready(existing)
 			if fade_sec <= 0.0:
 				_kill_fader()
 				existing.volume_db = float(VOLUME_DB[track])
@@ -133,7 +133,7 @@ static func _cut_to(node: AudioStreamPlayer, stream: AudioStream, track: int) ->
 	node.stream = stream
 	node.volume_db = float(VOLUME_DB[track])
 	current = track
-	node.play()
+	_play_when_ready(node)
 
 
 static func _crossfade_to(
@@ -195,8 +195,25 @@ static func _make_player(player_name: String) -> AudioStreamPlayer:
 	var node := AudioStreamPlayer.new()
 	node.name = player_name
 	node.process_mode = Node.PROCESS_MODE_ALWAYS
-	tree.root.add_child(node)
+	# While the first scene is still being installed the root is busy setting up
+	# its children, so a direct add_child is rejected. In that window the root is
+	# not ready yet, so defer the add until the tree is idle. Otherwise add now,
+	# so callers that read the player back on the same frame (resume, crossfade)
+	# still find it in the tree.
+	if tree.root.is_node_ready():
+		tree.root.add_child(node)
+	else:
+		tree.root.add_child.call_deferred(node)
 	return node
+
+
+## Start playback now when the player is already in the tree, otherwise defer it
+## so it runs right after a deferred add_child (audio can only play in-tree).
+static func _play_when_ready(node: AudioStreamPlayer, from_position: float = 0.0) -> void:
+	if node.is_inside_tree():
+		node.play(from_position)
+	else:
+		node.play.call_deferred(from_position)
 
 
 static func _enable_loop(stream: AudioStream) -> void:
