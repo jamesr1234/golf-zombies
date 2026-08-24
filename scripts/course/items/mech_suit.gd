@@ -74,6 +74,7 @@ func _ready() -> void:
 	crush.body_exited.connect(func(body: Node): combat.forget(body))
 	cockpit.collision_layer = 0
 	cockpit.collision_mask = Layers.PLAYER
+	_park_if_watched()
 
 
 static func spawn_near(buyer: Player) -> MechSuit:
@@ -263,11 +264,14 @@ func pilot_view_transform(pitch_deg: float) -> Transform3D:
 	return xform
 
 
+func _park_if_watched() -> void:
+	if NetSession.should_simulate(self):
+		return
+	collision_mask = 0
+
+
 func _physics_process(delta: float) -> void:
 	if not NetSession.should_simulate(self):
-		_net_interp.follow(self, sync_xform, delta, NetSync.CART_HZ, NetSync.WATCH_DELAY)
-		_seat_pilot()
-		_tick_visuals(delta)
 		return
 	combat.tick(delta)
 	sync_mag = combat.mag
@@ -282,6 +286,21 @@ func _physics_process(delta: float) -> void:
 	_seat_pilot()
 	_tick_visuals(delta)
 	sync_xform = global_transform
+
+
+## Watchers draw here so the capsule is never slid across the heightmap. Doing
+## that in physics is how a parked suit stayed glued to the plaza after the host
+## walked away.
+func _process(delta: float) -> void:
+	if NetSession.should_simulate(self):
+		return
+	_net_interp.follow(self, sync_xform, delta, NetSync.CART_HZ, NetSync.WATCH_DELAY)
+	_seat_pilot()
+	_tick_visuals(delta)
+
+
+func net_interp() -> NetInterp:
+	return _net_interp
 
 
 func _tick_visuals(delta: float) -> void:

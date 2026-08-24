@@ -26,6 +26,11 @@ func before_each() -> void:
 	suit.bind_owner(pilot)
 
 
+func after_each() -> void:
+	NetSession.close()
+	NetSession.seats.clear()
+
+
 func test_the_suit_is_built_of_neon_parts() -> void:
 	var visuals := suit.get_node_or_null("Visuals") as Node3D
 	assert_not_null(visuals, "MechVisuals.build is attached in _ready")
@@ -163,6 +168,26 @@ func test_a_parked_suit_still_publishes_its_pose() -> void:
 	assert_false(suit.closed)
 	assert_almost_eq(suit.sync_xform.origin.x, 12.0, 0.05)
 	assert_almost_eq(suit.sync_xform.origin.z, -8.0, 0.05)
+
+
+func test_a_watched_suit_does_not_scrape_the_ground() -> void:
+	NetSession._active = true
+	suit.set_multiplayer_authority(99)
+	suit._park_if_watched()
+	assert_eq(suit.collision_mask, 0, "a drawing must not fight the heightmap")
+
+
+func test_a_watched_suit_glides_to_the_replicated_pose() -> void:
+	NetSession._active = true
+	suit.set_multiplayer_authority(99)
+	suit._park_if_watched()
+	suit.global_position = Vector3.ZERO
+	suit.sync_xform = Transform3D(Basis(), Vector3(20.0, 0.0, -6.0))
+	suit._process(0.05)
+	assert_gt(
+		suit.global_position.distance_to(Vector3.ZERO), 8.0,
+		"the replicated pose is drawn on the render frame, not left at spawn"
+	)
 
 
 func test_a_remote_pilot_report_drives_the_suit() -> void:
