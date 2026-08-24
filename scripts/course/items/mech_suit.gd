@@ -65,6 +65,8 @@ func _ready() -> void:
 	add_to_group("mechs")
 	_visuals = MechVisuals.attach(self)
 	_apply_closed()
+	if sync_xform == Transform3D.IDENTITY:
+		sync_xform = global_transform
 	if owner_player == null and owner_peer > 0:
 		bind_owner(_player_with_peer(owner_peer))
 	crush.collision_layer = 0
@@ -273,6 +275,7 @@ func _physics_process(delta: float) -> void:
 	if not closed:
 		velocity = Vector3.ZERO
 		_tick_visuals(delta)
+		sync_xform = global_transform
 		return
 	_drive(delta)
 	combat.stomp(self, crush, allies())

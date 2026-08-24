@@ -156,6 +156,15 @@ func test_closed_sync_folds_the_hatch_for_watchers() -> void:
 	assert_false(suit.get_node("Visuals").get_node("Stairs").visible)
 
 
+func test_a_parked_suit_still_publishes_its_pose() -> void:
+	suit.global_position = Vector3(12.0, 0.4, -8.0)
+	suit.rotation.y = deg_to_rad(40.0)
+	await wait_physics_frames(1)
+	assert_false(suit.closed)
+	assert_almost_eq(suit.sync_xform.origin.x, 12.0, 0.05)
+	assert_almost_eq(suit.sync_xform.origin.z, -8.0, 0.05)
+
+
 func test_a_remote_pilot_report_drives_the_suit() -> void:
 	suit.apply_pilot_report(Vector2(1.0, -0.5), true, 45.0, -12.0, true)
 	assert_eq(suit.sync_stick, Vector2(1.0, -0.5))

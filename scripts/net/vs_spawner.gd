@@ -129,7 +129,10 @@ func _spawn_mech(data: Variant) -> Node:
 	var mech: MechSuit = MECH_SCENE.instantiate()
 	mech.set_multiplayer_authority(1)
 	NetSync.attach_mech(mech)
-	mech.global_position = info.get("at", Vector3.ZERO)
-	mech.rotation.y = deg_to_rad(float(info.get("yaw", 0.0)))
+	var at: Vector3 = info.get("at", Vector3.ZERO)
+	var yaw := deg_to_rad(float(info.get("yaw", 0.0)))
+	var pose := Transform3D(Basis.from_euler(Vector3(0.0, yaw, 0.0)), at)
+	mech.transform = pose
+	mech.sync_xform = pose
 	mech.owner_peer = int(info.get("owner_peer", 0))
 	return mech
