@@ -92,6 +92,18 @@ func test_a_zombie_snaps_to_the_floor_instead_of_bouncing() -> void:
 	assert_gt(zombie.floor_max_angle, deg_to_rad(50.0), "mounds must count as floor, not walls")
 
 
+func test_a_flare_mark_lights_a_zombie_then_fades() -> void:
+	var zombie: Zombie = preload("res://scenes/zombies/zombie.tscn").instantiate()
+	zombie.stats = preload("res://resources/zombies/walker.tres")
+	add_child_autofree(zombie)
+	await wait_physics_frames(1)
+	assert_false(zombie.is_flared())
+	zombie.mark_flare(0.2, false)
+	assert_true(zombie.is_flared())
+	await wait_seconds(0.35)
+	assert_false(zombie.is_flared())
+
+
 func test_a_brute_keeps_walking_through_a_hit() -> void:
 	var brute_hit := Zombie.knockback(Vector3.FORWARD, 24.0, BRUTE_RESISTANCE)
 	assert_gt(Zombie.walk_scale(brute_hit.length()), 0.75)

@@ -14,6 +14,8 @@ const CUES := {
 	"rifle_fire": [3, 1900.0, 280.0, 0.08, 0.32],
 	"shotgun_fire": [2, 180.0, 70.0, 0.14, 0.42],
 	"sniper_fire": [4, 220.0, 42.0, 0.52, 0.78],
+	"flare_fire": [3, 1400.0, 420.0, 0.1, 0.3],
+	"nailer_fire": [1, 2400.0, 900.0, 0.05, 0.22],
 	"scope": [0, 880.0, 1320.0, 0.06, 0.16],
 	"rocket_fire": [0, 140.0, 520.0, 0.22, 0.3],
 	"rocket_explode": [2, 90.0, 40.0, 0.38, 0.48],
@@ -102,6 +104,10 @@ static func fire_cue(visual: String) -> String:
 			return "net_fire"
 		"sniper":
 			return "sniper_fire"
+		"flare":
+			return "flare_fire"
+		"nailer":
+			return "nailer_fire"
 		_:
 			return "rifle_fire"
 

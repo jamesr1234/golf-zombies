@@ -29,6 +29,8 @@ const HEAD_RATIO := 0.72
 const FLOOR_SNAP := 0.45
 const FLOOR_MAX_DEG := 60.0
 const SAFE_MARGIN := 0.04
+const FLARE_LIGHT_ENERGY := 5.5
+const FLARE_LIGHT_RANGE := 9.0
 const _ZombieShot := preload("res://scripts/zombies/zombie_shot.gd")
 const _BeerCan := preload("res://scripts/player/beer_can.gd")
 const _WorldFx := preload("res://scripts/net/world_fx.gd")
@@ -78,6 +80,9 @@ var _repath_timer: float:
 var _stagger := Vector3.ZERO
 var _flash_left := 0.0
 var _flash_material: StandardMaterial3D
+var _flare_left := 0.0
+var _flare_material: StandardMaterial3D
+var _flare_light: OmniLight3D
 var _launched := false
 var _dying := false
 var _exploded := false
@@ -129,6 +134,7 @@ func _apply_stats() -> void:
 	# Drawn over the top of the body colour for a hit blink, so nothing about the
 	# zombie's own materials has to be saved and put back.
 	_flash_material = MeshFactory.material(Color.WHITE, false, Palette.GLOW_STRONG)
+	_flare_material = MeshFactory.material(Palette.LIME, false, Palette.GLOW_STRONG)
 	var capsule := CapsuleShape3D.new()
 	capsule.radius = stats.radius
 	capsule.height = stats.height
@@ -154,6 +160,7 @@ func _physics_process(delta: float) -> void:
 	_attack_timer = maxf(0.0, _attack_timer - delta)
 	_stagger = _stagger.move_toward(Vector3.ZERO, STAGGER_DECAY * delta)
 	_tick_flash(delta)
+	_tick_flare(delta)
 	if _drink_left > 0.0:
 		_sip(delta)
 		return
@@ -267,6 +274,10 @@ func is_flashing() -> bool:
 	return _flash_left > 0.0
 
 
+func is_flared() -> bool:
+	return _flare_left > 0.0
+
+
 func is_dying() -> bool:
 	return _dying
 
@@ -343,6 +354,7 @@ func _apply_replicated_look(delta: float) -> void:
 	if visual == null:
 		return
 	_tick_flash(delta)
+	_tick_flare(delta)
 	if visual.is_limp():
 		_tick_limp(delta, false)
 	visual.rotation.y = lerp_angle(
@@ -457,6 +469,17 @@ func _hit_look(
 	_WorldFx.announce_zombie_hit(self, int(region), direction, strength, locked, planted, skip)
 
 
+## Neon mark from the Flare Driver so packs and tower snipers stay lit at night.
+func mark_flare(duration: float, announce := true, skip_peer := 0) -> void:
+	if duration <= 0.0 or _dying:
+		return
+	_flare_left = maxf(_flare_left, duration)
+	_ensure_flare_light()
+	_set_flare(true)
+	if announce and NetSession.should_simulate(self):
+		_WorldFx.announce_flare(self, _flare_left, skip_peer)
+
+
 func _tick_flash(delta: float) -> void:
 	if _flash_left <= 0.0:
 		return
@@ -465,8 +488,51 @@ func _tick_flash(delta: float) -> void:
 		_set_flash(false)
 
 
+func _tick_flare(delta: float) -> void:
+	if _flare_left <= 0.0:
+		return
+	_flare_left = maxf(0.0, _flare_left - delta)
+	if _flare_light != null:
+		_flare_light.light_energy = FLARE_LIGHT_ENERGY * clampf(_flare_left / 2.0, 0.35, 1.0)
+	if is_zero_approx(_flare_left):
+		_set_flare(false)
+
+
 func _set_flash(on: bool) -> void:
-	visual.set_flash(_flash_material if on else null)
+	if on:
+		visual.set_flash(_flash_material)
+	elif is_flared():
+		visual.set_flash(_flare_material)
+	else:
+		visual.set_flash(null)
+
+
+func _set_flare(on: bool) -> void:
+	if on:
+		if not is_flashing():
+			visual.set_flash(_flare_material)
+		if _flare_light != null:
+			_flare_light.visible = true
+			_flare_light.light_energy = FLARE_LIGHT_ENERGY
+	else:
+		if _flare_light != null:
+			_flare_light.visible = false
+			_flare_light.light_energy = 0.0
+		if is_flashing():
+			visual.set_flash(_flash_material)
+		else:
+			visual.set_flash(null)
+
+
+func _ensure_flare_light() -> void:
+	if _flare_light != null:
+		return
+	_flare_light = OmniLight3D.new()
+	_flare_light.light_color = Palette.LIME
+	_flare_light.light_energy = FLARE_LIGHT_ENERGY
+	_flare_light.omni_range = FLARE_LIGHT_RANGE
+	_flare_light.position = Vector3(0.0, stats.height * 0.7, 0.0)
+	add_child(_flare_light)
 
 
 func _launch(impulse: Vector3, hit: Vector3) -> void:
@@ -662,6 +728,7 @@ func _hold_in_net(delta: float) -> void:
 	_attack_timer = maxf(0.0, _attack_timer - delta)
 	_stagger = Vector3.ZERO
 	_tick_flash(delta)
+	_tick_flare(delta)
 	velocity.x = 0.0
 	velocity.z = 0.0
 	if not is_on_floor():

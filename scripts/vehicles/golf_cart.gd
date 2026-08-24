@@ -106,6 +106,7 @@ func _ready() -> void:
 	crush_area.collision_layer = 0
 	crush_area.collision_mask = Layers.ZOMBIE
 	crush_area.body_exited.connect(_on_body_exited)
+	add_to_group("golf_carts")
 	add_child(CartVisuals.build())
 	_marks = _TireMarks.new()
 	_marks.name = "TireMarks"

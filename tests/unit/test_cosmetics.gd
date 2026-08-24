@@ -149,7 +149,7 @@ func test_the_armory_wall_hangs_guns_not_boxes() -> void:
 	assert_gte(counts["cylinders"], 8, "barrels and coils, not slabs")
 	assert_gte(counts["spheres"], 3, "muzzles and a warhead")
 	assert_eq(counts["tori"], 1, "the net hangs as a hoop")
-	assert_eq(_bobs(host), 5, "every gun turns on its hook")
+	assert_eq(_bobs(host), 7, "every gun turns on its hook")
 
 
 func test_the_items_wall_shows_kits_not_boxes() -> void:

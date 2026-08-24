@@ -7,9 +7,11 @@ signal ammo_changed()
 signal fired()
 
 const TRACER_COLOR := Palette.TRACER
+const FLARE_COLOR := Palette.LIME
 const BLOOD_COLOR := Palette.HIT_ZOMBIE
 const DUST_COLOR := Palette.HIT_WORLD
 const _WorldFx := preload("res://scripts/net/world_fx.gd")
+const CART_GROUP := "golf_carts"
 
 ## Net and rocket lead the bag so hole one can test the trap combo.
 var loadout: Array[WeaponStats] = [
@@ -367,7 +369,7 @@ func _trace(view: Transform3D, spread: float, current: WeaponStats) -> void:
 	var collider: Object = null if hit.is_empty() else hit["collider"]
 	var is_zombie := hurts_target(collider)
 	var kind := "tracer"
-	var color := TRACER_COLOR
+	var color := FLARE_COLOR if current.is_flare() else TRACER_COLOR
 	if current.has_scope():
 		kind = "sniper_hit" if collider != null else "sniper"
 		color = BLOOD_COLOR if is_zombie else DUST_COLOR
@@ -377,16 +379,22 @@ func _trace(view: Transform3D, spread: float, current: WeaponStats) -> void:
 		else:
 			color = HitFx.sniper_tint(true)
 	elif hit.is_empty():
-		HitFx.spawn(root, muzzle, target, TRACER_COLOR)
+		HitFx.spawn(root, muzzle, target, color)
 	else:
-		color = BLOOD_COLOR if is_zombie else DUST_COLOR
+		if not current.is_flare():
+			color = BLOOD_COLOR if is_zombie else DUST_COLOR
 		HitFx.spawn(root, muzzle, end, color)
+		if current.is_flare() and is_zombie:
+			HitFx.spark(root, end, FLARE_COLOR)
 	_WorldFx.announce_hitscan(self, muzzle, end, kind, color, _shooter_peer())
+	var amount := shot_damage(current, end)
 	if NetSession.is_active() and not multiplayer.is_server():
 		if is_zombie:
 			var zombie := collider as Zombie
 			if zombie != null:
-				zombie.show_hit(direction, end, current.damage * power_mult)
+				zombie.show_hit(direction, end, amount)
+				if current.is_flare():
+					zombie.mark_flare(current.flare_mark, false)
 		return
 	if is_zombie:
 		if collider.has_method("is_allied") and collider.is_allied():
@@ -395,7 +403,43 @@ func _trace(view: Transform3D, spread: float, current: WeaponStats) -> void:
 		var owner := get_parent() as Player
 		if zombie != null and owner != null:
 			zombie.last_hit_by = owner
-		collider.take_damage(current.damage * power_mult, direction, end)
+		collider.take_damage(amount, direction, end)
+		if current.is_flare() and zombie != null:
+			zombie.mark_flare(current.flare_mark, true, _shooter_peer())
+
+
+## Pellet damage after beer power and any cart-proximity bonus.
+func shot_damage(current: WeaponStats, at: Vector3) -> float:
+	var amount := current.damage * power_mult
+	if cart_bonus_applies(at, get_parent() as Node3D, current, get_tree()):
+		amount *= current.cart_damage_mult
+	return amount
+
+
+## Bonus when the hit or the shooter sits near a golf cart (or the shooter is riding).
+static func cart_bonus_applies(
+	at: Vector3, shooter: Node3D, current: WeaponStats, tree: SceneTree
+) -> bool:
+	if current == null or not current.has_cart_bonus() or tree == null:
+		return false
+	if near_golf_cart(at, current.cart_bonus_range, tree):
+		return true
+	if shooter != null and near_golf_cart(shooter.global_position, current.cart_bonus_range, tree):
+		return true
+	return false
+
+
+static func near_golf_cart(at: Vector3, range_m: float, tree: SceneTree) -> bool:
+	if tree == null or range_m <= 0.0:
+		return false
+	var reach := range_m * range_m
+	for node in tree.get_nodes_in_group(CART_GROUP):
+		var cart := node as Node3D
+		if cart == null:
+			continue
+		if at.distance_squared_to(cart.global_position) <= reach:
+			return true
+	return false
 
 
 static func hurts_target(collider: Object) -> bool:

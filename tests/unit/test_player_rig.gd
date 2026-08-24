@@ -249,6 +249,30 @@ func test_the_net_launcher_is_its_own_mesh() -> void:
 	assert_lt(gun.forward_extent(), -0.2, "the hoop should stick out past the rifle")
 
 
+func test_the_flare_driver_is_its_own_mesh() -> void:
+	var gun := Raygun.new()
+	add_child_autofree(gun)
+	gun.build(Palette.PLAYER_ONE)
+	assert_false(gun.is_flare())
+	gun.show_gun("flare")
+	assert_true(gun.is_flare())
+	assert_false(gun.is_nailer())
+	assert_false(gun.is_shotgun())
+	assert_lt(gun.forward_extent(), -0.2, "the glowing tip should stick out")
+
+
+func test_the_cart_nailer_is_its_own_mesh() -> void:
+	var gun := Raygun.new()
+	add_child_autofree(gun)
+	gun.build(Palette.PLAYER_ONE)
+	assert_false(gun.is_nailer())
+	gun.show_gun("nailer")
+	assert_true(gun.is_nailer())
+	assert_false(gun.is_flare())
+	assert_false(gun.is_rocket())
+	assert_lt(gun.forward_extent(), -0.2, "the spike barrel should stick out")
+
+
 func test_a_shotgun_kick_throws_the_gun_back_then_recovers() -> void:
 	var gun := Raygun.new()
 	add_child_autofree(gun)

@@ -4,7 +4,8 @@ extends Resource
 ## matter of adding a resource, not code.
 
 @export var display_name := "Rifle"
-## Which first-person mesh the raygun should show. "rifle", "shotgun", "rocket", "net".
+## Which first-person mesh the raygun should show. "rifle", "shotgun", "rocket",
+## "net", "sniper", "flare", "nailer".
 @export var visual := "rifle"
 @export var damage := 24.0
 @export var pellets := 1
@@ -32,6 +33,12 @@ extends Resource
 @export var trap_duration := 8.0
 ## Empty keeps hip-fire ADS. Sniper zoom clicks through these multipliers.
 @export var zoom_levels: PackedFloat32Array = PackedFloat32Array()
+## Seconds a hit zombie stays flare-lit. 0 is a normal gun.
+@export var flare_mark := 0.0
+## Extra damage when the shot or shooter is near a golf cart. 1 is no bonus.
+@export var cart_damage_mult := 1.0
+## Metres from a golf cart that unlocks cart_damage_mult. 0 disables the bonus.
+@export var cart_bonus_range := 0.0
 
 
 func shot_interval() -> float:
@@ -48,6 +55,14 @@ func is_net() -> bool:
 
 func has_scope() -> bool:
 	return zoom_levels.size() > 0
+
+
+func is_flare() -> bool:
+	return flare_mark > 0.0
+
+
+func has_cart_bonus() -> bool:
+	return cart_bonus_range > 0.0 and cart_damage_mult > 1.0
 
 
 func zoom_at(step: int) -> float:
