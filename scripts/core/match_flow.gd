@@ -29,6 +29,9 @@ const TEE_READY_RANGE := 4.0
 @export var start_in_clubhouse := false
 ## Spawn on the clubhouse circuit so the drive can be checked without holing out.
 @export var start_on_cart_path := false
+## Hole 1 playtest: the CPU boards as driver and throttles up right away so the
+## human can grapple onto a moving cart.
+@export var cpu_drives_at_start := false
 
 var score: GameState
 var hole: HoleData
@@ -313,6 +316,8 @@ func start_hole(index: int) -> void:
 	_place_cart()
 	_place_cart_girl()
 	_place_players()
+	if cpu_drives_at_start:
+		_board_cpu_driver()
 	spawner.clear_zombies()
 	hole_time_left = GameSettings.hole_seconds() + score.take_bonus_seconds()
 	freeze_left = score.take_freeze_seconds()
@@ -373,6 +378,16 @@ func start_play() -> void:
 			GameSettings.difficulty_label().to_upper(), score.max_strokes()
 		]
 	)
+
+
+func _board_cpu_driver() -> void:
+	for player in _players:
+		if player == null or not player.is_cpu():
+			continue
+		var yaw := rad_to_deg(cart.rotation.y)
+		player.spawn_at(cart.global_position + Vector3.UP * 1.0, yaw)
+		cart.board(player)
+		return
 
 
 func _place_players() -> void:
