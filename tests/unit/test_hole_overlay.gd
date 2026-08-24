@@ -186,6 +186,16 @@ func test_a_baked_suit_is_stripped_before_the_hole_goes_live() -> void:
 	assert_false(is_instance_valid(suit))
 
 
+func test_the_nav_region_has_a_stable_name() -> void:
+	var data := HoleGenerator.generate(0, 20260816)
+	var root := HoleBuilder.build(data)
+	add_child_autofree(root)
+	var nav := root.get_node_or_null(HoleBuilder.NAV_NAME) as NavigationRegion3D
+	assert_not_null(nav, "Computer 2 looks up Overlay RPCs by path")
+	assert_false(String(nav.name).begins_with("@"), "generated @ names differ on each machine")
+	assert_not_null(nav.get_node_or_null("Overlay/WindmillControl"))
+
+
 func test_an_editor_preview_is_the_generated_hole() -> void:
 	var preview := _Overlay.preview(0, 20260816)
 	add_child_autofree(preview)

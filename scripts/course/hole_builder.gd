@@ -10,6 +10,8 @@ const _Overlay := preload("res://scripts/course/hole_overlay.gd")
 const _Box := preload("res://scripts/course/box_prop.gd")
 const _MillDesk := preload("res://scripts/course/windmill_control.gd")
 
+const NAV_NAME := "Nav"
+
 const BARRIER_HEIGHT := 9.0
 const BARRIER_THICKNESS := 1.5
 ## Taller than a real flagstick on purpose, so the pin still reads from the
@@ -78,6 +80,7 @@ static func bake_navigation(root: Node3D) -> void:
 
 static func _navigation_region(data: HoleData) -> NavigationRegion3D:
 	var region := NavigationRegion3D.new()
+	region.name = NAV_NAME
 	var mesh := NavigationMesh.new()
 	mesh.cell_size = 1.0
 	mesh.cell_height = 0.5
