@@ -94,7 +94,8 @@ func test_play_opens_on_hole_one() -> void:
 	add_child_autofree(extra)
 	var other := extra.get_node("MatchFlow") as MatchFlow
 	assert_eq(other.starting_hole, 1)
-	assert_false(other.start_in_clubhouse)
+	other.start_in_clubhouse = false
+	other.start_on_cart_path = false
 	other.begin()
 	await wait_physics_frames(6)
 	assert_eq(other.score.hole_index, 0)
@@ -494,7 +495,7 @@ func test_picking_up_the_ball_opens_the_drive_to_the_next_tee() -> void:
 	flow.spawner.stop()
 	flow.arrive_at_clubhouse()
 	assert_true(flow.in_clubhouse())
-	assert_eq(flow.hole.par, 3, "opening the front door loads the next hole behind the exit")
+	assert_eq(flow.hole.par, 4, "opening the front door loads the next hole behind the exit")
 	assert_eq(flow.hole.index, flow.score.hole_index)
 	assert_lt(
 		flow.clubhouse.exit_point().distance_to(flow.hole.practice_tee),
@@ -509,7 +510,7 @@ func test_picking_up_the_ball_opens_the_drive_to_the_next_tee() -> void:
 	await wait_physics_frames(6)
 	assert_false(flow.in_clubhouse())
 	assert_true(flow.clubhouse.exit_open)
-	assert_eq(flow.hole.par, 3, "hole two of the template is the par three")
+	assert_eq(flow.hole.par, 4, "hole two of the template is a par four")
 	assert_eq(flow.score.strokes, 0)
 	assert_eq(flow.phase, MatchFlow.Phase.PREP, "the next hole opens on the practice green")
 	assert_eq(ball.current_surface(), Surface.Type.GREEN, "warm up before the hole starts")
