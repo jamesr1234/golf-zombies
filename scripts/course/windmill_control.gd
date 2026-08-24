@@ -126,7 +126,7 @@ func is_used_by(who: Node) -> bool:
 
 
 func try_toggle(player: Node) -> void:
-	if NetSession.is_active() and not multiplayer.is_server():
+	if not Engine.is_editor_hint() and NetSession.is_active() and not multiplayer.is_server():
 		_request_toggle.rpc_id(1, player.peer_id)
 	_toggle(player)
 
@@ -145,7 +145,7 @@ func tick(player: Node, _delta: float) -> void:
 		return
 	var stick := _stick_of(player)
 	sync_stick = stick
-	if NetSession.defers_world():
+	if not Engine.is_editor_hint() and NetSession.defers_world():
 		_report_stick.rpc_id(1, stick)
 		_pose_joystick(stick, _angle)
 		return
@@ -241,26 +241,33 @@ func _steer(stick: Vector2) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	# @tool runs this in the editor; NetSession is only a placeholder there.
+	if Engine.is_editor_hint():
+		_pose_from_sync()
+		return
 	if _watching():
-		var mill := mill()
-		if mill != null:
-			_angle = mill.rotor_rad()
-		_pose_joystick(sync_stick, _angle)
+		_pose_from_sync()
 		return
 	if operator == null:
-		var mill := mill()
-		if mill != null:
-			_angle = mill.rotor_rad()
-		_pose_joystick(sync_stick, _angle)
+		_pose_from_sync()
 	_publish_pose(delta)
 
 
+func _pose_from_sync() -> void:
+	var mill := mill()
+	if mill != null:
+		_angle = mill.rotor_rad()
+	_pose_joystick(sync_stick, _angle)
+
+
 func _watching() -> bool:
+	if Engine.is_editor_hint():
+		return false
 	return NetSession.is_active() and not multiplayer.is_server()
 
 
 func _publish_pose(delta: float, reliable := false) -> void:
-	if not NetSession.is_active() or not is_inside_tree():
+	if Engine.is_editor_hint() or not NetSession.is_active() or not is_inside_tree():
 		return
 	if not multiplayer.is_server():
 		return
