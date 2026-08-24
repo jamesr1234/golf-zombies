@@ -15,6 +15,8 @@ match, and owns every node unless authority was reassigned. Clients send input.
   `Steam` singleton or `SteamMultiplayerPeer`. It also builds both Steam peers.
 - `scripts/net/net_session.gd` is the **only** file that may assign
   `multiplayer.multiplayer_peer`, and it owns seats and session state.
+  It is `@tool` so editor course props can query `is_active()` without hitting
+  a placeholder Autoload; editor runs stay idle.
 - Every other file uses `rpc()`, `MultiplayerSpawner`, `MultiplayerSynchronizer`,
   and the `NetSession` helpers below.
 

@@ -1,8 +1,12 @@
+@tool
 extends Node
 ## Listen-server session for online VS. Survives scene changes so the peer stays
 ## up from the lobby into the match. Steam is the shipping transport; ENet stays
 ## for LAN and solo testing. Peer construction lives in SteamLobby for Steam and
 ## here for ENet; everything past _bind_peer() is transport-agnostic.
+##
+## Marked @tool so course props that run in the editor (windmill desk, etc.) can
+## call is_active() without hitting a placeholder Autoload. Editor runs stay idle.
 
 signal peers_changed()
 signal match_starting()
@@ -87,6 +91,9 @@ func is_steam() -> bool:
 
 
 func _ready() -> void:
+	if Engine.is_editor_hint():
+		set_process(false)
+		return
 	process_mode = Node.PROCESS_MODE_ALWAYS
 
 
@@ -96,6 +103,8 @@ func _ready() -> void:
 ## callbacks and the clock die together. Sitting at that machine and playing
 ## kept it awake, which is how this showed up.
 func _process(_delta: float) -> void:
+	if Engine.is_editor_hint():
+		return
 	if _active or _connecting:
 		_set_awake(true)
 
