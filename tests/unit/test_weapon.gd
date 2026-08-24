@@ -7,6 +7,8 @@ const SHOTGUN: WeaponStats = preload("res://resources/weapons/shotgun.tres")
 const SNIPER: WeaponStats = preload("res://resources/weapons/sniper.tres")
 const ROCKET: WeaponStats = preload("res://resources/weapons/rocket.tres")
 const NET: WeaponStats = preload("res://resources/weapons/net.tres")
+const FLARE: WeaponStats = preload("res://resources/weapons/flare_driver.tres")
+const NAILER: WeaponStats = preload("res://resources/weapons/cart_nailer.tres")
 
 
 func test_the_rifle_still_waits_its_full_interval_after_every_shot() -> void:
@@ -79,6 +81,10 @@ func test_a_bought_gun_is_added_to_the_loadout() -> void:
 
 func test_swapping_steps_forward_and_back_through_the_loadout() -> void:
 	var gun := _gun()
+	assert_eq(gun.stats(), FLARE)
+	gun.swap(1)
+	assert_eq(gun.stats(), NAILER)
+	gun.swap(1)
 	assert_eq(gun.stats(), NET)
 	gun.swap(1)
 	assert_eq(gun.stats(), ROCKET)
@@ -89,11 +95,20 @@ func test_swapping_steps_forward_and_back_through_the_loadout() -> void:
 	gun.swap(1)
 	assert_eq(gun.stats(), SNIPER)
 	gun.swap(1)
-	assert_eq(gun.stats(), NET)
+	assert_eq(gun.stats(), FLARE)
 	gun.swap(-1)
 	assert_eq(gun.stats(), SNIPER)
 	gun.swap(-1)
 	assert_eq(gun.stats(), SHOTGUN)
+
+
+func test_the_flare_and_nailer_start_in_the_bag() -> void:
+	var gun := _gun()
+	assert_true(gun.has_gun(FLARE))
+	assert_true(gun.has_gun(NAILER))
+	assert_eq(gun.stats(), FLARE, "hole one starts on the Flare Driver")
+	assert_false(gun.add_gun(FLARE), "owning it once is enough")
+	assert_false(gun.add_gun(NAILER), "owning it once is enough")
 
 
 func test_the_sniper_cycles_2x_5x_10x_then_hip() -> void:
@@ -118,6 +133,36 @@ func test_swapping_off_the_sniper_drops_the_scope() -> void:
 	gun.swap(1)
 	assert_almost_eq(gun.zoom_mult(), 1.0, 0.001)
 	assert_false(gun.is_scoped())
+
+
+func test_the_flare_driver_marks_and_is_semi_auto() -> void:
+	assert_true(FLARE.is_flare())
+	assert_gt(FLARE.flare_mark, 5.0)
+	assert_false(FLARE.automatic)
+	assert_eq(FLARE.visual, "flare")
+	assert_gt(FLARE.damage, RIFLE.damage)
+	assert_lt(FLARE.rounds_per_minute, RIFLE.rounds_per_minute)
+
+
+func test_the_cart_nailer_pays_extra_near_a_golf_cart() -> void:
+	assert_true(NAILER.has_cart_bonus())
+	assert_eq(NAILER.visual, "nailer")
+	assert_true(NAILER.automatic)
+	assert_lt(NAILER.damage, RIFLE.damage)
+	assert_gt(NAILER.rounds_per_minute, RIFLE.rounds_per_minute)
+	assert_false(Weapon.cart_bonus_applies(Vector3.ZERO, null, NAILER, null))
+	var cart := Node3D.new()
+	cart.add_to_group("golf_carts")
+	add_child_autofree(cart)
+	cart.global_position = Vector3(2.0, 0.0, 0.0)
+	assert_true(Weapon.near_golf_cart(Vector3.ZERO, NAILER.cart_bonus_range, get_tree()))
+	assert_true(Weapon.cart_bonus_applies(Vector3.ZERO, null, NAILER, get_tree()))
+	assert_false(Weapon.near_golf_cart(Vector3(40.0, 0.0, 0.0), NAILER.cart_bonus_range, get_tree()))
+	var gun := _gun()
+	gun.power_mult = 1.0
+	assert_almost_eq(gun.shot_damage(NAILER, Vector3.ZERO), NAILER.damage * NAILER.cart_damage_mult, 0.001)
+	assert_almost_eq(gun.shot_damage(NAILER, Vector3(40.0, 0.0, 0.0)), NAILER.damage, 0.001)
+	assert_almost_eq(gun.shot_damage(RIFLE, Vector3.ZERO), RIFLE.damage, 0.001)
 
 
 func _gun() -> Weapon:

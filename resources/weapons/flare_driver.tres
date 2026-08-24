@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="WeaponStats" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/player/weapon_stats.gd" id="1_stats"]
+
+[resource]
+script = ExtResource("1_stats")
+display_name = "Flare Driver"
+visual = "flare"
+damage = 38.0
+pellets = 1
+rounds_per_minute = 180.0
+automatic = false
+mag_size = 12
+reserve_start = 48
+reserve_max = 96
+spread_deg = 1.2
+ads_spread_deg = 0.25
+range_m = 110.0
+reload_time = 2.1
+pickup_amount = 12
+burst = 1
+kick = 0.35
+flare_mark = 7.0

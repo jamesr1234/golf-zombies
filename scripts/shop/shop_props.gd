@@ -30,6 +30,8 @@ static func armory(root: Node3D) -> void:
 	_rocket(_bob(root, Vector3(0.0, 1.85, 0.48), 0.4, 1.4))
 	_rifle(_bob(root, Vector3(-2.35, 0.95, 0.42), -0.65, 2.1))
 	_shotgun(_bob(root, Vector3(2.35, 0.92, 0.42), 0.6, 2.8))
+	_flare(_bob(root, Vector3(-1.15, 1.45, 0.42), 0.5, 1.9))
+	_nailer(_bob(root, Vector3(1.15, 1.42, 0.42), -0.45, 2.5))
 
 
 static func items(root: Node3D) -> void:
@@ -55,6 +57,10 @@ static func preview(parent: Node3D, item: Dictionary) -> void:
 	match String(item.get("id", "")):
 		"rocket":
 			_rocket(parent)
+		"flare_driver":
+			_flare(parent)
+		"cart_nailer":
+			_nailer(parent)
 		"ammo":
 			_ammo(parent)
 		"barrier":
@@ -167,6 +173,35 @@ static func _net(parent: Node3D) -> void:
 	parent.add_child(hoop)
 	var grip := _box(parent, Vector3(0.08, 0.2, 0.09), Palette.NET.darkened(0.5), 0.0, Vector3(0.0, -0.16, 0.2))
 	grip.rotation.x = deg_to_rad(-16.0)
+
+
+static func _flare(parent: Node3D) -> void:
+	parent.rotation.y = deg_to_rad(-12.0)
+	parent.rotation.z = deg_to_rad(8.0)
+	var wood := Palette.AMBER.darkened(0.5)
+	_box(parent, Vector3(0.12, 0.1, 0.28), wood, 0.0, Vector3.ZERO)
+	var shaft := _cyl(parent, 0.03, 0.7, wood.darkened(0.2), 0.0, Vector3(0.0, 0.02, -0.45))
+	shaft.rotation.x = deg_to_rad(90.0)
+	_sphere(parent, 0.07, Palette.LIME, Palette.GLOW_STRONG, Vector3(0.0, 0.02, -0.82))
+	var ring := _cyl(parent, 0.055, 0.05, Palette.LIME, Palette.GLOW_MEDIUM, Vector3(0.0, 0.02, -0.7))
+	ring.rotation.x = deg_to_rad(90.0)
+	var grip := _box(parent, Vector3(0.08, 0.2, 0.09), wood, 0.0, Vector3(0.0, -0.16, 0.14))
+	grip.rotation.x = deg_to_rad(-16.0)
+
+
+static func _nailer(parent: Node3D) -> void:
+	parent.rotation.y = deg_to_rad(20.0)
+	parent.rotation.z = deg_to_rad(-6.0)
+	var metal := Palette.CART.darkened(0.28)
+	_box(parent, Vector3(0.1, 0.12, 0.4), metal, 0.0, Vector3.ZERO)
+	var barrel := _cyl(parent, 0.028, 0.55, metal, 0.0, Vector3(0.0, 0.02, -0.42))
+	barrel.rotation.x = deg_to_rad(90.0)
+	var spike := _cyl(parent, 0.018, 0.14, Palette.CART, Palette.GLOW_STRONG, Vector3(0.0, 0.02, -0.74))
+	spike.rotation.x = deg_to_rad(90.0)
+	_box(parent, Vector3(0.07, 0.22, 0.1), metal.darkened(0.15), 0.0, Vector3(0.0, -0.16, 0.0))
+	var grip := _box(parent, Vector3(0.08, 0.2, 0.09), metal, 0.0, Vector3(0.0, -0.16, 0.16))
+	grip.rotation.x = deg_to_rad(-18.0)
+	_box(parent, Vector3(0.05, 0.04, 0.28), Palette.CART, Palette.GLOW_SOFT, Vector3(0.0, 0.1, -0.08))
 
 
 static func _ammo(parent: Node3D) -> void:

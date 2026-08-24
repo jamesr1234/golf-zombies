@@ -45,6 +45,8 @@ func test_gun_visuals_pick_matching_shot_cues() -> void:
 	assert_eq(Sfx.fire_cue("rocket"), "rocket_fire")
 	assert_eq(Sfx.fire_cue("net"), "net_fire")
 	assert_eq(Sfx.fire_cue("sniper"), "sniper_fire")
+	assert_eq(Sfx.fire_cue("flare"), "flare_fire")
+	assert_eq(Sfx.fire_cue("nailer"), "nailer_fire")
 
 
 func test_the_sniper_shot_is_a_heavier_boom() -> void:

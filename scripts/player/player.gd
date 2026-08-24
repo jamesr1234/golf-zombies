@@ -1213,6 +1213,12 @@ func _fight(delta: float) -> void:
 		if weapon != null:
 			weapon.zoom_step = -1
 		weapon.tick(delta, head.global_transform, false, false, false)
+		# Clubhouse still lets you flip the bag so new guns are visible at the armory.
+		if _in_clubhouse() and not shopping and health.is_alive() and not is_celebrating():
+			if input.just_pressed("swap_weapon"):
+				_cycle_held(1)
+			elif input.just_pressed("swap_weapon_prev"):
+				_cycle_held(-1)
 		if is_carrying_ball() and not is_underwater() and input.just_pressed("shoot"):
 			_throw_ball()
 		return

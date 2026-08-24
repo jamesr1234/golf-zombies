@@ -3,6 +3,8 @@ extends Object
 ## Department shelves. Shop owns buy/listing; this file is just what is for sale.
 
 const ROCKET: WeaponStats = preload("res://resources/weapons/rocket.tres")
+const FLARE_DRIVER: WeaponStats = preload("res://resources/weapons/flare_driver.tres")
+const CART_NAILER: WeaponStats = preload("res://resources/weapons/cart_nailer.tres")
 
 
 static func wear_by_id(item_id: String) -> Dictionary:
@@ -47,7 +49,23 @@ static func weapons() -> Array[Dictionary]:
 			"kind": "weapon",
 			"stats": ROCKET,
 			"info": "A slow single shot that explodes in a six-metre blast. One in the bag is enough.",
-		}
+		},
+		{
+			"id": "flare_driver",
+			"name": "Flare Driver",
+			"price": 280,
+			"kind": "weapon",
+			"stats": FLARE_DRIVER,
+			"info": "A mid-range club gun. Hits light zombies up for seven seconds so tower snipers and night packs stay visible.",
+		},
+		{
+			"id": "cart_nailer",
+			"name": "Cart Nailer",
+			"price": 320,
+			"kind": "weapon",
+			"stats": CART_NAILER,
+			"info": "A fast SMG that hits harder near the golf cart, or while you are riding it.",
+		},
 	]
 
 
