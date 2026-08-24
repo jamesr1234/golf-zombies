@@ -184,7 +184,7 @@ func test_offline_physics_does_not_touch_the_net() -> void:
 	assert_false(desk._watching(), "solo play is not a client watch")
 	desk._publish_pose(1.0, true)
 	desk._physics_process(STEP)
-	assert_almost_eq(desk.sync_stick, Vector2.ZERO, 0.001)
+	assert_eq(desk.sync_stick, Vector2.ZERO)
 
 
 func test_a_desk_beside_a_named_mill_wires_itself() -> void:
