@@ -207,6 +207,10 @@ func puppets() -> Dictionary:
 	var pack := worst_zombie(get_tree().get_nodes_in_group("zombies"))
 	if pack != null:
 		found["zombie"] = pack
+	for node in get_tree().get_nodes_in_group("mechs"):
+		var mech := node as MechSuit
+		if mech != null and not NetSession.should_simulate(mech) and not mech.predicts_locally():
+			found["mech"] = mech.net_interp()
 	var carts: Node = world.get_node_or_null("Carts") if world != null else null
 	if carts == null:
 		return found

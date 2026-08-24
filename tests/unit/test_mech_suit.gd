@@ -241,3 +241,26 @@ func test_a_remote_pilot_report_drives_the_suit() -> void:
 	assert_eq(suit.sync_jumps, 1)
 	suit.apply_pilot_report(Vector2.ZERO, false, 0.0, 0.0, true)
 	assert_eq(suit.sync_jumps, 2)
+
+
+func test_a_suit_it_already_simulates_is_never_predicted() -> void:
+	suit.try_close(pilot)
+	assert_false(suit.predicts_locally(), "the host already walks it")
+
+
+func test_a_watched_empty_suit_is_not_predicted() -> void:
+	NetSession._active = true
+	suit.set_multiplayer_authority(99)
+	assert_false(suit.predicts_locally(), "with no one at the stick there is nothing to predict")
+
+
+func test_the_local_pilot_predicts_the_suit() -> void:
+	suit.try_close(pilot)
+	NetSession._active = true
+	suit.set_multiplayer_authority(99)
+	pilot.net_driven = true
+	pilot.peer_id = 1
+	assert_true(suit.predicts_locally(), "Computer 2 drives from the stick, not a late pose")
+	suit._park_if_watched()
+	suit._physics_process(0.05)
+	assert_eq(suit.collision_mask, Layers.VEHICLE_MASK, "a predicted suit has to meet the ground")

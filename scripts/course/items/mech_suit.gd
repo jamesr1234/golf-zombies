@@ -30,12 +30,14 @@ var pilot: Player
 var combat := MechCombat.new()
 var _visuals: MechVisuals
 var _net_interp := NetInterp.new()
+var _predict := NetPredict.new()
 var _seen_jumps := 0
 var _net_yaw := 0.0
 var _want_fire := false
 var _want_reload := false
 var _drawn_closed := false
 var _wire_left := 0.0
+var _predicting := false
 
 @export var closed := false
 @export var hp := MAX_HP
@@ -48,7 +50,7 @@ var _wire_left := 0.0
 @export var sync_xform := Transform3D.IDENTITY:
 	set(value):
 		sync_xform = value
-		if is_inside_tree() and _watching():
+		if is_inside_tree() and _watching() and not _predicting:
 			_net_interp.arrive(value)
 
 @onready var crush: Area3D = $Crush
@@ -281,13 +283,25 @@ func pilot_view_transform(pitch_deg: float) -> Transform3D:
 
 
 func _park_if_watched() -> void:
-	if not _watching():
+	if not _watching() or predicts_locally():
+		collision_mask = Layers.VEHICLE_MASK
 		return
 	collision_mask = 0
 
 
 func _physics_process(delta: float) -> void:
-	if _watching():
+	var predicting := predicts_locally()
+	if predicting != _predicting:
+		_predicting = predicting
+		_predict.clear()
+		_park_if_watched()
+	if _watching() and not predicting:
+		return
+	if predicting:
+		_drive(delta)
+		_predict.remember(global_position)
+		_seat_pilot()
+		_tick_visuals(delta)
 		return
 	combat.tick(delta)
 	sync_mag = combat.mag
@@ -312,7 +326,10 @@ func _physics_process(delta: float) -> void:
 func _process(delta: float) -> void:
 	if not _watching():
 		return
-	_net_interp.follow(self, sync_xform, delta, NetSync.CART_HZ, NetSync.WATCH_DELAY)
+	if _predicting:
+		_predict.correct(self, sync_xform, delta)
+	else:
+		_net_interp.follow(self, sync_xform, delta, NetSync.CART_HZ, NetSync.WATCH_DELAY)
 	_seat_pilot()
 	_tick_visuals(delta)
 
@@ -357,6 +374,13 @@ func _watching() -> bool:
 	return not is_multiplayer_authority()
 
 
+## A sealed suit with this peer at the stick is driven here, the same way a
+## cart is: the stick is the cause, the host pose only corrects. Watchers
+## still glide, because they do not have the wheel.
+func predicts_locally() -> bool:
+	return closed and _watching() and _reads_local_input()
+
+
 static func find_net(tree: SceneTree, owner_peer: int) -> MechSuit:
 	if tree == null:
 		return null
@@ -379,11 +403,11 @@ func _tick_visuals(delta: float) -> void:
 		_apply_closed()
 	var pace := 0.0
 	if closed:
-		if _watching():
+		if _predicting or not _watching():
+			pace = Vector2(velocity.x, velocity.z).length() / SPRINT
+		else:
 			var stick := sync_stick.length()
 			pace = stick if sync_sprint else stick * (WALK / SPRINT)
-		else:
-			pace = Vector2(velocity.x, velocity.z).length() / SPRINT
 	_visuals.animate(delta, pace)
 
 
@@ -429,6 +453,8 @@ func _aim() -> void:
 
 
 func _fight() -> void:
+	if _predicting:
+		return
 	if pilot == null or pilot.is_golfing():
 		return
 	var reload := false
