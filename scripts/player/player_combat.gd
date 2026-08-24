@@ -85,13 +85,13 @@ func tick(player: Player, delta: float) -> void:
 		elif player.input.just_pressed("shoot"):
 			player.place.confirm(player)
 		return
-	# Riding shotgun you can still shoot. The driver is on the wheel. Water is a
-	# swim: R2 dives or throws the ball instead of firing.
+	# Riding shotgun you can still shoot. The driver is on the wheel. Grappling
+	# tows you along the rope but your hands are free. Water is a swim: R2 dives
+	# or throws the ball instead of firing.
 	var can_fight := (
 		player.health.is_alive() and player.state != Player.State.GOLFING and not player.is_driving()
 		and not player.is_swimming() and not player.is_carrying_ball() and not player.is_shielding()
 		and not player.is_climbing()
-		and not player.is_grappling()
 		and not player.is_milling()
 		and not player.is_in_mech()
 		and not player._in_clubhouse() and not player.is_celebrating()

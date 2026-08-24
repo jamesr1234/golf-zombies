@@ -173,6 +173,29 @@ func test_playtest_can_open_on_the_cart_path() -> void:
 	assert_true(other.spawner.is_transit())
 
 
+func test_playtest_cpu_drives_at_start_on_hole_one() -> void:
+	var extra := WORLD.instantiate()
+	add_child_autofree(extra)
+	var other := extra.get_node("MatchFlow") as MatchFlow
+	var cpu := extra.get_node("Players/Player1") as Player
+	var human := extra.get_node("Players/Player2") as Player
+	var ride := extra.get_node("GolfCart") as GolfCart
+	cpu.possess_cpu()
+	other.cpu_drives_at_start = true
+	other.start_in_clubhouse = false
+	other.start_on_cart_path = false
+	other.begin()
+	await wait_physics_frames(6)
+	assert_eq(other.phase, MatchFlow.Phase.PREP)
+	assert_eq(other.score.hole_index, 0)
+	assert_eq(ride.driver, cpu, "the buddy drives so you can grapple on")
+	assert_false(ride.is_riding(human), "you stay on foot to test the hook")
+	assert_gt(
+		Vector2(ride.velocity.x, ride.velocity.z).length(), 0.5,
+		"the cart should already be rolling"
+	)
+
+
 func test_flying_into_the_trees_puts_the_cart_back_on_the_path() -> void:
 	var extra := WORLD.instantiate()
 	add_child_autofree(extra)

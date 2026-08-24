@@ -122,6 +122,23 @@ func test_a_tap_hops_out_of_the_cart_without_climbing_back_in() -> void:
 	assert_false(cpu.brain.shot_requested, "hopping out is not a CPU golf order")
 
 
+func test_driving_holds_forward() -> void:
+	var cpu: Player = preload("res://scenes/players/player.tscn").instantiate()
+	var cart: GolfCart = preload("res://scenes/vehicles/golf_cart.tscn").instantiate()
+	add_child_autofree(cpu)
+	add_child_autofree(cart)
+	cpu.possess_cpu()
+	cpu.cart = cart
+	cart.set_physics_process(false)
+	cart.global_position = Vector3.ZERO
+	cart.board(cpu)
+	cpu.set_physics_process(false)
+	cpu.brain.tick(0.016)
+	var pad := cpu.input as CpuInput
+	assert_lt(pad.move.y, -0.5, "drive down the fairway")
+	assert_true(pad.pressed("shoot"), "boost like a human holding the trigger")
+
+
 func test_the_cpu_does_not_golf_until_asked() -> void:
 	var cpu: Player = preload("res://scenes/players/player.tscn").instantiate()
 	add_child_autofree(cpu)

@@ -17,6 +17,8 @@ const LOOK_SCALE := 25.0
 const COVER_STANDOFF := 1.55
 const COVER_PLANT := 1.25
 const CONTACT_CLICK := 0.05
+const CART_END := 16.0
+const LOOK_AHEAD := 8.0
 
 var shot_requested := false
 
@@ -50,6 +52,9 @@ func tick(_delta: float) -> void:
 		return
 	if shot_requested:
 		_play_shot(pad)
+		return
+	if _player.is_driving():
+		_drive(pad)
 		return
 	if _player.is_riding():
 		_ride(pad, partner)
@@ -124,6 +129,39 @@ func _revive(pad: CpuInput, partner: Player) -> void:
 	if _player._distance_to(partner) <= Player.REVIVE_RANGE:
 		pad.move = Vector2.ZERO
 		pad.hold("revive")
+
+
+func _drive(pad: CpuInput) -> void:
+	if _near_clubhouse():
+		pad.tap("interact")
+		return
+	var along := _drive_heading()
+	_look_at(pad, _player.global_position + along * LOOK_AHEAD)
+	pad.move = local_move(_player.global_transform.basis, along)
+	pad.hold("shoot")
+
+
+func _drive_heading() -> Vector3:
+	var flow := _player.flow as MatchFlow
+	if flow != null and flow.cart_path != null and flow.cart_path.centerline.size() >= 2:
+		var along := CartPathTrack.along(flow.cart_path.centerline, _player.global_position)
+		return CartPathTrack.heading_at(flow.cart_path.centerline, along)
+	if flow != null and flow.hole != null:
+		return flow._along_hole()
+	var nose := -_player.global_transform.basis.z
+	nose.y = 0.0
+	return nose.normalized() if nose.length_squared() > 0.0001 else Vector3.FORWARD
+
+
+func _near_clubhouse() -> bool:
+	var flow := _player.flow as MatchFlow
+	if flow == null:
+		return false
+	if flow.cart_path != null:
+		return _player.global_position.distance_to(flow.cart_path.tee) < CART_END
+	if flow.clubhouse != null and is_instance_valid(flow.clubhouse):
+		return _player.global_position.distance_to(flow.clubhouse.door_point()) < CART_END
+	return false
 
 
 func _ride(pad: CpuInput, partner: Player) -> void:
