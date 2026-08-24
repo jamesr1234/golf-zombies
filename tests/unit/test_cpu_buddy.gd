@@ -139,6 +139,25 @@ func test_driving_holds_forward() -> void:
 	assert_true(pad.pressed("shoot"), "boost like a human holding the trigger")
 
 
+func test_playtest_driver_ignores_practice_shots() -> void:
+	var cpu: Player = preload("res://scenes/players/player.tscn").instantiate()
+	var cart: GolfCart = preload("res://scenes/vehicles/golf_cart.tscn").instantiate()
+	add_child_autofree(cpu)
+	add_child_autofree(cart)
+	cpu.possess_cpu()
+	cpu.cart = cart
+	cpu.flow = _FakeDriveFlow.new()
+	cart.set_physics_process(false)
+	cpu.set_physics_process(false)
+	cart.global_position = Vector3.ZERO
+	cart.board(cpu)
+	cpu.brain.request_shot()
+	cpu.brain.tick(0.016)
+	assert_false(cpu.brain.shot_requested, "practice orders cannot pull the buddy off the cart")
+	var pad := cpu.input as CpuInput
+	assert_lt(pad.move.y, -0.5, "keep driving instead of walking to the mat")
+
+
 func test_the_cpu_does_not_golf_until_asked() -> void:
 	var cpu: Player = preload("res://scenes/players/player.tscn").instantiate()
 	add_child_autofree(cpu)
@@ -240,3 +259,10 @@ func _cover_pair() -> Array:
 	sniper.global_position = Vector3(0.0, 0.0, -80.0)
 	cpu.global_position = CpuBuddy.cover_point(human.global_position, sniper.global_position)
 	return [cpu, human, sniper]
+
+
+class _FakeDriveFlow:
+	var cpu_drives_at_start := true
+	var cart_path = null
+	var clubhouse = null
+	var hole = null

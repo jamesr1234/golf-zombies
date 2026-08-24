@@ -191,6 +191,14 @@ func test_playtest_cpu_drives_at_start_on_hole_one() -> void:
 	assert_eq(ride.driver, cpu, "the buddy drives so you can grapple on")
 	assert_false(ride.is_riding(human), "you stay on foot to test the hook")
 	assert_gt(
+		cpu.global_position.distance_to(other.hole.practice_tee), 8.0,
+		"the buddy skips the practice green and goes straight to the cart"
+	)
+	assert_lt(
+		cpu.global_position.distance_to(ride.global_position), 4.0,
+		"the buddy starts in the cart, not walking over from the mat"
+	)
+	assert_gt(
 		Vector2(ride.velocity.x, ride.velocity.z).length(), 0.5,
 		"the cart should already be rolling"
 	)

@@ -50,6 +50,17 @@ func tick(_delta: float) -> void:
 	if partner != null and partner.health.is_downed():
 		_revive(pad, partner)
 		return
+	## Playtest: stay on the cart. Never peel off for a practice putt.
+	if _wants_driver_seat():
+		shot_requested = false
+		if _player.is_driving():
+			_drive(pad)
+			return
+		if _player.is_riding():
+			_ride(pad, partner)
+			return
+		_board(pad)
+		return
 	if shot_requested:
 		_play_shot(pad)
 		return
@@ -63,6 +74,11 @@ func tick(_delta: float) -> void:
 		_board(pad)
 		return
 	_follow_and_fight(pad, partner)
+
+
+func _wants_driver_seat() -> bool:
+	var flow = _player.flow
+	return flow != null and bool(flow.get("cpu_drives_at_start"))
 
 
 func _play_shot(pad: CpuInput) -> void:
@@ -172,7 +188,11 @@ func _ride(pad: CpuInput, partner: Player) -> void:
 
 
 func _should_board(partner: Player) -> bool:
-	if partner == null or not partner.is_riding() or _player.cart == null:
+	if _player.cart == null:
+		return false
+	if _wants_driver_seat():
+		return not _player.cart.is_riding(_player)
+	if partner == null or not partner.is_riding():
 		return false
 	return not _player.cart.is_riding(_player)
 
