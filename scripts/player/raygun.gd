@@ -42,6 +42,8 @@ var _shotgun: Node3D
 var _rocket: Node3D
 var _sniper: Node3D
 var _net: Node3D
+var _flare: Node3D
+var _nailer: Node3D
 var _phase := 0.0
 var _amount := 0.0
 var _steady_left := 0.0
@@ -70,6 +72,12 @@ func build(color: Color) -> void:
 	_net = Node3D.new()
 	add_child(_net)
 	_build_net(_net, color)
+	_flare = Node3D.new()
+	add_child(_flare)
+	_build_flare(_flare, color)
+	_nailer = Node3D.new()
+	add_child(_nailer)
+	_build_nailer(_nailer, color)
 	_paint_view(self)
 	show_gun("rifle")
 
@@ -89,6 +97,10 @@ func show_gun(kind: String) -> void:
 		_sniper.visible = kind == "sniper"
 	if _net != null:
 		_net.visible = kind == "net"
+	if _flare != null:
+		_flare.visible = kind == "flare"
+	if _nailer != null:
+		_nailer.visible = kind == "nailer"
 
 
 func is_shotgun() -> bool:
@@ -107,6 +119,14 @@ func is_net() -> bool:
 	return _net != null and _net.visible
 
 
+func is_flare() -> bool:
+	return _flare != null and _flare.visible
+
+
+func is_nailer() -> bool:
+	return _nailer != null and _nailer.visible
+
+
 ## Farthest the visible gun reaches down the barrel, used to tell the two meshes apart.
 func forward_extent() -> float:
 	var root := _rifle
@@ -116,6 +136,10 @@ func forward_extent() -> float:
 		root = _sniper
 	elif is_net():
 		root = _net
+	elif is_flare():
+		root = _flare
+	elif is_nailer():
+		root = _nailer
 	elif is_shotgun():
 		root = _shotgun
 	if root == null:
@@ -376,6 +400,57 @@ func _build_net(parent: Node3D, color: Color) -> void:
 	var cell := MeshFactory.box(Vector3(0.04, 0.035, 0.06), Palette.NET, Palette.GLOW_SOFT)
 	cell.position = Vector3(0.0, 0.04, 0.02)
 	parent.add_child(cell)
+
+
+func _build_flare(parent: Node3D, color: Color) -> void:
+	var metal := color.darkened(0.4)
+	var wood := Palette.AMBER.darkened(0.55)
+	var head := MeshFactory.box(Vector3(0.07, 0.055, 0.12), wood)
+	head.position = Vector3(0.0, 0.01, -0.02)
+	parent.add_child(head)
+	var shaft := MeshFactory.cylinder(0.016, 0.28, metal)
+	shaft.rotation.x = deg_to_rad(90.0)
+	shaft.position.z = -0.2
+	parent.add_child(shaft)
+	var tip := MeshFactory.sphere(0.03, Palette.LIME, Palette.GLOW_STRONG)
+	tip.position.z = -0.36
+	parent.add_child(tip)
+	var ring := MeshFactory.cylinder(0.028, 0.02, Palette.LIME, Palette.GLOW_MEDIUM)
+	ring.rotation.x = deg_to_rad(90.0)
+	ring.position.z = -0.3
+	parent.add_child(ring)
+	var grip := MeshFactory.box(Vector3(0.045, 0.11, 0.05), wood)
+	grip.position = Vector3(0.0, -0.08, 0.06)
+	grip.rotation.x = deg_to_rad(-14.0)
+	parent.add_child(grip)
+	var cell := MeshFactory.box(Vector3(0.035, 0.03, 0.05), Palette.LIME, Palette.GLOW_SOFT)
+	cell.position = Vector3(0.0, 0.045, 0.02)
+	parent.add_child(cell)
+
+
+func _build_nailer(parent: Node3D, color: Color) -> void:
+	var metal := Palette.CART.darkened(0.35)
+	var body := MeshFactory.box(Vector3(0.055, 0.07, 0.16), metal)
+	body.position = Vector3(0.0, 0.0, 0.02)
+	parent.add_child(body)
+	var barrel := MeshFactory.cylinder(0.015, 0.22, metal)
+	barrel.rotation.x = deg_to_rad(90.0)
+	barrel.position.z = -0.16
+	parent.add_child(barrel)
+	var spike := MeshFactory.cylinder(0.01, 0.06, Palette.CART, Palette.GLOW_SOFT)
+	spike.rotation.x = deg_to_rad(90.0)
+	spike.position.z = -0.3
+	parent.add_child(spike)
+	var mag := MeshFactory.box(Vector3(0.04, 0.1, 0.05), color.darkened(0.5))
+	mag.position = Vector3(0.0, -0.08, 0.0)
+	parent.add_child(mag)
+	var grip := MeshFactory.box(Vector3(0.042, 0.1, 0.048), metal)
+	grip.position = Vector3(0.0, -0.085, 0.07)
+	grip.rotation.x = deg_to_rad(-18.0)
+	parent.add_child(grip)
+	var rail := MeshFactory.box(Vector3(0.03, 0.02, 0.12), Palette.CART, Palette.GLOW_SOFT)
+	rail.position = Vector3(0.0, 0.05, -0.04)
+	parent.add_child(rail)
 
 
 func _paint_view(node: Node) -> void:

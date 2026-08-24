@@ -108,6 +108,12 @@ static func announce_zombie_hit(
 		)
 
 
+static func announce_flare(from: Node, duration: float, skip_peer := 0) -> void:
+	var fx := _broadcaster(from)
+	if fx != null:
+		fx._replicate_flare.rpc(from.get_path(), duration, skip_peer)
+
+
 static func announce_fireworks(from: Node, at: Vector3, color: Color) -> void:
 	var fx := _broadcaster(from)
 	if fx != null:
@@ -223,6 +229,16 @@ func apply_zombie_hit(
 	return zombie
 
 
+func apply_flare(zombie_path: NodePath, duration: float, skip_peer := 0) -> Zombie:
+	if _skip(skip_peer):
+		return null
+	var zombie := get_tree().root.get_node_or_null(zombie_path) as Zombie
+	if zombie == null:
+		return null
+	zombie.mark_flare(duration, false)
+	return zombie
+
+
 func apply_fireworks(at: Vector3, color: Color) -> Node:
 	return Fireworks.spawn(_fx_root(), at, color)
 
@@ -292,6 +308,11 @@ func _replicate_zombie_hit(
 	planted: bool, skip_peer: int
 ) -> void:
 	apply_zombie_hit(zombie_path, region, direction, strength, locked, planted, skip_peer)
+
+
+@rpc("authority", "call_remote", "unreliable")
+func _replicate_flare(zombie_path: NodePath, duration: float, skip_peer: int) -> void:
+	apply_flare(zombie_path, duration, skip_peer)
 
 
 @rpc("authority", "call_remote", "unreliable")

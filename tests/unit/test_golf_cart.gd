@@ -287,6 +287,7 @@ func test_a_boost_stripe_hurls_a_player_down_the_lane() -> void:
 func test_the_drop_off_sits_on_the_ground_not_inside_it() -> void:
 	var cart: GolfCart = preload("res://scenes/vehicles/golf_cart.tscn").instantiate()
 	add_child_autofree(cart)
+	assert_true(cart.is_in_group("golf_carts"), "nailer proximity looks up this group")
 	cart.global_position = Vector3(0.0, 0.5, 0.0)
 	var floor := StaticBody3D.new()
 	floor.collision_layer = Layers.WORLD

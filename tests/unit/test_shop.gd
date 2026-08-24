@@ -37,6 +37,37 @@ func test_the_rocket_is_on_the_armory_shelf() -> void:
 	assert_eq(ROCKET.visual, "rocket")
 
 
+func test_the_flare_driver_and_cart_nailer_are_on_the_armory_shelf() -> void:
+	var flare := _find("flare_driver")
+	var nailer := _find("cart_nailer")
+	assert_eq(String(flare["name"]), "Flare Driver")
+	assert_eq(int(flare["price"]), 280)
+	assert_true((flare["stats"] as WeaponStats).is_flare())
+	assert_eq(String(nailer["name"]), "Cart Nailer")
+	assert_eq(int(nailer["price"]), 320)
+	assert_true((nailer["stats"] as WeaponStats).has_cart_bonus())
+	assert_eq(shop.count(Shop.Dept.WEAPONS), 3)
+
+
+func test_buying_the_flare_driver_puts_it_in_the_bag() -> void:
+	var flare: WeaponStats = _find("flare_driver")["stats"]
+	assert_false(gun.has_gun(flare))
+	score.credit(280)
+	assert_true(shop.buy("flare_driver", score, _loadout()))
+	assert_true(gun.has_gun(flare))
+	assert_eq(score.money, 0)
+	assert_false(shop.buy("flare_driver", score, _loadout()), "owning it once is enough")
+
+
+func test_buying_the_cart_nailer_puts_it_in_the_bag() -> void:
+	var nailer: WeaponStats = _find("cart_nailer")["stats"]
+	assert_false(gun.has_gun(nailer))
+	score.credit(320)
+	assert_true(shop.buy("cart_nailer", score, _loadout()))
+	assert_true(gun.has_gun(nailer))
+	assert_eq(gun.stats(), nailer)
+
+
 func test_the_rocket_starts_in_the_bag() -> void:
 	assert_true(gun.has_gun(ROCKET))
 	score.credit(Shop.ROCKET_PRICE)
