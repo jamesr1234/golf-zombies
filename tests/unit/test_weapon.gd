@@ -91,11 +91,23 @@ func test_swapping_steps_forward_and_back_through_the_loadout() -> void:
 	gun.swap(1)
 	assert_eq(gun.stats(), SNIPER)
 	gun.swap(1)
+	assert_eq(gun.stats(), FLARE)
+	gun.swap(1)
+	assert_eq(gun.stats(), NAILER)
+	gun.swap(1)
 	assert_eq(gun.stats(), NET)
 	gun.swap(-1)
-	assert_eq(gun.stats(), SNIPER)
+	assert_eq(gun.stats(), NAILER)
 	gun.swap(-1)
-	assert_eq(gun.stats(), SHOTGUN)
+	assert_eq(gun.stats(), FLARE)
+
+
+func test_the_flare_and_nailer_start_in_the_bag() -> void:
+	var gun := _gun()
+	assert_true(gun.has_gun(FLARE))
+	assert_true(gun.has_gun(NAILER))
+	assert_false(gun.add_gun(FLARE), "owning it once is enough")
+	assert_false(gun.add_gun(NAILER), "owning it once is enough")
 
 
 func test_the_sniper_cycles_2x_5x_10x_then_hip() -> void:
