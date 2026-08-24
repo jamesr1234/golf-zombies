@@ -206,3 +206,20 @@ func test_sprint_reels_the_rope_in() -> void:
 	grappler.slack = move_toward(grappler.slack, Grappler.MIN_SLACK, Grappler.REEL * 1.0)
 	assert_lt(grappler.slack, before)
 	assert_gt(grappler.slack, Grappler.MIN_SLACK - 0.01)
+
+
+func test_you_can_shoot_while_on_the_rope() -> void:
+	var player: Player = PLAYER.instantiate()
+	add_child_autofree(player)
+	var cart: GolfCart = CART.instantiate()
+	add_child_autofree(cart)
+	await wait_physics_frames(1)
+	player.input = CpuInput.new("p1", true)
+	player.global_position = Vector3(0.0, 1.0, 8.0)
+	cart.global_position = Vector3(0.0, 0.4, 0.0)
+	player.begin_grapple(cart, cart.global_position + Vector3(0.0, 0.6, 0.0))
+	assert_true(player.is_grappling())
+	(player.input as CpuInput).hold("shoot")
+	player.combat.tick(player, STEP)
+	assert_true(player.weapon.is_firing(), "grappling should not block the trigger")
+	assert_true(player.raygun.visible, "the gun should stay out on the rope")
