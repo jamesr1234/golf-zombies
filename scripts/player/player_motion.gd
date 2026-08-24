@@ -41,6 +41,10 @@ func tick(player: Player, delta: float) -> void:
 		if not player.climber.tick(player, delta):
 			player._drop_climb()
 		return
+	if player.is_grappling():
+		if not player.grappler.tick(player, delta):
+			player._drop_grapple()
+		return
 	if player.is_milling():
 		player.mill_desk.tick(player, delta)
 		player.velocity = Vector3.ZERO
@@ -113,6 +117,7 @@ func jumped(player: Player) -> bool:
 func fling(player: Player, direction: Vector3, speed: float, lift := 14.0, lock := 1.0) -> void:
 	if player.is_riding():
 		return
+	player._drop_grapple()
 	var dir := Vector3(direction.x, 0.0, direction.z)
 	if dir.length_squared() < 0.0001:
 		dir = -player.transform.basis.z

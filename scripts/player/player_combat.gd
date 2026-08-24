@@ -14,7 +14,10 @@ func setup(player: Player) -> void:
 
 
 func update_shield(player: Player) -> void:
-	if player.is_placing() or player.is_climbing() or player.is_milling() or player.is_in_mech():
+	if (
+		player.is_placing() or player.is_climbing() or player.is_grappling()
+		or player.is_milling() or player.is_in_mech()
+	):
 		return
 	var was_up := player.state == Player.State.SHIELDING
 	if player.state == Player.State.SHIELDING and not wants_shield(player):
@@ -40,6 +43,7 @@ func wants_shield(player: Player) -> bool:
 		and not player._in_clubhouse()
 		and not player.is_carrying_ball()
 		and not player.is_climbing()
+		and not player.is_grappling()
 		and not player.is_milling()
 		and not player.motion.can_latch_climb(player)
 	)
@@ -87,6 +91,7 @@ func tick(player: Player, delta: float) -> void:
 		player.health.is_alive() and player.state != Player.State.GOLFING and not player.is_driving()
 		and not player.is_swimming() and not player.is_carrying_ball() and not player.is_shielding()
 		and not player.is_climbing()
+		and not player.is_grappling()
 		and not player.is_milling()
 		and not player.is_in_mech()
 		and not player._in_clubhouse() and not player.is_celebrating()

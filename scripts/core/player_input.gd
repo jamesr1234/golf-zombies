@@ -15,15 +15,17 @@ const HINTS := {
 		"pause": "Esc",
 		"map": "M", "ascend": "E", "descend": "Q", "grab": "Space", "shield": "C",
 		"zoom": "Z / Right Click", "aim": "Right Click", "look": "Mouse",
+		"grapple": "V", "jump": "Space", "sprint": "Shift",
 	},
 	"p2": {
 		"interact": "Circle", "revive": "Triangle", "swing": "R2", "shoot": "R2",
 		"move": "Left Stick",
 		"reload": "Square", "melee": "L1",
-		"swap_weapon": "D-Pad Up/Down", "swap_gear": "D-Pad Left/Right",
+		"swap_weapon": "D-Pad Up/Down", "swap_gear": "D-Pad Right",
 		"pause": "Options",
 		"map": "Triangle", "ascend": "R1", "descend": "L1", "grab": "Circle", "shield": "R1",
 		"zoom": "R3", "aim": "L2", "look": "Right Stick",
+		"grapple": "D-Pad Left", "jump": "Cross", "sprint": "L3",
 	},
 }
 

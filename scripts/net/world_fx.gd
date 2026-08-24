@@ -53,6 +53,14 @@ static func announce_net(
 		fx._replicate_net.rpc(origin, fly, radius, duration, range_m)
 
 
+static func announce_grapple(
+	from: Node, origin: Vector3, fly: Vector3, skip_peer := 0
+) -> void:
+	var fx := _broadcaster(from)
+	if fx != null:
+		fx._replicate_grapple.rpc(origin, fly, skip_peer)
+
+
 static func announce_trap(from: Node, at: Vector3, radius: float, duration: float) -> void:
 	var fx := _broadcaster(from)
 	if fx != null:
@@ -174,6 +182,15 @@ func apply_net_shot(
 	return NetShot.spawn_flight(_fx_root(), origin, fly, radius, duration, range_m, true)
 
 
+func apply_grapple(origin: Vector3, fly: Vector3, skip_peer := 0) -> GrappleHook:
+	if _skip(skip_peer):
+		return null
+	var hook := GrappleHook.spawn(_fx_root(), origin, fly, null, true)
+	if hook != null:
+		hook.fly_to(origin + fly.normalized() * Grappler.RANGE)
+	return hook
+
+
 func apply_trap(at: Vector3, radius: float, duration: float) -> NetTrap:
 	return NetTrap.deploy(_fx_root(), at, radius, duration, true)
 
@@ -268,6 +285,11 @@ func _replicate_net(
 	origin: Vector3, fly: Vector3, radius: float, duration: float, range_m: float
 ) -> void:
 	apply_net_shot(origin, fly, radius, duration, range_m)
+
+
+@rpc("authority", "call_remote", "unreliable")
+func _replicate_grapple(origin: Vector3, fly: Vector3, skip_peer: int) -> void:
+	apply_grapple(origin, fly, skip_peer)
 
 
 @rpc("authority", "call_remote", "reliable")

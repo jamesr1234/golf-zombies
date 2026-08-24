@@ -6,6 +6,10 @@ extends RefCounted
 func text(player: Player) -> String:
 	if player.talking:
 		return "%s to move on" % player.input.hint("interact")
+	if player.is_grappling():
+		return "Riding the hook   %s to let go   hold %s to reel in" % [
+			player.input.hint("jump"), player.input.hint("sprint")
+		]
 	if player.is_climbing():
 		return "hold %s left   hold %s right   sticks reach   jump drop" % [
 			player.input.hint("melee"), player.input.hint("shield")
@@ -92,4 +96,9 @@ func text(player: Player) -> String:
 		]
 	if player.buzz.held > 0:
 		return "%s for beer" % player.input.hint("swap_weapon")
+	if (
+		player._can_fire_grapple() and player.active_cart() != null
+		and player.global_position.distance_to(player.active_cart().global_position) < Grappler.RANGE
+	):
+		return "%s to grapple the cart" % player.input.hint("grapple")
 	return ""

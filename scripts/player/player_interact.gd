@@ -12,6 +12,8 @@ var cpu_shot_latched := false
 func tick(player: Player, delta: float) -> void:
 	if player.is_climbing():
 		return
+	if player.is_grappling() and player.input.just_pressed("interact"):
+		player._drop_grapple()
 	if player.is_milling():
 		if player.input.just_pressed("interact"):
 			player.mill_desk.try_toggle(player)
@@ -105,6 +107,8 @@ func cpu_shot_hold_applies(player: Player) -> bool:
 func use(player: Player) -> void:
 	if player.is_climbing():
 		return
+	if player.is_grappling():
+		player._drop_grapple()
 	if player.shopping:
 		player.shop.confirm(player)
 	elif player.talking:

@@ -62,6 +62,8 @@ func tick(player: Player, delta: float) -> void:
 			player.climber.pose_left(), player.climber.pose_right(), player.climber.left_aim,
 			player.climber.left != Vector3.INF, player.climber.right != Vector3.INF
 		)
+	elif player.is_grappling():
+		player.body.tow(player.grappler.line_end(), player.pace())
 	elif player.is_shielding():
 		player.body.guard()
 	else:
@@ -88,3 +90,4 @@ func tick(player: Player, delta: float) -> void:
 		player.raygun.show_gun(player.weapon.stats().visual)
 		player.raygun.animate(delta, travel, player.weapon.is_firing(), player.weapon.reload_fraction())
 	player.beer.animate(player, delta)
+	player._draw_grapple_line()

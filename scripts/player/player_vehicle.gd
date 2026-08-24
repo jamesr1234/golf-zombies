@@ -6,6 +6,7 @@ extends RefCounted
 
 func enter_ride(player: Player) -> void:
 	player._drop_climb()
+	player._drop_grapple()
 	player._cancel_place()
 	player.state = Player.State.RIDING
 	player.velocity = Vector3.ZERO
@@ -23,6 +24,7 @@ func exit_ride(player: Player) -> void:
 
 func enter_mech(player: Player, suit: MechSuit) -> void:
 	player._drop_climb()
+	player._drop_grapple()
 	player._cancel_place()
 	player.mech = suit
 	player.state = Player.State.MECH
@@ -71,6 +73,7 @@ func sit_as_passenger(player: Player, sit_at: Vector3) -> void:
 
 func enter_golf(player: Player) -> void:
 	player._drop_climb()
+	player._drop_grapple()
 	player._cancel_place()
 	player.state = Player.State.GOLFING
 	player.velocity = Vector3.ZERO
@@ -125,8 +128,12 @@ func spawn_at(player: Player, position: Vector3, facing_yaw: float) -> void:
 	player.stand_at(position, facing_yaw)
 	player.look.pitch = 0.0
 	player.swim.underwater = false
-	if player.state == Player.State.SWIMMING or player.state == Player.State.CLIMBING:
+	if (
+		player.state == Player.State.SWIMMING or player.state == Player.State.CLIMBING
+		or player.state == Player.State.GRAPPLING
+	):
 		player._drop_climb()
+		player._drop_grapple()
 		player.state = Player.State.NORMAL
 	if player.is_milling():
 		player.mill_desk.release(player)

@@ -11,7 +11,7 @@ func after_each() -> void:
 	NetSession.close()
 	NetSession.seats.clear()
 	GameSettings.reset()
-	for group in ["rockets", "net_shots", "net_traps", "thrown_beers", "fireworks", "sniper_beams"]:
+	for group in ["rockets", "net_shots", "net_traps", "thrown_beers", "fireworks", "sniper_beams", "grapple_hooks"]:
 		for node in get_tree().get_nodes_in_group(group):
 			node.remove_from_group(group)
 			node.queue_free()
@@ -41,6 +41,7 @@ func test_a_pawn_sync_speaks_for_its_owner() -> void:
 	assert_true(pawn_sync.replication_config.has_property(NodePath(":sync_reload")))
 	assert_true(pawn_sync.replication_config.has_property(NodePath(":sync_scoped")))
 	assert_true(pawn_sync.replication_config.has_property(NodePath(":sync_pitch")))
+	assert_true(pawn_sync.replication_config.has_property(NodePath(":sync_grapple_at")))
 	# Without the stick a watcher can only replay poses, and replaying poses is
 	# what puts every uneven arrival on screen.
 	assert_true(pawn_sync.replication_config.has_property(NodePath(":sync_stick")))

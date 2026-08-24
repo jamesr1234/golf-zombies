@@ -58,6 +58,7 @@ func on_downed(player: Player) -> void:
 	if player.state == Player.State.SWIMMING:
 		player.swim.leave(player)
 	player._drop_climb()
+	player._drop_grapple()
 	if player.is_milling():
 		player.mill_desk.release(player)
 	# Dumped out of the cart, so your partner has to come and pick you up.

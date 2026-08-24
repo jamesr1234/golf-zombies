@@ -3,7 +3,7 @@ extends CharacterBody3D
 ## One script for both players. Movement, swim, shop, beer, combat, and camera
 ## live in composable helpers so each stays under the line-count rule.
 
-enum State { NORMAL, GOLFING, RIDING, SWIMMING, SHIELDING, PLACING, CLIMBING, MECH }
+enum State { NORMAL, GOLFING, RIDING, SWIMMING, SHIELDING, PLACING, CLIMBING, MECH, GRAPPLING }
 
 ## Re-exported for callers and tests that still read Player.CONST.
 const SPRINT_SPEED := PlayerMotion.SPRINT_SPEED
@@ -25,6 +25,7 @@ const FLOOR_SNAP := PlayerMotion.FLOOR_SNAP
 const FLOOR_MAX_DEG := PlayerMotion.FLOOR_MAX_DEG
 const SAFE_MARGIN := PlayerMotion.SAFE_MARGIN
 const REMOTE_POSE_EASE := PlayerAnim.REMOTE_POSE_EASE
+const _WorldFx := preload("res://scripts/net/world_fx.gd")
 
 @export var input_prefix := "p1"
 @export var uses_mouse := true
@@ -78,6 +79,10 @@ var buzz := Buzz.new()
 ## CPU partner plants a shield after a tower sniper connects, or while you snipe.
 var wants_cover := false
 var climber := Climber.new()
+var grappler := Grappler.new()
+var _grapple_line: GrappleLine
+## World point of a latched claw, so a watcher can draw the rope.
+@export var sync_grapple_at := Vector3.INF
 var mill_desk
 
 var swim := PlayerSwim.new()
@@ -181,6 +186,8 @@ func _ready() -> void:
 	combat.setup(self)
 	shop.setup(self)
 	beer.setup(self)
+	_grapple_line = GrappleLine.new()
+	add_child(_grapple_line)
 	add_to_group("players")
 
 
@@ -221,6 +228,7 @@ func _physics_process(delta: float) -> void:
 			if input.just_pressed("reload"):
 				mech.report_reload.rpc_id(1)
 	combat.update_shield(self)
+	_tick_grapple()
 	if health.is_downed():
 		head.position.y = DOWNED_HEAD_HEIGHT
 	elif is_riding():
@@ -244,6 +252,7 @@ func _physics_process(delta: float) -> void:
 	sync_pitch = look.pitch
 	sync_stick = input.move_vector()
 	sync_sprint = input.pressed("sprint")
+	sync_grapple_at = grappler.attach_world() if grappler.is_latched() else Vector3.INF
 	sync_xform = global_transform
 	anim.tick(self, delta)
 
@@ -321,6 +330,10 @@ func is_placing() -> bool:
 
 func is_climbing() -> bool:
 	return state == State.CLIMBING and climber.is_active()
+
+
+func is_grappling() -> bool:
+	return state == State.GRAPPLING
 
 
 func is_milling() -> bool:
@@ -897,6 +910,103 @@ func _request_chug() -> void:
 
 func wants_drunk_fx() -> bool:
 	return beer.wants_drunk_fx(self)
+
+
+func begin_grapple(ride: Node3D, at: Vector3) -> bool:
+	if not _can_keep_grapple():
+		grappler.drop()
+		return false
+	if not grappler.latch(self, ride, at):
+		return false
+	_cancel_place()
+	if _shield != null:
+		_shield.set_raised(false)
+	state = State.GRAPPLING
+	_set_grapple_mask(true)
+	return true
+
+
+func _drop_grapple() -> void:
+	var was := is_grappling()
+	grappler.drop()
+	_set_grapple_mask(false)
+	if was:
+		state = State.NORMAL
+		Sfx.play("grapple_release", self)
+
+
+func _tick_grapple() -> void:
+	if grappler.is_flying() and input.just_pressed("grapple"):
+		grappler.cancel_flight()
+		return
+	if is_grappling():
+		return
+	if input.just_pressed("grapple") and _can_fire_grapple():
+		_fire_grapple()
+
+
+func _can_fire_grapple() -> bool:
+	if state != State.NORMAL or shopping or talking or is_celebrating() or is_milling():
+		return false
+	if health == null or not health.is_alive():
+		return false
+	if is_carrying_ball() or is_holding_beer() or grappler.is_active():
+		return false
+	return true
+
+
+func _can_keep_grapple() -> bool:
+	if health == null or not health.is_alive():
+		return false
+	return not (
+		is_riding() or is_golfing() or is_in_mech() or is_climbing()
+		or is_milling() or shopping or talking
+	)
+
+
+func _fire_grapple() -> void:
+	var origin := Grappler.muzzle_of(self)
+	var direction := -head.global_transform.basis.z
+	if NetSession.is_active() and not multiplayer.is_server():
+		_request_grapple.rpc_id(1, origin, direction)
+		grappler.fire(self, origin, direction, true)
+		return
+	grappler.fire(self, origin, direction, false)
+	_WorldFx.announce_grapple(self, origin, direction, peer_id)
+
+
+func _draw_grapple_line() -> void:
+	if _grapple_line == null:
+		return
+	var from := Grappler.muzzle_of(self)
+	var to := grappler.line_end()
+	if to == Vector3.INF and is_grappling():
+		to = sync_grapple_at
+	if to == Vector3.INF:
+		_grapple_line.hide_line()
+		return
+	_grapple_line.draw(from, to, is_grappling() or grappler.is_latched())
+
+
+func _set_grapple_mask(on: bool) -> void:
+	if collision_layer != Layers.PLAYER:
+		return
+	if on:
+		collision_mask = Layers.PLAYER_MASK & ~(Layers.VEHICLE | Layers.MECH)
+	else:
+		collision_mask = Layers.PLAYER_MASK
+
+
+@rpc("any_peer", "reliable")
+func _request_grapple(origin: Vector3, direction: Vector3) -> void:
+	if not multiplayer.is_server():
+		return
+	if multiplayer.get_remote_sender_id() != peer_id:
+		return
+	if not _can_fire_grapple():
+		return
+	grappler.fire(self, origin, direction, false)
+	_WorldFx.announce_grapple(self, origin, direction, peer_id)
 
 
 func begin_mill(desk) -> void:

@@ -120,6 +120,8 @@ func view_fov(player: Player) -> float:
 	var bump := player.buzz.fov_bump() if player.wants_drunk_fx() else 0.0
 	if player.is_climbing():
 		return Climber.CAM_FOV
+	if player.is_grappling():
+		return Grappler.FOV
 	if player.is_celebrating():
 		return CHEER_FOV
 	if player.is_in_mech():
@@ -150,6 +152,7 @@ func celebrate(player: Player) -> void:
 		return
 	if player.is_riding() or player.is_swimming() or player.is_golfing() or player.is_in_mech():
 		return
+	player._drop_grapple()
 	player._cancel_place()
 	if player.state == Player.State.SHIELDING:
 		player.state = Player.State.NORMAL
