@@ -142,9 +142,12 @@ The suite covers the scorecard boundary, the swing meter, hole generation, the
 health and revive rules, and an integration pass over a live world.
 
 ```bash
-/Applications/Godot.app/Contents/MacOS/Godot --headless \
+godot --headless \
   -s addons/gut/gut_cmdln.gd -gdir=res://tests -ginclude_subdirs -gexit
 ```
+
+On macOS the binary is `/Applications/Godot.app/Contents/MacOS/Godot`. GitHub Actions
+runs the same command on every pull request with Godot **4.6.1** Linux headless.
 
 Tuning knobs live at the top of their own scripts: `Shot` for how far the club
 hits, `SwingMeter` for timing, `Surface` for how each lie rolls, `SpawnDirector`

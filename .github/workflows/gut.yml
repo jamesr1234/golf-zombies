@@ -1,0 +1,69 @@
+# Runs the GUT suite on every PR and on pushes to main.
+# Same command as README.md Tests, on Linux Godot 4.6.1 headless.
+name: GUT
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Headless (Godot 4.6.1)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      GODOT_VERSION: "4.6.1"
+      # Leak-check logs on engine shutdown can mask the GUT exit code.
+      GODOT_DISABLE_LEAK_CHECKS: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache Godot
+        id: cache-godot
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/godot
+          key: godot-${{ env.GODOT_VERSION }}-stable-linux.x86_64
+
+      - name: Download Godot ${{ env.GODOT_VERSION }}
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        working-directory: ${{ runner.temp }}
+        run: |
+          mkdir -p godot
+          curl -fsSL -o godot.zip \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q godot.zip -d godot
+          mv "godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64" godot/godot
+          chmod +x godot/godot
+          rm -f godot.zip
+
+      - name: Add Godot to PATH
+        run: |
+          chmod +x "${{ runner.temp }}/godot/godot"
+          echo "${{ runner.temp }}/godot" >> "$GITHUB_PATH"
+
+      - name: Import project
+        # .godot/ is gitignored; GUT exits 0 if class_names are not imported yet.
+        run: godot --headless --import
+
+      - name: Run GUT
+        run: |
+          set -euo pipefail
+          godot --headless \
+            -s addons/gut/gut_cmdln.gd \
+            -gdir=res://tests \
+            -ginclude_subdirs \
+            -gexit 2>&1 | tee gut.log
+          if grep -q "Nothing was run" gut.log || ! grep -q "Passing Tests" gut.log; then
+            echo "::error::GUT did not run the suite (0 tests or no summary)"
+            exit 1
+          fi
