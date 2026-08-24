@@ -231,6 +231,23 @@ func climb(left_to: Vector3, right_to: Vector3, _aim: Vector3, _left_on: bool, _
 	_show_arm_hands(true)
 
 
+## Towed behind a cart or mech: gun arm on the rope, legs trailing.
+func tow(hook_at: Vector3, travel: float) -> void:
+	pose(clampf(travel, 0.0, 1.0))
+	torso.rotation.x = deg_to_rad(16.0)
+	hips.position.y = HIP_HEIGHT
+	legs[0].rotation.x = deg_to_rad(26.0)
+	legs[1].rotation.x = deg_to_rad(-10.0)
+	if hook_at != Vector3.INF:
+		_reach(arms[GUN_ARM], hook_at)
+	else:
+		arms[GUN_ARM].rotation.x = deg_to_rad(78.0)
+		arms[GUN_ARM].rotation.z = deg_to_rad(12.0)
+	arms[FREE_ARM].rotation.x = deg_to_rad(48.0)
+	arms[FREE_ARM].rotation.z = deg_to_rad(-16.0)
+	_show_arm_hands(true)
+
+
 ## Folded into a cart seat. The driver reaches for the wheel; shotgun keeps the
 ## gun arm up. Goofy on purpose: the legs stick out and the chest leans back.
 func sit(driving: bool, wheel_deg := 0.0, grips: Array[Vector3] = []) -> void:

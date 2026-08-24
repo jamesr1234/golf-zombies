@@ -32,3 +32,5 @@ const ENEMY_SHOT_MASK := WORLD | PLAYER | SHIELD | PROP | BARRIER | FORT
 ## The cart is stopped by scenery but not by bodies: zombies are there to be run
 ## over, and a player on foot should never be shoved around by their own ride.
 const VEHICLE_MASK := WORLD | BARRIER | PROP | FORT | MECH
+## Grapple claw. Hits rides and scenery, flies through people and the undead.
+const HOOK_MASK := WORLD | PROP | BARRIER | FORT | VEHICLE | MECH

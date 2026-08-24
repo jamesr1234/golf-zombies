@@ -3,7 +3,7 @@ extends CharacterBody3D
 ## One script for both players. The only difference between them is the input
 ## prefix and whether they steer with a trackpad or a right stick.
 
-enum State { NORMAL, GOLFING, RIDING, SWIMMING, SHIELDING, PLACING, CLIMBING, MECH }
+enum State { NORMAL, GOLFING, RIDING, SWIMMING, SHIELDING, PLACING, CLIMBING, MECH, GRAPPLING }
 
 const WALK_SPEED := 5.4
 const SPRINT_SPEED := 8.2
@@ -168,6 +168,10 @@ var wants_cover := false
 var _cheer_left := 0.0
 var _fling_left := 0.0
 var climber := Climber.new()
+var grappler := Grappler.new()
+var _grapple_line: GrappleLine
+## World point of a latched claw, so a watcher can draw the rope.
+@export var sync_grapple_at := Vector3.INF
 var mill_desk
 
 @onready var head: Node3D = $Head
@@ -203,6 +207,8 @@ func _ready() -> void:
 	_beer.paint_view()
 	_beer.visible = false
 	head.add_child(_beer)
+	_grapple_line = GrappleLine.new()
+	add_child(_grapple_line)
 	add_to_group("players")
 
 
@@ -243,6 +249,7 @@ func _physics_process(delta: float) -> void:
 			if input.just_pressed("reload"):
 				mech.report_reload.rpc_id(1)
 	_update_shield()
+	_tick_grapple()
 	if health.is_downed():
 		head.position.y = DOWNED_HEAD_HEIGHT
 	elif is_riding():
@@ -266,6 +273,7 @@ func _physics_process(delta: float) -> void:
 	sync_pitch = _pitch
 	sync_stick = input.move_vector()
 	sync_sprint = input.pressed("sprint")
+	sync_grapple_at = grappler.attach_world() if grappler.is_latched() else Vector3.INF
 	sync_xform = global_transform
 	_animate(delta)
 
@@ -360,6 +368,10 @@ func is_climbing() -> bool:
 	return state == State.CLIMBING
 
 
+func is_grappling() -> bool:
+	return state == State.GRAPPLING
+
+
 func is_milling() -> bool:
 	return mill_desk != null
 
@@ -374,6 +386,7 @@ func celebrate() -> void:
 		return
 	if is_riding() or is_swimming() or is_golfing() or is_in_mech():
 		return
+	_drop_grapple()
 	_cancel_place()
 	if state == State.SHIELDING:
 		state = State.NORMAL
@@ -443,6 +456,7 @@ func wallet():
 func fling(direction: Vector3, speed: float, lift := 14.0, lock := 1.0) -> void:
 	if is_riding():
 		return
+	_drop_grapple()
 	var dir := Vector3(direction.x, 0.0, direction.z)
 	if dir.length_squared() < 0.0001:
 		dir = -transform.basis.z
@@ -518,6 +532,8 @@ func get_view_fov() -> float:
 	var bump := buzz.fov_bump() if wants_drunk_fx() else 0.0
 	if is_climbing():
 		return Climber.CAM_FOV
+	if is_grappling():
+		return Grappler.FOV
 	if is_celebrating():
 		return CHEER_FOV
 	if is_in_mech():
@@ -603,8 +619,9 @@ func spawn_at(position: Vector3, facing_yaw: float) -> void:
 	stand_at(position, facing_yaw)
 	_pitch = 0.0
 	_underwater = false
-	if state == State.SWIMMING or state == State.CLIMBING:
+	if state == State.SWIMMING or state == State.CLIMBING or state == State.GRAPPLING:
 		_drop_climb()
+		_drop_grapple()
 		state = State.NORMAL
 	if is_milling():
 		mill_desk.release(self)
@@ -612,6 +629,7 @@ func spawn_at(position: Vector3, facing_yaw: float) -> void:
 
 func enter_golf_mode() -> void:
 	_drop_climb()
+	_drop_grapple()
 	_cancel_place()
 	state = State.GOLFING
 	velocity = Vector3.ZERO
@@ -631,6 +649,7 @@ func exit_golf_mode() -> void:
 
 func enter_ride() -> void:
 	_drop_climb()
+	_drop_grapple()
 	_cancel_place()
 	state = State.RIDING
 	velocity = Vector3.ZERO
@@ -678,6 +697,7 @@ func golf_stance_point(lie: Vector3, aim_yaw_deg: float) -> Vector3:
 
 func enter_mech(suit: MechSuit) -> void:
 	_drop_climb()
+	_drop_grapple()
 	_cancel_place()
 	mech = suit
 	state = State.MECH
@@ -766,6 +786,10 @@ func sit_as_passenger(sit_at: Vector3) -> void:
 func get_prompt() -> String:
 	if talking:
 		return "%s to move on" % input.hint("interact")
+	if is_grappling():
+		return "Riding the hook   %s to let go   hold %s to reel in" % [
+			input.hint("jump"), input.hint("sprint")
+		]
 	if is_climbing():
 		return "hold %s left   hold %s right   sticks reach   jump drop" % [
 			input.hint("melee"), input.hint("shield")
@@ -852,6 +876,11 @@ func get_prompt() -> String:
 		]
 	if buzz.held > 0:
 		return "%s for beer" % input.hint("swap_weapon")
+	if (
+		_can_fire_grapple() and _active_cart() != null
+		and global_position.distance_to(_active_cart().global_position) < Grappler.RANGE
+	):
+		return "%s to grapple the cart" % input.hint("grapple")
 	return ""
 
 
@@ -918,7 +947,7 @@ func _apply_look(delta: float) -> void:
 
 
 func _update_shield() -> void:
-	if is_placing() or is_climbing() or is_milling() or is_in_mech():
+	if is_placing() or is_climbing() or is_grappling() or is_milling() or is_in_mech():
 		return
 	var was_up := state == State.SHIELDING
 	if state == State.SHIELDING and not _wants_shield():
@@ -944,6 +973,7 @@ func _wants_shield() -> bool:
 		and not _in_clubhouse()
 		and not is_carrying_ball()
 		and not is_climbing()
+		and not is_grappling()
 		and not is_milling()
 		and not _can_latch_climb()
 	)
@@ -1062,6 +1092,10 @@ func _move(delta: float) -> void:
 		if not climber.tick(self, delta):
 			_drop_climb()
 		return
+	if is_grappling():
+		if not grappler.tick(self, delta):
+			_drop_grapple()
+		return
 	if is_milling():
 		mill_desk.tick(self, delta)
 		velocity = Vector3.ZERO
@@ -1163,6 +1197,7 @@ func _fight(delta: float) -> void:
 		health.is_alive() and state != State.GOLFING and not is_driving()
 		and not is_swimming() and not is_carrying_ball() and not is_shielding()
 		and not is_climbing()
+		and not is_grappling()
 		and not is_milling()
 		and not is_in_mech()
 		and not _in_clubhouse() and not is_celebrating()
@@ -1328,6 +1363,8 @@ func _animate(delta: float) -> void:
 			climber.pose_left(), climber.pose_right(), climber.left_aim,
 			climber.left != Vector3.INF, climber.right != Vector3.INF
 		)
+	elif is_grappling():
+		body.tow(grappler.line_end(), pace())
 	elif is_shielding():
 		body.guard()
 	else:
@@ -1358,6 +1395,7 @@ func _animate(delta: float) -> void:
 			and not is_placing()
 		)
 		_beer.animate(delta, show_beer)
+	_draw_grapple_line()
 
 
 func _orders_cpu_shots() -> bool:
@@ -1367,6 +1405,8 @@ func _orders_cpu_shots() -> bool:
 func _interact(delta: float) -> void:
 	if is_climbing():
 		return
+	if is_grappling() and input.just_pressed("interact"):
+		_drop_grapple()
 	if is_milling():
 		if input.just_pressed("interact"):
 			mill_desk.try_toggle(self)
@@ -1454,6 +1494,8 @@ func _cpu_shot_hold_applies() -> bool:
 func _use_interact() -> void:
 	if is_climbing():
 		return
+	if is_grappling():
+		_drop_grapple()
 	if shopping:
 		_shop_confirm()
 	elif talking:
@@ -1945,6 +1987,103 @@ func _drop_climb() -> void:
 		state = State.NORMAL
 
 
+func begin_grapple(ride: Node3D, at: Vector3) -> bool:
+	if not _can_keep_grapple():
+		grappler.drop()
+		return false
+	if not grappler.latch(self, ride, at):
+		return false
+	_cancel_place()
+	if _shield != null:
+		_shield.set_raised(false)
+	state = State.GRAPPLING
+	_set_grapple_mask(true)
+	return true
+
+
+func _drop_grapple() -> void:
+	var was := is_grappling()
+	grappler.drop()
+	_set_grapple_mask(false)
+	if was:
+		state = State.NORMAL
+		Sfx.play("grapple_release", self)
+
+
+func _tick_grapple() -> void:
+	if grappler.is_flying() and input.just_pressed("grapple"):
+		grappler.cancel_flight()
+		return
+	if is_grappling():
+		return
+	if input.just_pressed("grapple") and _can_fire_grapple():
+		_fire_grapple()
+
+
+func _can_fire_grapple() -> bool:
+	if state != State.NORMAL or shopping or talking or is_celebrating() or is_milling():
+		return false
+	if health == null or not health.is_alive():
+		return false
+	if is_carrying_ball() or is_holding_beer() or grappler.is_active():
+		return false
+	return true
+
+
+func _can_keep_grapple() -> bool:
+	if health == null or not health.is_alive():
+		return false
+	return not (
+		is_riding() or is_golfing() or is_in_mech() or is_climbing()
+		or is_milling() or shopping or talking
+	)
+
+
+func _fire_grapple() -> void:
+	var origin := Grappler.muzzle_of(self)
+	var direction := -head.global_transform.basis.z
+	if NetSession.is_active() and not multiplayer.is_server():
+		_request_grapple.rpc_id(1, origin, direction)
+		grappler.fire(self, origin, direction, true)
+		return
+	grappler.fire(self, origin, direction, false)
+	_WorldFx.announce_grapple(self, origin, direction, peer_id)
+
+
+func _draw_grapple_line() -> void:
+	if _grapple_line == null:
+		return
+	var from := Grappler.muzzle_of(self)
+	var to := grappler.line_end()
+	if to == Vector3.INF and is_grappling():
+		to = sync_grapple_at
+	if to == Vector3.INF:
+		_grapple_line.hide_line()
+		return
+	_grapple_line.draw(from, to, is_grappling() or grappler.is_latched())
+
+
+func _set_grapple_mask(on: bool) -> void:
+	if collision_layer != Layers.PLAYER:
+		return
+	if on:
+		collision_mask = Layers.PLAYER_MASK & ~(Layers.VEHICLE | Layers.MECH)
+	else:
+		collision_mask = Layers.PLAYER_MASK
+
+
+@rpc("any_peer", "reliable")
+func _request_grapple(origin: Vector3, direction: Vector3) -> void:
+	if not multiplayer.is_server():
+		return
+	if multiplayer.get_remote_sender_id() != peer_id:
+		return
+	if not _can_fire_grapple():
+		return
+	grappler.fire(self, origin, direction, false)
+	_WorldFx.announce_grapple(self, origin, direction, peer_id)
+
+
 func _mill_control():
 	return _MillDesk.nearest(self)
 
@@ -2261,6 +2400,7 @@ func _on_downed() -> void:
 	if state == State.SWIMMING:
 		_leave_water()
 	_drop_climb()
+	_drop_grapple()
 	if is_milling():
 		mill_desk.release(self)
 	# Dumped out of the cart, so your partner has to come and pick you up.

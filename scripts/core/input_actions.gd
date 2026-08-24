@@ -13,6 +13,7 @@ const ACTIONS: PackedStringArray = [
 	"sprint", "jump", "shoot", "aim", "zoom", "reload", "melee", "swap_weapon",
 	"swap_weapon_prev", "swap_gear", "swap_gear_prev",
 	"interact", "revive", "swing", "pause", "map", "ascend", "grab", "shield",
+	"grapple",
 ]
 
 
@@ -67,6 +68,7 @@ static func _register_keyboard(prefix: String) -> void:
 	_key(prefix + "_map", KEY_M)
 	_key(prefix + "_pause", KEY_ESCAPE)
 	_key(prefix + "_shield", KEY_C)
+	_key(prefix + "_grapple", KEY_V)
 	_key(prefix + "_zoom", KEY_Z)
 	_mouse(prefix + "_shoot", MOUSE_BUTTON_LEFT)
 	_mouse(prefix + "_swing", MOUSE_BUTTON_LEFT)
@@ -78,6 +80,7 @@ static func _ensure_keyboard_overrides(prefix: String) -> void:
 	_set_key(prefix + "_ascend", KEY_E)
 	_set_key(prefix + "_grab", KEY_SPACE)
 	_set_key(prefix + "_shield", KEY_C)
+	_set_key(prefix + "_grapple", KEY_V)
 	_set_key(prefix + "_swap_gear", KEY_G)
 	_set_key(prefix + "_map", KEY_M)
 
@@ -102,7 +105,7 @@ static func _register_gamepad_for(prefix: String, device: int) -> void:
 	_button(prefix + "_swap_weapon", JOY_BUTTON_DPAD_DOWN, device)
 	_button(prefix + "_swap_weapon_prev", JOY_BUTTON_DPAD_UP, device)
 	_button(prefix + "_swap_gear", JOY_BUTTON_DPAD_RIGHT, device)
-	_button(prefix + "_swap_gear_prev", JOY_BUTTON_DPAD_LEFT, device)
+	_button(prefix + "_grapple", JOY_BUTTON_DPAD_LEFT, device)
 	_button(prefix + "_interact", JOY_BUTTON_B, device)
 	_button(prefix + "_revive", JOY_BUTTON_Y, device)
 	_button(prefix + "_map", JOY_BUTTON_Y, device)
