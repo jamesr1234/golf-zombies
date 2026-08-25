@@ -357,6 +357,8 @@ func test_driving_transit_holds_forward() -> void:
 	var cart: GolfCart = CART.instantiate()
 	add_child_autofree(cart)
 	cart.set_physics_process(false)
+	cart.global_position = Vector3.ZERO
+	cart.rotation.y = 0.0
 	_player.cart = cart
 	cart.driver = _player
 	_player.enter_ride()
@@ -364,6 +366,34 @@ func test_driving_transit_holds_forward() -> void:
 	_tick()
 	assert_lt(_ghost.move.y, -0.5, "drive down the path")
 	assert_true(_ghost.wants("shoot"), "boost like a human holding the trigger")
+
+
+func test_transit_cpu_drifts_a_right_hander() -> void:
+	_player.flow = _FakeFlow.new()
+	_player.flow.phase = VsMatchFlow.Phase.TRANSIT
+	var path := CartPath.new()
+	add_child_autofree(path)
+	path.heading = Vector3(0.0, 0.0, -1.0)
+	path.centerline = [
+		Vector3.ZERO,
+		Vector3(0.0, 0.0, -20.0),
+		Vector3(24.0, 0.0, -20.0),
+	]
+	path.tee = Vector3(80.0, 0.0, -20.0)
+	_player.flow.course = {"cart_path": path, "clubhouse": null}
+	var cart: GolfCart = CART.instantiate()
+	add_child_autofree(cart)
+	cart.set_physics_process(false)
+	cart.global_position = Vector3(0.0, 0.0, -18.0)
+	cart.rotation.y = 0.0
+	_player.cart = cart
+	cart.driver = _player
+	_player.enter_ride()
+	_player.global_position = cart.global_position
+	_tick()
+	assert_gt(_ghost.move.x, GolfCart.DRIFT_STEER, "steer into the corner")
+	assert_true(_ghost.wants("shoot"), "boost plus steer is the drift")
+	assert_lt(_ghost.move.y, -0.9, "stay on the pedal through the slide")
 
 
 func _wet_ball(at: Vector3) -> GolfBall:

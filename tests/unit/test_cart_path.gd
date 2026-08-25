@@ -193,6 +193,23 @@ func test_the_clubhouse_arrows_hang_in_the_sky() -> void:
 		assert_null(_arrow_copy(arrow), "the gate is the label now, not every arrow")
 
 
+func test_aim_at_looks_ahead_into_a_corner() -> void:
+	var points: Array[Vector3] = [
+		Vector3(0.0, 0.0, 0.0),
+		Vector3(0.0, 0.0, -20.0),
+		Vector3(24.0, 0.0, -20.0),
+	]
+	var aim := CartPathTrack.aim_at(points, Vector3(0.0, 0.0, -18.0), 16.0)
+	assert_gt(aim.x, 6.0, "the racing line has to point into the right-hander")
+	assert_lt(aim.z, -18.0)
+
+
+func test_aim_at_pulls_a_wide_cart_back_onto_the_path() -> void:
+	var points: Array[Vector3] = [Vector3.ZERO, Vector3(0.0, 0.0, -40.0)]
+	var aim := CartPathTrack.aim_at(points, Vector3(8.0, 0.0, -10.0), 12.0)
+	assert_lt(aim.x, 8.0, "slide wide and the stick tugs you back to center")
+
+
 func test_the_circuit_is_a_long_drift_track() -> void:
 	var path := _path()
 	assert_gte(CartPathTrack.turn_count(), 6, "corners are what make drifting the fast line")
