@@ -135,9 +135,15 @@ func _drive(pad: CpuInput) -> void:
 	if _near_clubhouse():
 		pad.tap("interact")
 		return
-	var along := _drive_heading()
-	_look_at(pad, _player.global_position + along * LOOK_AHEAD)
-	pad.move = local_move(_player.global_transform.basis, along)
+	var cart := _player.cart
+	var from := cart.global_position if cart != null else _player.global_position
+	var heading := cart.rotation.y if cart != null else _player.rotation.y
+	var target := from + _drive_heading() * LOOK_AHEAD
+	var flow := _player.flow as MatchFlow
+	if flow != null and flow.cart_path != null and flow.cart_path.centerline.size() >= 2:
+		target = CartPathTrack.aim_at(flow.cart_path.centerline, from)
+	_look_at(pad, target)
+	pad.move = race_move(heading, target - from)
 	pad.hold("shoot")
 
 
@@ -331,6 +337,14 @@ static func cart_move(heading_yaw: float, world_dir: Vector3) -> Vector2:
 	var steer := clampf(-yaw_err / 40.0, -1.0, 1.0)
 	var throttle := -1.0 if absf(yaw_err) < 70.0 else -0.35
 	return Vector2(steer, throttle)
+
+
+## Clubhouse race: full pedal so boost-plus-steer is a drift, not a crawl.
+static func race_move(heading_yaw: float, world_dir: Vector3) -> Vector2:
+	var stick := cart_move(heading_yaw, world_dir)
+	if stick != Vector2.ZERO:
+		stick.y = -1.0
+	return stick
 
 
 ## Player yaw decreases when look.x is positive, pitch decreases when look.y is.

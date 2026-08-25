@@ -21,6 +21,9 @@ const LEGS: Array = [
 ]
 const JOIN := 1.1
 const ARC_STEP_DEG := 10.0
+## Far enough down the line to set up a drift; pull back onto the tarmac if wide.
+const AIM_AHEAD := 16.0
+const AIM_PULL := 0.55
 
 
 static func centerline(origin: Vector3, heading: Vector3, start_h: float) -> Array[Vector3]:
@@ -146,6 +149,18 @@ static func heading_at(points: Array[Vector3], distance: float) -> Vector3:
 	if along.length_squared() < 0.0001:
 		return finish_heading(points)
 	return along.normalized()
+
+
+## Point a racer steers toward: look-ahead on the racing line, plus a tug
+## back onto the tarmac if they have slid wide.
+static func aim_at(points: Array[Vector3], from: Vector3, ahead := AIM_AHEAD) -> Vector3:
+	if points.size() < 2:
+		return from
+	var progress := along(points, from)
+	var target := at(points, progress + ahead)
+	var on := closest(points, from)
+	var pull := Vector3(on.x - from.x, 0.0, on.z - from.z)
+	return target + pull * AIM_PULL
 
 
 static func _arc(

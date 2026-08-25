@@ -44,6 +44,12 @@ func test_cart_move_steers_right_when_the_ball_is_to_the_right() -> void:
 	assert_lt(stick.y, 0.0, "still on the pedal while turning")
 
 
+func test_race_move_keeps_the_pedal_down_in_a_tight_corner() -> void:
+	var stick := CpuBuddy.race_move(0.0, Vector3(12.0, 0.0, -2.0))
+	assert_gt(stick.x, GolfCart.DRIFT_STEER, "enough steer to slide")
+	assert_almost_eq(stick.y, -1.0, 0.001, "a racer does not lift in the corner")
+
+
 func test_looking_right_needs_a_positive_look_x() -> void:
 	# Yaw 0 faces -Z. A point to the right is +X, which is a negative yaw change,
 	# and the player subtracts look.x from yaw, so the stick must go right.

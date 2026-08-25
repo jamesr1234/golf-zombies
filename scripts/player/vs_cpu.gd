@@ -2,7 +2,7 @@ class_name VsCpu
 extends RefCounted
 ## Online opponent on the owning peer. Writes an InputGhost so the pawn reads
 ## Godot Input like a human. Walks or carts to the team ball, dives if it
-## finds the water, takes a beat over the shot, then fights.
+## finds the water, races the clubhouse circuit, then fights.
 
 const SHOOT_RANGE := 22.0
 const MELEE_RANGE := 2.1
@@ -332,9 +332,15 @@ func _drive() -> void:
 	if _near_clubhouse():
 		_ghost.tap("interact")
 		return
-	var along := _path_heading()
-	_look_at(_player.global_position + along * LOOK_AHEAD)
-	_ghost.move = CpuBuddy.local_move(_player.global_transform.basis, along)
+	var cart := _player.cart
+	var from := cart.global_position if cart != null else _player.global_position
+	var heading := cart.rotation.y if cart != null else _player.rotation.y
+	var target := from + _path_heading() * LOOK_AHEAD
+	var path := _cart_path()
+	if path != null and path.centerline.size() >= 2:
+		target = CartPathTrack.aim_at(path.centerline, from)
+	_look_at(target)
+	_ghost.move = CpuBuddy.race_move(heading, target - from)
 	_ghost.hold("shoot")
 
 
