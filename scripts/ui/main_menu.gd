@@ -1,16 +1,16 @@
 class_name MainMenu
 extends Control
-## Neon title screen: pick 1P or 2P, then a difficulty, then load the course.
+## Neon title screen: pick a mode, then a difficulty, then load the course.
 
 const GAMEPLAY := "res://scenes/main.tscn"
 const LOBBY := "res://scenes/net/lobby.tscn"
 const _Music := preload("res://scripts/fx/music.gd")
-const MODE_COPY := ["1 Player", "2 Player", "Online", "Coop Multiplayer VS"]
+const MODE_COPY := ["1 Player", "2 Player", "Online VS", "Coop VS"]
 const MODE_BLURB := [
 	"You and a CPU partner. One screen. Hold Circle / E for the CPU to take a shot.",
 	"Local co-op. Player 1 uses the controller. Player 2 uses the keyboard.",
 	"Eight players. Own ball. Melee only. Host or join by IP.",
-	"Eight teams of two. One ball per team, alternate shot. Empty seats fill with CPU. Lowest team total wins.",
+	"Eight teams of two. One shared ball, alternate shot. Empty seats fill with CPU.",
 ]
 const DIFF_BLURB := [
 	"More time, fewer zombies, gunners wait until hole 3.",
@@ -167,17 +167,17 @@ func _build() -> void:
 
 	var root := VBoxContainer.new()
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
-	root.offset_left = 120.0
-	root.offset_top = 70.0
-	root.offset_right = -120.0
-	root.offset_bottom = -70.0
+	root.offset_left = 80.0
+	root.offset_top = 36.0
+	root.offset_right = -80.0
+	root.offset_bottom = -36.0
 	root.alignment = BoxContainer.ALIGNMENT_CENTER
-	root.add_theme_constant_override("separation", 18)
+	root.add_theme_constant_override("separation", 12)
 	add_child(root)
 
 	_title = Label.new()
 	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_title.label_settings = HudStyle.banner(Palette.MAGENTA, 64)
+	_title.label_settings = HudStyle.banner(Palette.MAGENTA, 52)
 	_title.text = HudStyle.chrome("Golf Zombies")
 	root.add_child(_title)
 
@@ -189,12 +189,13 @@ func _build() -> void:
 
 	_panel = PanelContainer.new()
 	_panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	_panel.custom_minimum_size = Vector2(640.0, 0.0)
+	_panel.custom_minimum_size = Vector2(560.0, 0.0)
+	_panel.clip_contents = false
 	_panel.add_theme_stylebox_override("panel", _panel_style())
 	root.add_child(_panel)
 
 	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 12)
+	column.add_theme_constant_override("separation", 8)
 	_panel.add_child(column)
 
 	_heading = Label.new()
@@ -203,7 +204,7 @@ func _build() -> void:
 	column.add_child(_heading)
 
 	_options = VBoxContainer.new()
-	_options.add_theme_constant_override("separation", 8)
+	_options.add_theme_constant_override("separation", 6)
 	column.add_child(_options)
 
 	_blurb = Label.new()
@@ -224,7 +225,7 @@ func _build() -> void:
 func _refresh() -> void:
 	var labels := MODE_COPY if step == Step.MODE else Array(GameSettings.LABELS)
 	var selected := mode_index if step == Step.MODE else difficulty_index
-	_heading.text = HudStyle.chrome("Select players" if step == Step.MODE else "Select difficulty")
+	_heading.text = HudStyle.chrome("Select mode" if step == Step.MODE else "Select difficulty")
 	_blurb.text = MODE_BLURB[mode_index] if step == Step.MODE else DIFF_BLURB[difficulty_index]
 	for child in _options.get_children():
 		child.queue_free()
@@ -235,7 +236,7 @@ func _refresh() -> void:
 		button.focus_mode = Control.FOCUS_NONE
 		button.alignment = HORIZONTAL_ALIGNMENT_CENTER
 		button.add_theme_font_override("font", HudStyle.banner(Palette.CYAN).font)
-		button.add_theme_font_size_override("font_size", 28)
+		button.add_theme_font_size_override("font_size", 24)
 		button.add_theme_stylebox_override("normal", _option_style(i == selected))
 		button.add_theme_stylebox_override("hover", _option_style(true))
 		button.add_theme_stylebox_override("pressed", _option_style(true))
@@ -262,10 +263,10 @@ func _panel_style() -> StyleBoxFlat:
 	box.border_color = Color(Palette.CYAN, 0.7)
 	box.set_border_width_all(2)
 	box.set_corner_radius_all(4)
-	box.content_margin_left = 28.0
-	box.content_margin_right = 28.0
-	box.content_margin_top = 22.0
-	box.content_margin_bottom = 22.0
+	box.content_margin_left = 22.0
+	box.content_margin_right = 22.0
+	box.content_margin_top = 14.0
+	box.content_margin_bottom = 14.0
 	return box
 
 
@@ -275,8 +276,8 @@ func _option_style(selected: bool) -> StyleBoxFlat:
 	box.border_color = Palette.MAGENTA if selected else Color(Palette.CYAN, 0.35)
 	box.set_border_width_all(2 if selected else 1)
 	box.set_corner_radius_all(3)
-	box.content_margin_left = 16.0
-	box.content_margin_right = 16.0
-	box.content_margin_top = 10.0
-	box.content_margin_bottom = 10.0
+	box.content_margin_left = 14.0
+	box.content_margin_right = 14.0
+	box.content_margin_top = 7.0
+	box.content_margin_bottom = 7.0
 	return box
