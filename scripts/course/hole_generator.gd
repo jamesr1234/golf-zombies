@@ -222,7 +222,7 @@ static func _add_hazards(
 
 	# Hole 1 stays dry so the opener is a fairway, not a swim. Later par-4/5s
 	# still roll a pond; hole 3 keeps its mountain gap.
-	if data.par > 3 and rng.randf() < 0.45:
+	if data.index != 0 and data.par > 3 and rng.randf() < 0.45:
 		var t := rng.randf_range(0.35, 0.7)
 		var along := rng.randf_range(WATER_MIN_SPAN * 1.6, WATER_MIN_SPAN * 2.2)
 		_add_water(data, width, headings, t, along)
