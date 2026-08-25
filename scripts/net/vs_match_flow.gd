@@ -1200,7 +1200,7 @@ func _apply_scores(payload: Dictionary, clock: float, phase_value: int, teams: D
 
 
 func _broadcast_scores() -> void:
-	if not multiplayer.is_server():
+	if multiplayer == null or not multiplayer.is_server():
 		return
 	var payload := {}
 	for peer_id in _scores.keys():
