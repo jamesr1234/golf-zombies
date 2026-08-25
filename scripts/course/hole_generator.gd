@@ -220,10 +220,9 @@ static func _add_hazards(
 			Vector2(radius * 2.0, radius * 2.0), 0.0, true
 		))
 
-	if data.index == 0:
-		var water := _add_water(data, width, headings, 0.4, WATER_MIN_SPAN * 1.85)
-		_add_takeoff(data, water)
-	elif data.par > 3 and rng.randf() < 0.45:
+	# Hole 1 stays dry so the opener is a fairway, not a swim. Later par-4/5s
+	# still roll a pond; hole 3 keeps its mountain gap.
+	if data.par > 3 and rng.randf() < 0.45:
 		var t := rng.randf_range(0.35, 0.7)
 		var along := rng.randf_range(WATER_MIN_SPAN * 1.6, WATER_MIN_SPAN * 2.2)
 		_add_water(data, width, headings, t, along)
@@ -242,25 +241,6 @@ static func _add_water(
 	)
 	data.patches.append(patch)
 	return patch
-
-
-## Tee-side of the pond, lip on the water's edge, so a cart that sends it clears
-## the drink instead of driving into it.
-static func _add_takeoff(data: HoleData, water: Dictionary) -> void:
-	var yaw: float = water["yaw"]
-	var forward := Vector3.FORWARD.rotated(Vector3.UP, deg_to_rad(yaw))
-	var center: Vector3 = water["position"]
-	var size: Vector2 = water["size"]
-	var near := center - forward * (size.y * 0.5)
-	var at := near - forward * (JumpRamp.ground_run() * 0.5)
-	data.jumps.append({
-		"position": at,
-		"yaw": yaw,
-		"width": JumpRamp.WIDTH,
-		"length": JumpRamp.LENGTH,
-		"angle_deg": JumpRamp.ANGLE_DEG,
-		"role": "takeoff",
-	})
 
 
 static func _add_props(data: HoleData, rng: RandomNumberGenerator, width: float) -> void:

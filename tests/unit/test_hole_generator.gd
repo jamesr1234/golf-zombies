@@ -562,33 +562,13 @@ func test_hole_three_is_a_mountain_you_climb_then_jump() -> void:
 	assert_false(HoleGenerator.generate(1, SEED).has_mountain())
 
 
-func test_hole_one_always_has_water_and_a_cart_jump() -> void:
+func test_hole_one_has_no_water_trap() -> void:
 	for extra in 6:
 		var hole := HoleGenerator.generate(0, SEED + extra * 17)
 		assert_eq(hole.index, 0)
-		var water := {}
 		for patch in hole.patches:
-			if patch["type"] == Surface.Type.WATER:
-				water = patch
-				break
-		assert_false(water.is_empty(), "hole 1 needs a pond to jump")
-		assert_eq(hole.jumps.size(), 1, "one takeoff, not a scatter of ramps")
-		var jump: Dictionary = hole.jumps[0]
-		assert_eq(jump["role"], "takeoff")
-		var water_at: Vector3 = water["position"]
-		var jump_at: Vector3 = jump["position"]
-		assert_lt(
-			jump_at.distance_to(hole.tee), water_at.distance_to(hole.tee),
-			"the ramp sits on the tee side of the water"
-		)
-		assert_gt(
-			jump_at.distance_to(hole.cup), hole.green_radius + 8.0,
-			"the jump cannot sit on the green"
-		)
-		var range := JumpRamp.flight_distance(
-			GolfCart.MAX_SPEED, jump["angle_deg"], JumpRamp.lip_height(jump["length"], jump["angle_deg"])
-		)
-		assert_gt(range, HoleGenerator.WATER_MIN_SPAN, "the ramp is still a real launch")
+			assert_ne(patch["type"], Surface.Type.WATER, "hole 1 stays a dry opener")
+		assert_eq(hole.jumps.size(), 0, "no pond means no takeoff ramp")
 
 
 func _near_bounds_edge(bounds: Rect2, point: Vector3, margin: float) -> bool:

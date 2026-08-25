@@ -84,7 +84,7 @@ func _go_to_ball(delta: float) -> bool:
 	if _player.is_golfing():
 		_swing(_player.golf, delta)
 		return true
-	if _player.is_carrying_ball() or ball.is_submerged() or ball.is_carried():
+	if _player.is_carrying_ball() or ball.is_carried() or _ball_in_water(ball):
 		_lined_up = false
 		return _water_retrieve()
 	if ball.is_in_play():
@@ -173,7 +173,14 @@ func _water_retrieve() -> bool:
 	if _player.is_swimming():
 		return _swim_for_ball()
 	var dest := ball.global_position
-	if _player.is_riding() or _flat_range(dest) > WALK_RANGE:
+	if _player.is_riding():
+		if _flat_range(dest) <= HOP_RANGE or _water_depth(_player.global_position) >= 0.6:
+			_ghost.tap("interact")
+			return true
+		if _player.is_driving():
+			_drive_toward(dest)
+		return true
+	if _flat_range(dest) > WALK_RANGE:
 		return _ride_to(dest)
 	_walk_toward(dest)
 	_ghost.hold("sprint", _flat_range(dest) > 8.0)
@@ -189,7 +196,8 @@ func _swim_for_ball() -> bool:
 		return true
 	_walk_toward(ball.global_position)
 	if not _player.is_underwater():
-		_ghost.tap("shoot")
+		if _player.global_position.distance_to(ball.global_position) <= 6.0:
+			_ghost.tap("shoot")
 		return true
 	var depth := ball.global_position.y - _player.global_position.y
 	if depth < -0.3:
@@ -205,11 +213,42 @@ func _throw_recovered() -> bool:
 		return true
 	var pin := _pin()
 	_look_at(pin)
+	if not _toss_reaches_land(pin):
+		_walk_toward(pin)
+		return true
 	var from := _player.head.global_position if _player.head != null else _player.global_position
 	if absf(CpuBuddy.yaw_error(_player.rotation.y, from, pin)) > AIM_OK_DEG:
 		return true
 	_ghost.tap("shoot")
 	return true
+
+
+func _ball_in_water(ball: GolfBall) -> bool:
+	if ball == null or ball.is_carried():
+		return false
+	if ball.is_submerged():
+		return true
+	return _water_depth(ball.global_position) >= PlayerSwim.WADE_DEPTH
+
+
+func _water_depth(at: Vector3) -> float:
+	if _player.flow != null and _player.flow.hole != null:
+		return _player.flow.hole.water_depth_at(at)
+	return 0.0
+
+
+func _toss_reaches_land(pin: Vector3) -> bool:
+	if _player.flow == null or _player.flow.hole == null:
+		return true
+	var dir := pin - _player.global_position
+	dir.y = 0.0
+	if dir.length_squared() < 0.04:
+		return true
+	dir = dir.normalized()
+	for dist in [5.0, 9.0, 13.0]:
+		if _water_depth(_player.global_position + dir * dist) < PlayerSwim.WADE_DEPTH:
+			return true
+	return false
 
 
 func _leave_the_water() -> bool:

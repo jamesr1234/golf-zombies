@@ -213,5 +213,5 @@ func test_an_editor_preview_is_the_generated_hole() -> void:
 	assert_eq(preview.name, "Preview")
 	assert_true(bool(preview.get_meta("overlay_preview")))
 	assert_gt(preview.find_children("*", "TreeProp", true, false).size(), 8)
-	assert_eq(preview.find_children("*", "JumpRamp", true, false).size(), 1)
+	assert_eq(preview.find_children("*", "JumpRamp", true, false).size(), 0)
 	assert_null(preview.find_child("Overlay", true, false), "preview must not nest the overlay scene")
