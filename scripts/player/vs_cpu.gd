@@ -1,26 +1,40 @@
 class_name VsCpu
 extends RefCounted
 ## Online opponent on the owning peer. Writes an InputGhost so the pawn reads
-## Godot Input like a human. Plays its own ball, fights, drives, and leaves shop.
+## Godot Input like a human. Walks or carts to the team ball, takes a beat
+## over the shot, then fights.
 
 const SHOOT_RANGE := 22.0
 const MELEE_RANGE := 2.1
 const AIM_OK_DEG := 12.0
-const CONTACT_CLICK := 0.05
 const CART_END := 16.0
 const LOOK_AHEAD := 8.0
+const WALK_RANGE := 16.0
+const HOP_RANGE := 7.5
+const WAIT_RANGE := 5.0
 
 var _player: Player
 var _ghost
 var _shot_power := 0.5
+var _think_left := 0.0
+var _address_left := 0.0
+var _power_slop := 0.0
+var _contact_slop := 0.1
+var _aim_slop := Vector3.ZERO
+var _lined_up := false
+var _rng := RandomNumberGenerator.new()
 
 
 func setup(player: Player, pad) -> void:
 	_player = player
 	_ghost = pad
+	_rng.seed = hash(player.peer_id if player != null else 0)
+	_power_slop = _rng.randf_range(-0.1, 0.14)
+	_contact_slop = _rng.randf_range(0.07, 0.18)
+	_aim_slop = Vector3(_rng.randf_range(-2.2, 2.2), 0.0, _rng.randf_range(-2.2, 2.2))
 
 
-func tick(_delta: float) -> void:
+func tick(delta: float) -> void:
 	if _player == null or _ghost == null:
 		return
 	if _player.health != null and not _player.health.is_alive():
@@ -34,10 +48,10 @@ func tick(_delta: float) -> void:
 		VsMatchFlow.Phase.TRANSIT:
 			_transit()
 		_:
-			_hole()
+			_hole(delta)
 
 
-func _hole() -> void:
+func _hole(delta: float) -> void:
 	if _player.partner != null and _player.partner.health != null and _player.partner.health.is_downed():
 		_walk_toward(_player.partner.global_position)
 		if _player.partner_needs_revive():
@@ -47,12 +61,12 @@ func _hole() -> void:
 		_ghost.tap("interact")
 		return
 	if _phase() == VsMatchFlow.Phase.RETRIEVE:
-		_walk_to_ball()
+		_go_to_ball(delta)
 		return
 	if _can("can_start_play") and not _player.cpu_filled:
 		_ghost.tap("interact")
 		return
-	if _play_golf():
+	if _go_to_ball(delta):
 		return
 	if _phase() == VsMatchFlow.Phase.PREP:
 		_walk_toward(_tee())
@@ -60,30 +74,98 @@ func _hole() -> void:
 	_fight()
 
 
-func _play_golf() -> bool:
-	if GameSettings.is_coop_vs() and not _may_strike():
+func _go_to_ball(delta: float) -> bool:
+	var ball := _ball()
+	if ball == null or ball.is_holed() or ball.is_stowed() or ball.is_closed():
+		_lined_up = false
 		return false
-	var golf := _player.golf
-	if golf == null or golf.ball == null:
+	if ball.is_in_play():
+		_lined_up = false
 		return false
-	var ball := golf.ball
-	if ball.is_holed() or ball.is_in_play() or ball.is_stowed() or ball.is_closed():
-		return false
-	if golf.is_golfing(_player):
-		_swing(golf)
+	var dest := ball.global_position
+	var range := _flat_range(dest)
+	if _player.is_golfing():
+		_swing(_player.golf, delta)
 		return true
-	if golf.can_claim(_player):
-		_shot_power = CpuBuddy.wanted_power(
-			_player.global_position, golf.pin(), Shot.can_putt(ball.current_surface()),
-			_club_kit(), golf.green_span
-		)
+	if range > WALK_RANGE:
+		return _ride_to(dest)
+	if _player.is_riding():
 		_ghost.tap("interact")
 		return true
-	if golf.is_available() and _may_strike():
-		_walk_toward(ball.global_position)
-		_look_at(ball.global_position)
+	if _may_strike() and _player.golf != null:
+		return _address_or_claim(delta)
+	if range > WAIT_RANGE:
+		_walk_toward(dest)
+		_ghost.hold("sprint", range > WALK_RANGE * 0.7)
 		return true
 	return false
+
+
+func _address_or_claim(delta: float) -> bool:
+	var golf := _player.golf
+	if golf.is_golfing(_player):
+		_swing(golf, delta)
+		return true
+	if golf.can_claim(_player):
+		if not _lined_up:
+			_lined_up = true
+			_think_left = _rng.randf_range(0.7, 1.8)
+			_shot_power = clampf(
+				CpuBuddy.wanted_power(
+					_player.global_position, golf.pin(), Shot.can_putt(golf.ball.current_surface()),
+					_club_kit(), golf.green_span
+				) + _power_slop,
+				0.08,
+				0.96
+			)
+		_look_at(golf.pin() + _aim_slop)
+		if _think_left > 0.0:
+			_think_left -= delta
+			return true
+		_ghost.tap("interact")
+		_address_left = _rng.randf_range(0.8, 2.1)
+		_lined_up = false
+		return true
+	if golf.is_available():
+		_walk_toward(golf.ball.global_position)
+		_look_at(golf.ball.global_position)
+		return true
+	return false
+
+
+func _ride_to(dest: Vector3) -> bool:
+	if _player.is_driving():
+		if _flat_range(dest) <= HOP_RANGE:
+			_ghost.tap("interact")
+			return true
+		_drive_toward(dest)
+		return true
+	if _player.is_riding():
+		if _flat_range(dest) <= HOP_RANGE:
+			_ghost.tap("interact")
+		return true
+	var cart := _cart()
+	if cart == null:
+		_walk_toward(dest)
+		_ghost.hold("sprint")
+		return true
+	if cart.can_board(_player):
+		_ghost.tap("interact")
+		return true
+	_walk_toward(cart.global_position)
+	_ghost.hold("sprint")
+	return true
+
+
+func _drive_toward(world_point: Vector3) -> void:
+	var dir := world_point - _player.global_position
+	dir.y = 0.0
+	if dir.length_squared() < 0.04:
+		return
+	_look_at(_player.global_position + dir.normalized() * LOOK_AHEAD)
+	_ghost.move = CpuBuddy.local_move(_player.global_transform.basis, dir.normalized())
+	if dir.length() > 22.0:
+		_ghost.hold("shoot")
 
 
 func _may_strike() -> bool:
@@ -96,22 +178,17 @@ func _may_strike() -> bool:
 	return true
 
 
-func _walk_to_ball() -> void:
-	var golf := _player.golf
-	if golf != null and golf.ball != null and not golf.ball.is_stowed():
-		_walk_toward(golf.ball.global_position)
+func _swing(golf: GolfController, delta: float) -> void:
+	_look_at(golf.pin() + _aim_slop)
+	if _address_left > 0.0:
+		_address_left -= delta
 		return
-	_walk_toward(_tee())
-
-
-func _swing(golf: GolfController) -> void:
-	_look_at(golf.pin())
 	var meter := golf.meter
 	if meter.state == SwingMeter.State.READY:
 		_ghost.tap("swing")
 	elif meter.state == SwingMeter.State.BACKSWING and meter.value >= _shot_power:
 		_ghost.tap("swing")
-	elif meter.state == SwingMeter.State.DOWNSWING and meter.value <= CONTACT_CLICK:
+	elif meter.state == SwingMeter.State.DOWNSWING and meter.value <= _contact_slop:
 		_ghost.tap("swing")
 
 
@@ -206,6 +283,18 @@ func _tee() -> Vector3:
 	if _player.flow != null and _player.flow.hole != null:
 		return _player.flow.hole.tee
 	return _player.global_position
+
+
+func _ball() -> GolfBall:
+	if _player.golf != null:
+		return _player.golf.ball
+	return null
+
+
+func _flat_range(world_point: Vector3) -> float:
+	var offset := world_point - _player.global_position
+	offset.y = 0.0
+	return offset.length()
 
 
 func _cart() -> GolfCart:
