@@ -72,9 +72,120 @@ func test_a_backswing_at_wanted_power_requests_swing() -> void:
 	_player.golf = golf
 	_player.enter_golf_mode()
 	_brain._shot_power = CpuBuddy.wanted_power(Vector3.ZERO, Vector3(0.0, 0.0, -120.0))
+	_brain._power_slop = 0.0
+	_brain._contact_slop = 0.05
+	_brain._address_left = 0.0
 	_tick()
 	assert_true(_ghost.wants("swing"), "click two at the top of the meter")
 	assert_false(_ghost.wants("interact"))
+
+
+func test_off_turn_cpu_walks_to_the_team_ball() -> void:
+	GameSettings.mode = GameSettings.Mode.ONLINE_COOP_VS
+	NetSession.seats = {1: 0, 2: 1}
+	_player.peer_id = 2
+	_player.cpu_filled = true
+	_player.global_position = Vector3.ZERO
+	var flow := VsMatchFlow.new()
+	flow.phase = VsMatchFlow.Phase.PLAYING
+	var card := TeamScore.new()
+	card.team = 0
+	flow._team_scores[0] = card
+	_player.flow = flow
+	var golf := GolfController.new()
+	var ball := GolfBall.new()
+	add_child_autofree(golf)
+	add_child_autofree(ball)
+	ball.global_position = Vector3(0.0, 0.0, -40.0)
+	golf.ball = ball
+	_player.golf = golf
+	_tick()
+	assert_gt(_ghost.move.length(), 0.3, "the partner goes to the shared ball")
+	assert_false(_ghost.wants("interact"), "off-turn does not claim")
+	assert_false(_ghost.wants("swing"))
+	flow.free()
+
+
+func test_a_long_approach_goes_to_the_cart_first() -> void:
+	_player.flow = _CartFlow.new()
+	_player.flow.phase = VsMatchFlow.Phase.PLAYING
+	_player.global_position = Vector3.ZERO
+	var golf := GolfController.new()
+	var ball := GolfBall.new()
+	add_child_autofree(golf)
+	add_child_autofree(ball)
+	ball.global_position = Vector3(0.0, 0.0, -80.0)
+	golf.ball = ball
+	_player.golf = golf
+	var cart: GolfCart = CART.instantiate()
+	add_child_autofree(cart)
+	cart.set_physics_process(false)
+	cart.global_position = Vector3(8.0, 0.0, 0.0)
+	_player.flow.cart = cart
+	_tick()
+	assert_gt(_ghost.move.x, 0.3, "walk to the cart, not the far ball")
+	assert_true(_ghost.wants("sprint"))
+	assert_false(_ghost.wants("interact"), "cart is still out of board range")
+
+
+func test_driver_hops_out_near_the_ball() -> void:
+	_player.flow = _FakeFlow.new()
+	_player.flow.phase = VsMatchFlow.Phase.PLAYING
+	var golf := GolfController.new()
+	var ball := GolfBall.new()
+	add_child_autofree(golf)
+	add_child_autofree(ball)
+	ball.global_position = Vector3(0.0, 0.0, -5.0)
+	golf.ball = ball
+	_player.golf = golf
+	var cart: GolfCart = CART.instantiate()
+	add_child_autofree(cart)
+	cart.set_physics_process(false)
+	_player.cart = cart
+	cart.driver = _player
+	_player.enter_ride()
+	_player.global_position = Vector3.ZERO
+	_tick()
+	assert_true(_ghost.wants("interact"), "hop out when the ball is in walking range")
+
+
+func test_cpu_takes_a_beat_before_claiming() -> void:
+	_player.flow = _FakeFlow.new()
+	_player.flow.phase = VsMatchFlow.Phase.PLAYING
+	var golf := GolfController.new()
+	var ball := GolfBall.new()
+	add_child_autofree(golf)
+	add_child_autofree(ball)
+	ball.global_position = Vector3.ZERO
+	golf.ball = ball
+	_player.golf = golf
+	_player.global_position = Vector3(1.0, 0.0, 0.0)
+	_tick()
+	assert_false(_ghost.wants("interact"), "read the line first")
+	assert_gt(_brain._think_left, 0.0)
+	_brain._think_left = 0.0
+	_tick()
+	assert_true(_ghost.wants("interact"))
+
+
+func test_address_waits_before_the_first_click() -> void:
+	_player.flow = _FakeFlow.new()
+	_player.flow.phase = VsMatchFlow.Phase.PLAYING
+	var golf := GolfController.new()
+	var ball := GolfBall.new()
+	add_child_autofree(golf)
+	add_child_autofree(ball)
+	golf.ball = ball
+	golf.golfer = _player
+	golf.meter.state = SwingMeter.State.READY
+	_player.golf = golf
+	_player.enter_golf_mode()
+	_brain._address_left = 1.2
+	_tick()
+	assert_false(_ghost.wants("swing"), "waggle first")
+	_brain._address_left = 0.0
+	_tick()
+	assert_true(_ghost.wants("swing"))
 
 
 func test_driving_transit_holds_forward() -> void:
@@ -111,3 +222,28 @@ class _FakeFlow:
 
 	func can_start_play(_who: Node3D) -> bool:
 		return phase == VsMatchFlow.Phase.PREP
+
+	func is_practice() -> bool:
+		return phase == VsMatchFlow.Phase.PREP or phase == VsMatchFlow.Phase.SHOP
+
+	func can_strike(_who: Node3D) -> bool:
+		return true
+
+
+class _CartFlow:
+	var phase := VsMatchFlow.Phase.PLAYING
+	var hole
+	var course
+	var cart: GolfCart
+
+	func can_start_play(_who: Node3D) -> bool:
+		return false
+
+	func is_practice() -> bool:
+		return false
+
+	func can_strike(_who: Node3D) -> bool:
+		return true
+
+	func cart_for(_who: Node3D) -> GolfCart:
+		return cart
