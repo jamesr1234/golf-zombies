@@ -1,8 +1,8 @@
 class_name VsCpu
 extends RefCounted
 ## Online opponent on the owning peer. Writes an InputGhost so the pawn reads
-## Godot Input like a human. Walks or carts to the team ball, takes a beat
-## over the shot, then fights.
+## Godot Input like a human. Walks or carts to the team ball, dives if it
+## finds the water, takes a beat over the shot, then fights.
 
 const SHOOT_RANGE := 22.0
 const MELEE_RANGE := 2.1
@@ -84,6 +84,9 @@ func _go_to_ball(delta: float) -> bool:
 	if _player.is_golfing():
 		_swing(_player.golf, delta)
 		return true
+	if _player.is_carrying_ball() or ball.is_submerged() or ball.is_carried():
+		_lined_up = false
+		return _water_retrieve()
 	if ball.is_in_play():
 		_lined_up = false
 		if range > HOP_RANGE or _player.is_riding():
@@ -157,6 +160,74 @@ func _ride_to(dest: Vector3) -> bool:
 	_walk_toward(cart.global_position)
 	_ghost.hold("sprint")
 	return true
+
+
+func _water_retrieve() -> bool:
+	var ball := _ball()
+	if ball == null:
+		return false
+	if _player.is_carrying_ball():
+		return _throw_recovered()
+	if ball.is_carried() and ball.carrier() != _player:
+		return _leave_the_water()
+	if _player.is_swimming():
+		return _swim_for_ball()
+	var dest := ball.global_position
+	if _player.is_riding() or _flat_range(dest) > WALK_RANGE:
+		return _ride_to(dest)
+	_walk_toward(dest)
+	_ghost.hold("sprint", _flat_range(dest) > 8.0)
+	return true
+
+
+func _swim_for_ball() -> bool:
+	var ball := _ball()
+	if ball == null:
+		return _leave_the_water()
+	if _player.swim != null and _player.swim.can_grab_ball(_player):
+		_ghost.tap("grab")
+		return true
+	_walk_toward(ball.global_position)
+	if not _player.is_underwater():
+		_ghost.tap("shoot")
+		return true
+	var depth := ball.global_position.y - _player.global_position.y
+	if depth < -0.3:
+		_ghost.hold("melee")
+	elif depth > 0.4:
+		_ghost.hold("ascend")
+	return true
+
+
+func _throw_recovered() -> bool:
+	if _player.is_underwater():
+		_ghost.hold("ascend")
+		return true
+	var pin := _pin()
+	_look_at(pin)
+	var from := _player.head.global_position if _player.head != null else _player.global_position
+	if absf(CpuBuddy.yaw_error(_player.rotation.y, from, pin)) > AIM_OK_DEG:
+		return true
+	_ghost.tap("shoot")
+	return true
+
+
+func _leave_the_water() -> bool:
+	if not _player.is_swimming():
+		return false
+	if _player.is_underwater():
+		_ghost.hold("ascend")
+		return true
+	_ghost.tap("grab")
+	return true
+
+
+func _pin() -> Vector3:
+	if _player.golf != null:
+		return _player.golf.pin()
+	if _player.flow != null and _player.flow.hole != null:
+		return _player.flow.hole.cup
+	return _player.global_position + Vector3(0.0, 0.0, -8.0)
 
 
 func _drive_toward(world_point: Vector3) -> void:
