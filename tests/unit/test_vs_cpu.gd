@@ -188,6 +188,58 @@ func test_address_waits_before_the_first_click() -> void:
 	assert_true(_ghost.wants("swing"))
 
 
+func test_driver_holds_forward_from_the_cart_heading() -> void:
+	_player.flow = _FakeFlow.new()
+	_player.flow.phase = VsMatchFlow.Phase.PLAYING
+	var golf := GolfController.new()
+	var ball := GolfBall.new()
+	add_child_autofree(golf)
+	add_child_autofree(ball)
+	ball.global_position = Vector3(0.0, 0.0, -40.0)
+	golf.ball = ball
+	_player.golf = golf
+	var cart: GolfCart = CART.instantiate()
+	add_child_autofree(cart)
+	cart.set_physics_process(false)
+	cart.global_position = Vector3.ZERO
+	cart.rotation.y = 0.0
+	_player.cart = cart
+	cart.driver = _player
+	_player.enter_ride()
+	_player.global_position = Vector3.ZERO
+	_player.rotation.y = PI * 0.5
+	_tick()
+	assert_lt(_ghost.move.y, -0.5, "drive from the cart nose, not the pawn look")
+	assert_almost_eq(_ghost.move.x, 0.0, 0.2, "already facing the ball")
+	assert_true(_ghost.wants("shoot"), "boost on a long fairway ride")
+	assert_false(_ghost.wants("interact"), "too far to hop out")
+
+
+func test_cpu_drives_to_the_ball_after_the_shot() -> void:
+	_player.flow = _FakeFlow.new()
+	_player.flow.phase = VsMatchFlow.Phase.PLAYING
+	var golf := GolfController.new()
+	var ball := GolfBall.new()
+	add_child_autofree(golf)
+	add_child_autofree(ball)
+	ball.global_position = Vector3(0.0, 0.0, -80.0)
+	ball._in_play = true
+	golf.ball = ball
+	_player.golf = golf
+	var cart: GolfCart = CART.instantiate()
+	add_child_autofree(cart)
+	cart.set_physics_process(false)
+	cart.global_position = Vector3.ZERO
+	cart.rotation.y = 0.0
+	_player.cart = cart
+	cart.driver = _player
+	_player.enter_ride()
+	_player.global_position = Vector3.ZERO
+	_tick()
+	assert_lt(_ghost.move.y, -0.5, "chase the shot instead of sitting still")
+	assert_false(_ghost.wants("interact"), "keep driving until the ball is close")
+
+
 func test_driving_transit_holds_forward() -> void:
 	_player.flow = _FakeFlow.new()
 	_player.flow.phase = VsMatchFlow.Phase.TRANSIT

@@ -32,6 +32,18 @@ func test_local_move_right_is_positive_stick_x() -> void:
 	assert_almost_eq(stick.y, 0.0, 0.001)
 
 
+func test_cart_move_holds_forward_when_the_nose_faces_the_ball() -> void:
+	var stick := CpuBuddy.cart_move(0.0, Vector3(0.0, 0.0, -12.0))
+	assert_almost_eq(stick.x, 0.0, 0.05)
+	assert_lt(stick.y, -0.9, "forward throttle is negative stick Y")
+
+
+func test_cart_move_steers_right_when_the_ball_is_to_the_right() -> void:
+	var stick := CpuBuddy.cart_move(0.0, Vector3(10.0, 0.0, 0.0))
+	assert_gt(stick.x, 0.5, "positive steer yaws the cart toward +X")
+	assert_lt(stick.y, 0.0, "still on the pedal while turning")
+
+
 func test_looking_right_needs_a_positive_look_x() -> void:
 	# Yaw 0 faces -Z. A point to the right is +X, which is a negative yaw change,
 	# and the player subtracts look.x from yaw, so the stick must go right.

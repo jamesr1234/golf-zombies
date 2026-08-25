@@ -321,6 +321,18 @@ static func local_move(basis: Basis, world_dir: Vector3) -> Vector2:
 	return Vector2(local.x, local.z).limit_length(1.0)
 
 
+## Cart stick from the cart's yaw, not the seated pawn's look. X steers,
+## -Y is forward throttle. Softens the pedal when the nose is way off.
+static func cart_move(heading_yaw: float, world_dir: Vector3) -> Vector2:
+	var flat := Vector3(world_dir.x, 0.0, world_dir.z)
+	if flat.length_squared() < 0.0001:
+		return Vector2.ZERO
+	var yaw_err := yaw_error(heading_yaw, Vector3.ZERO, flat)
+	var steer := clampf(-yaw_err / 40.0, -1.0, 1.0)
+	var throttle := -1.0 if absf(yaw_err) < 70.0 else -0.35
+	return Vector2(steer, throttle)
+
+
 ## Player yaw decreases when look.x is positive, pitch decreases when look.y is.
 static func look_stick(yaw_error_deg: float, pitch_error_deg: float) -> Vector2:
 	return Vector2(
