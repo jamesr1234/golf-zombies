@@ -78,12 +78,58 @@ func player_count() -> int:
 	return seats.size()
 
 
+func max_players() -> int:
+	return GameSettings.online_max_players()
+
+
+func is_cpu_peer(peer_id: int) -> bool:
+	return CoopVs.is_cpu_peer(peer_id)
+
+
+func human_count() -> int:
+	var n := 0
+	for peer_id in seats.keys():
+		if not is_cpu_peer(int(peer_id)):
+			n += 1
+	return n
+
+
 func seat_for(peer_id: int) -> int:
 	return int(seats.get(peer_id, -1))
 
 
 func color_for(peer_id: int) -> Color:
-	return Palette.seat_color(seat_for(peer_id))
+	var seat := seat_for(peer_id)
+	if GameSettings.is_coop_vs():
+		return Palette.seat_color(CoopVs.tint_index(seat))
+	return Palette.seat_color(seat)
+
+
+func request_seat(seat: int) -> void:
+	if not _active:
+		return
+	if is_host():
+		_try_claim_seat(multiplayer.get_unique_id(), seat)
+		return
+	_request_seat.rpc_id(1, seat)
+
+
+func _try_claim_seat(peer_id: int, seat: int) -> bool:
+	if seat < 0 or seat >= max_players():
+		return false
+	if not CoopVs.apply_seat_claim(seats, peer_id, seat):
+		return false
+	if is_host() and _active:
+		_sync_seats.rpc(seats, int(GameSettings.mode))
+	peers_changed.emit()
+	return true
+
+
+@rpc("any_peer", "reliable")
+func _request_seat(seat: int) -> void:
+	if not is_host():
+		return
+	_try_claim_seat(multiplayer.get_remote_sender_id(), seat)
 
 
 func is_steam() -> bool:
@@ -166,7 +212,7 @@ func host(p_port: int = DEFAULT_PORT) -> Error:
 	## macOS turns "*" into an IPv6-only socket. Computer 2 joins with
 	## 192.168.4.x (IPv4), so the host has to listen on IPv4.
 	peer.set_bind_ip("0.0.0.0")
-	var err := peer.create_server(p_port, MAX_PLAYERS - 1)
+	var err := peer.create_server(p_port, max_players() - 1)
 	if err != OK:
 		return err
 	port = p_port
@@ -202,7 +248,7 @@ func host_steam() -> Error:
 		return ERR_UNAVAILABLE
 	if not SteamLobby.is_online():
 		return ERR_UNAVAILABLE
-	if await SteamLobby.create_lobby(MAX_PLAYERS) == 0:
+	if await SteamLobby.create_lobby(max_players()) == 0:
 		return ERR_CANT_CREATE
 	var peer := SteamLobby.create_host_peer()
 	if peer == null:
@@ -260,6 +306,8 @@ func start_match() -> void:
 	if not is_host():
 		return
 	_seat_wired_peers()
+	if GameSettings.is_coop_vs():
+		seats = CoopVs.filled_seats(seats)
 	print("[net] start_match seats=%d wire=%d remotes=%s" % [
 		seats.size(), wire_count(), multiplayer.get_peers()
 	])
@@ -270,20 +318,22 @@ func start_match() -> void:
 		seat_list.append(seat_for(peer_id))
 	## Send each remote a packet, then run locally. Broadcast+call_local can
 	## still lose the start if the host is the only one on the wire.
+	var mode := int(GameSettings.mode)
 	for peer_id in multiplayer.get_peers():
-		_begin_match.rpc_id(peer_id, course_seed, int(GameSettings.difficulty), ids, seat_list)
-	_begin_match(course_seed, int(GameSettings.difficulty), ids, seat_list)
+		_begin_match.rpc_id(peer_id, course_seed, int(GameSettings.difficulty), ids, seat_list, mode)
+	_begin_match(course_seed, int(GameSettings.difficulty), ids, seat_list, mode)
 
 
 @rpc("authority", "call_local", "reliable")
 func _begin_match(
-	seed: int, difficulty: int, ids: PackedInt32Array, seat_list: PackedInt32Array
+	seed: int, difficulty: int, ids: PackedInt32Array, seat_list: PackedInt32Array,
+	mode: int = int(GameSettings.Mode.ONLINE_VS)
 ) -> void:
 	course_seed = seed
 	seats.clear()
 	for i in ids.size():
 		seats[ids[i]] = seat_list[i] if i < seat_list.size() else i
-	GameSettings.mode = GameSettings.Mode.ONLINE_VS
+	GameSettings.mode = mode as GameSettings.Mode
 	GameSettings.difficulty = difficulty as GameSettings.Kind
 	match_starting.emit()
 	## Changing scenes in this same call drops the outgoing start packet on the
@@ -325,18 +375,18 @@ func _bind_peer(peer: MultiplayerPeer, hosting: bool, p_backend: Backend) -> voi
 func _on_peer_connected(id: int) -> void:
 	print("[net] peer %d connected  seats=%d wire=%d" % [id, seats.size(), wire_count()])
 	if is_host():
-		if seats.size() >= MAX_PLAYERS:
+		if seats.size() >= max_players():
 			multiplayer.multiplayer_peer.disconnect_peer(id)
 			return
 		_assign_seat(id)
-		_sync_seats.rpc(seats)
+		_sync_seats.rpc(seats, int(GameSettings.mode))
 	peers_changed.emit()
 
 
 func _on_peer_disconnected(id: int) -> void:
 	seats.erase(id)
 	if is_host():
-		_sync_seats.rpc(seats)
+		_sync_seats.rpc(seats, int(GameSettings.mode))
 	peers_changed.emit()
 
 
@@ -380,13 +430,14 @@ func _assign_seat(peer_id: int) -> void:
 	if seats.has(peer_id):
 		return
 	var used: Array = seats.values()
-	for seat in MAX_PLAYERS:
+	for seat in max_players():
 		if not used.has(seat):
 			seats[peer_id] = seat
 			return
 
 
 @rpc("authority", "call_remote", "reliable")
-func _sync_seats(p_seats: Dictionary) -> void:
+func _sync_seats(p_seats: Dictionary, mode: int = int(GameSettings.Mode.ONLINE_VS)) -> void:
 	seats = p_seats.duplicate()
+	GameSettings.mode = mode as GameSettings.Mode
 	peers_changed.emit()

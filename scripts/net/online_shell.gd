@@ -29,7 +29,7 @@ var _cpu_banner: Label
 
 
 func _enter_tree() -> void:
-	InputActions.register_for_mode(GameSettings.Mode.ONLINE_VS)
+	InputActions.register_for_mode(GameSettings.mode)
 
 
 func _ready() -> void:

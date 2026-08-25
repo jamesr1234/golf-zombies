@@ -13,6 +13,7 @@ const NOSE_Z := -1.5
 
 static func build() -> Node3D:
 	var root := Node3D.new()
+	root.name = "Visuals"
 	root.add_child(_deck())
 	for post in _roof():
 		root.add_child(post)
@@ -21,6 +22,31 @@ static func build() -> Node3D:
 	for light in _headlights():
 		root.add_child(light)
 	return root
+
+
+static func apply_tint(root: Node, color: Color) -> void:
+	if root == null:
+		return
+	_tint_node(root, color)
+
+
+static func _tint_node(node: Node, color: Color) -> void:
+	var mesh := node as MeshInstance3D
+	if mesh != null:
+		var mat := mesh.get_active_material(0) as StandardMaterial3D
+		if mat != null and not mat.albedo_color.is_equal_approx(Palette.HEADLIGHT):
+			var tinted := mat.duplicate() as StandardMaterial3D
+			if mat.albedo_color.is_equal_approx(Palette.CART_FRAME):
+				tinted.albedo_color = color.darkened(0.62)
+				if tinted.emission_enabled:
+					tinted.emission = tinted.albedo_color
+			else:
+				tinted.albedo_color = color
+				if tinted.emission_enabled:
+					tinted.emission = color
+			mesh.material_override = tinted
+	for child in node.get_children():
+		_tint_node(child, color)
 
 
 static func _deck() -> Node3D:

@@ -52,6 +52,8 @@ const _WorldFx := preload("res://scripts/net/world_fx.gd")
 
 var peer_id := 0
 var net_driven := false
+var cpu_filled := false
+var vs_brain: VsCpu
 var _net_interp := NetInterp.new()
 var _predict := NetPredict.new()
 var score
@@ -189,6 +191,8 @@ func _ready() -> void:
 	_grapple_line = GrappleLine.new()
 	add_child(_grapple_line)
 	add_to_group("players")
+	if cpu_filled:
+		possess_vs_cpu()
 
 
 func _physics_process(delta: float) -> void:
@@ -208,7 +212,11 @@ func _physics_process(delta: float) -> void:
 		_tick_watched_combat(delta)
 		_walk_as_watched(delta)
 		return
-	if brain != null:
+	if vs_brain != null:
+		if input is CpuInput:
+			(input as CpuInput).begin_frame()
+		vs_brain.tick(delta)
+	elif brain != null:
 		brain.tick(delta)
 	if is_driving() and NetSession.is_active() and not multiplayer.is_server() and cart != null:
 		cart.report_drive.rpc_id(1, input.move_vector(), input.pressed("shoot"))
@@ -349,7 +357,12 @@ func celebrate() -> void:
 
 
 func is_cpu() -> bool:
-	return brain != null
+	return brain != null or vs_brain != null
+
+
+func seat_index() -> int:
+	var seat := NetSession.seat_for(peer_id)
+	return seat if seat >= 0 else 0
 
 
 func possess_cpu() -> void:
@@ -357,6 +370,14 @@ func possess_cpu() -> void:
 	input = CpuInput.new(input_prefix, false)
 	brain = CpuBuddy.new()
 	brain.setup(self)
+
+
+func possess_vs_cpu() -> void:
+	uses_mouse = false
+	cpu_filled = true
+	input = CpuInput.new(input_prefix, false)
+	vs_brain = VsCpu.new()
+	vs_brain.setup(self, input)
 
 
 func listen_to_both_devices() -> void:

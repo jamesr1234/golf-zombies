@@ -25,6 +25,30 @@ func after_each() -> void:
 	if _ghost != null:
 		_ghost.release_all()
 	GameSettings.mode = GameSettings.Mode.SOLO
+	NetSession.seats.clear()
+
+
+func test_coop_cpu_skips_golf_off_turn() -> void:
+	GameSettings.mode = GameSettings.Mode.ONLINE_COOP_VS
+	NetSession.seats = {1: 0, 2: 1}
+	_player.peer_id = 2
+	_player.cpu_filled = true
+	var flow := VsMatchFlow.new()
+	flow.phase = VsMatchFlow.Phase.PLAYING
+	var card := TeamScore.new()
+	card.team = 0
+	flow._team_scores[0] = card
+	_player.flow = flow
+	var golf := GolfController.new()
+	var ball := GolfBall.new()
+	add_child_autofree(golf)
+	add_child_autofree(ball)
+	golf.ball = ball
+	_player.golf = golf
+	_tick()
+	assert_false(_ghost.wants("interact"), "the CPU waits for its turn")
+	assert_false(_ghost.wants("swing"))
+	flow.free()
 
 
 func test_prep_near_the_tee_requests_interact() -> void:

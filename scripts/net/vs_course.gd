@@ -74,6 +74,10 @@ func player_pose(seat: int, count: int) -> Dictionary:
 
 
 static func tee_offset(seat: int, count: int) -> float:
+	if GameSettings.is_coop_vs():
+		var team := float(CoopVs.team_of(seat))
+		var mate := -0.55 if CoopVs.pair_index(seat) == 0 else 0.55
+		return (team - 3.5) * PLAYER_SPREAD + mate
 	return (float(seat) - float(maxi(1, count) - 1) * 0.5) * PLAYER_SPREAD
 
 
@@ -96,6 +100,8 @@ func _seat_balls(balls: Array[GolfBall], origin: Vector3) -> void:
 		if balls[i] == null:
 			continue
 		var seat := NetSession.seat_for(balls[i].owner_peer)
+		if GameSettings.is_coop_vs() and balls[i].team >= 0:
+			seat = CoopVs.tee_seat(balls[i].team)
 		if seat < 0:
 			seat = i
 		balls[i].place_at(hole.lift(origin + lateral * ball_offset(seat, n)))
@@ -103,6 +109,8 @@ func _seat_balls(balls: Array[GolfBall], origin: Vector3) -> void:
 
 
 static func ball_offset(seat: int, count: int) -> float:
+	if GameSettings.is_coop_vs():
+		return (float(CoopVs.team_of(seat)) - 3.5) * BALL_SPREAD
 	return (float(seat) - float(maxi(1, count) - 1) * 0.5) * BALL_SPREAD
 
 
@@ -289,7 +297,7 @@ func place_player_at_carts(player: Player, carts: Array[GolfCart]) -> void:
 
 
 func transit_player_pose(seat: int, carts: Array[GolfCart]) -> Dictionary:
-	var cart := cart_for_seat(seat, carts)
+	var cart := cart_for_seat(cart_index_for_seat(seat), carts)
 	if cart == null and not carts.is_empty():
 		cart = carts[0]
 	if cart == null:
@@ -300,11 +308,16 @@ func transit_player_pose(seat: int, carts: Array[GolfCart]) -> Dictionary:
 		right = Vector3.RIGHT
 	else:
 		right = right.normalized()
+	var side := -1.0 if GameSettings.is_coop_vs() and CoopVs.pair_index(seat) == 0 else 1.0
 	var origin := cart.global_position if cart.is_inside_tree() else cart.position
-	var at := origin + right * TRANSIT_STAND
+	var at := origin + right * TRANSIT_STAND * side
 	if hole != null:
 		at = hole.lift(at)
 	return {"at": at + Vector3.UP * 1.2, "yaw": rad_to_deg(cart.rotation.y)}
+
+
+static func cart_index_for_seat(seat: int) -> int:
+	return CoopVs.cart_slot(seat) if GameSettings.is_coop_vs() else seat
 
 
 func _discard_clubhouse() -> void:

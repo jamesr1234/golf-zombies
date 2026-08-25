@@ -11,13 +11,13 @@ const CART_END := 16.0
 const LOOK_AHEAD := 8.0
 
 var _player: Player
-var _ghost: InputGhost
+var _ghost
 var _shot_power := 0.5
 
 
-func setup(player: Player, ghost: InputGhost) -> void:
+func setup(player: Player, pad) -> void:
 	_player = player
-	_ghost = ghost
+	_ghost = pad
 
 
 func tick(_delta: float) -> void:
@@ -38,7 +38,18 @@ func tick(_delta: float) -> void:
 
 
 func _hole() -> void:
-	if _can("can_start_play"):
+	if _player.partner != null and _player.partner.health != null and _player.partner.health.is_downed():
+		_walk_toward(_player.partner.global_position)
+		if _player.partner_needs_revive():
+			_ghost.hold("revive")
+		return
+	if _can("can_retrieve_ball"):
+		_ghost.tap("interact")
+		return
+	if _phase() == VsMatchFlow.Phase.RETRIEVE:
+		_walk_to_ball()
+		return
+	if _can("can_start_play") and not _player.cpu_filled:
 		_ghost.tap("interact")
 		return
 	if _play_golf():
@@ -50,6 +61,8 @@ func _hole() -> void:
 
 
 func _play_golf() -> bool:
+	if GameSettings.is_coop_vs() and not _may_strike():
+		return false
 	var golf := _player.golf
 	if golf == null or golf.ball == null:
 		return false
@@ -66,11 +79,29 @@ func _play_golf() -> bool:
 		)
 		_ghost.tap("interact")
 		return true
-	if golf.is_available():
+	if golf.is_available() and _may_strike():
 		_walk_toward(ball.global_position)
 		_look_at(ball.global_position)
 		return true
 	return false
+
+
+func _may_strike() -> bool:
+	if _player.flow == null:
+		return true
+	if _player.flow.has_method("is_practice") and _player.flow.is_practice():
+		return true
+	if _player.flow.has_method("can_strike"):
+		return bool(_player.flow.can_strike(_player))
+	return true
+
+
+func _walk_to_ball() -> void:
+	var golf := _player.golf
+	if golf != null and golf.ball != null and not golf.ball.is_stowed():
+		_walk_toward(golf.ball.global_position)
+		return
+	_walk_toward(_tee())
 
 
 func _swing(golf: GolfController) -> void:
@@ -116,7 +147,7 @@ func _drive() -> void:
 
 
 func _shop() -> void:
-	if _can("can_open_exit"):
+	if _can("can_open_exit") and not _player.cpu_filled:
 		_ghost.tap("interact")
 		return
 	var house := _clubhouse()

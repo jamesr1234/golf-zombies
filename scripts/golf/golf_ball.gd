@@ -28,6 +28,8 @@ var bounds := Rect2(-500.0, -500.0, 1000.0, 1000.0)
 var last_safe_position := Vector3.ZERO
 ## 0 means anyone can play it (local co-op). Online VS sets the owning peer.
 var owner_peer := 0
+## Coop Multiplayer VS: team 0..7. -1 means FFA / local (use owner_peer).
+var team := -1
 @export var sync_xform := Transform3D.IDENTITY:
 	set(value):
 		sync_xform = value
@@ -84,9 +86,13 @@ func apply_color(color: Color) -> void:
 
 
 func is_owned_by(player: Node) -> bool:
-	if owner_peer == 0:
+	if owner_peer == 0 and team < 0:
 		return true
-	return player != null and int(player.get("peer_id")) == owner_peer
+	if player == null:
+		return false
+	if GameSettings.is_coop_vs() and team >= 0:
+		return CoopVs.team_of(NetSession.seat_for(int(player.get("peer_id")))) == team
+	return int(player.get("peer_id")) == owner_peer
 
 
 func place_at(position: Vector3) -> void:

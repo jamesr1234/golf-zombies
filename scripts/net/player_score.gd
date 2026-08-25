@@ -2,6 +2,7 @@ class_name PlayerScore
 extends GameState
 ## One player's stroke card and wallet. Hole index is advanced by the VS round,
 ## not by this object, so eight cards can finish the same hole independently.
+## In Coop Multiplayer VS the stroke card lives on TeamScore; this keeps money.
 
 var peer_id := 1
 var seat := 0
@@ -12,6 +13,7 @@ func _init(p_pars: PackedInt32Array = PackedInt32Array()) -> void:
 	if p_pars.is_empty():
 		p_pars = HoleGenerator.pars()
 	super._init(p_pars)
+	max_over = GameSettings.max_over_par()
 
 
 func color() -> Color:

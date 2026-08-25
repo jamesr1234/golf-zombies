@@ -57,6 +57,8 @@ func test_stick_or_wasd_cycles_the_highlighted_mode() -> void:
 	menu.move(1)
 	assert_eq(menu.mode_index, 2)
 	menu.move(1)
+	assert_eq(menu.mode_index, 3)
+	menu.move(1)
 	assert_eq(menu.mode_index, 0)
 
 
@@ -67,3 +69,15 @@ func test_online_opens_from_the_title() -> void:
 	menu.mode_index = 2
 	menu.apply_settings()
 	assert_true(GameSettings.is_online())
+	assert_false(GameSettings.is_coop_vs())
+
+
+func test_coop_multiplayer_vs_opens_from_the_title() -> void:
+	var menu: MainMenu = MENU.instantiate()
+	add_child_autofree(menu)
+	await wait_frames(1)
+	menu.mode_index = 3
+	menu.apply_settings()
+	assert_true(GameSettings.is_online())
+	assert_true(GameSettings.is_coop_vs())
+	assert_eq(GameSettings.online_max_players(), 16)

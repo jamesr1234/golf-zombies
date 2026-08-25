@@ -10,6 +10,7 @@ enum Phase { PREP, PLAYING, RETRIEVE, TRANSIT, SHOP }
 
 const HOLE_BANNER_TIME := 3.5
 const TEE_READY_RANGE := 4.0
+const RETRIEVE_RANGE := 3.2
 const _Music := preload("res://scripts/fx/music.gd")
 const _WorldFx := preload("res://scripts/net/world_fx.gd")
 
@@ -28,6 +29,7 @@ var _players: Array[Player] = []
 var _balls: Array[GolfBall] = []
 var _carts: Array[GolfCart] = []
 var _scores: Dictionary = {}
+var _team_scores: Dictionary = {}
 var _banner := 0
 var _clock_broadcast := 0.0
 
@@ -73,6 +75,8 @@ func bind_spawned() -> void:
 			_carts.append(node)
 			node.set_multiplayer_authority(1)
 			NetSync.attach_cart(node)
+			if GameSettings.is_coop_vs():
+				node.apply_tint(Palette.seat_color(VsCourse.cart_slot(node, _carts.size() - 1)))
 	_carts.sort_custom(func(a, b): return String(a.name) < String(b.name))
 	_wire_players()
 
@@ -92,6 +96,9 @@ func start_hole(index: int) -> void:
 		vs_spawner.plant_hole_mech(hole)
 	for card in _scores.values():
 		(card as PlayerScore).advance_to(index)
+	_ensure_team_cards()
+	for card in _team_scores.values():
+		(card as TeamScore).advance_to(index)
 	_sync_local_score()
 	## Scene-baked carts exist on every peer. Park them here so a joiner sees
 	## the same two-row lot instead of eight carts stacked at the origin.
@@ -160,6 +167,25 @@ func score_for(player: Player) -> PlayerScore:
 	return _scores.get(player.peer_id, score) as PlayerScore
 
 
+func team_score_for(player: Player) -> TeamScore:
+	if player == null:
+		return _local_team_card()
+	return _team_card(CoopVs.team_of(player.seat_index()))
+
+
+func can_strike(player: Player) -> bool:
+	if player == null or not GameSettings.is_coop_vs():
+		return true
+	var card := team_score_for(player)
+	if card == null or card.done_this_hole:
+		return false
+	return player.seat_index() == card.striker_seat()
+
+
+func is_striker(player: Player) -> bool:
+	return can_strike(player)
+
+
 func mark_peer_gone(peer_id: int) -> void:
 	var card := _scores.get(peer_id) as PlayerScore
 	if card != null and not card.done_this_hole:
@@ -167,6 +193,9 @@ func mark_peer_gone(peer_id: int) -> void:
 
 
 func settle_disconnected(peer_id: int) -> void:
+	if GameSettings.is_coop_vs():
+		_replace_with_cpu(peer_id)
+		return
 	mark_peer_gone(peer_id)
 	var player := _player_for(peer_id)
 	if player != null:
@@ -194,6 +223,51 @@ func settle_disconnected(peer_id: int) -> void:
 			_complete_hole()
 
 
+func _replace_with_cpu(peer_id: int) -> void:
+	if peer_id == 1:
+		return
+	var wallet := _scores.get(peer_id) as PlayerScore
+	var player := _player_for(peer_id)
+	var seat := wallet.seat if wallet != null else -1
+	if seat < 0 and player != null:
+		seat = player.seat_index()
+	if seat < 0:
+		return
+	var at := Vector3.ZERO
+	var yaw := 0.0
+	if player != null:
+		at = player.global_position
+		yaw = rad_to_deg(player.rotation.y)
+		_players.erase(player)
+		player.queue_free()
+	var players_root := get_node_or_null("../Players")
+	if players_root != null:
+		var leftover := players_root.get_node_or_null("P%d" % peer_id)
+		if leftover != null and leftover != player:
+			leftover.queue_free()
+	NetSession.seats.erase(peer_id)
+	var cpu: Player = null
+	if vs_spawner != null and multiplayer.is_server():
+		cpu = vs_spawner.spawn_cpu_for_seat(seat, self)
+	if cpu != null and at != Vector3.ZERO:
+		cpu.spawn_at(at, yaw)
+	var cpu_id := cpu.peer_id if cpu != null else CoopVs.next_cpu_peer_id(NetSession.seats)
+	if cpu == null:
+		NetSession.seats[cpu_id] = seat
+	if wallet != null:
+		wallet.peer_id = cpu_id
+		_scores[cpu_id] = wallet
+		_scores.erase(peer_id)
+	if NetSession.is_host() and NetSession.is_active():
+		NetSession._sync_seats.rpc(NetSession.seats, int(GameSettings.mode))
+	CoopVs.bind_partners(_players)
+	_wire_players()
+	_sync_local_score()
+	scorecard_changed.emit()
+	if multiplayer.is_server():
+		_broadcast_scores()
+
+
 func _on_peer_left(peer_id: int) -> void:
 	if not multiplayer.is_server():
 		return
@@ -204,6 +278,12 @@ func cart_for(who: Node3D) -> GolfCart:
 	var riding := _riding_cart(who)
 	if riding != null:
 		return riding
+	if GameSettings.is_coop_vs() and course != null:
+		var player := who as Player
+		if player != null:
+			var team_cart := course.cart_for_seat(CoopVs.cart_slot(player.seat_index()), _carts)
+			if team_cart != null:
+				return team_cart
 	var best: GolfCart
 	var best_d := 999.0
 	for cart in _carts:
@@ -216,12 +296,25 @@ func cart_for(who: Node3D) -> GolfCart:
 	return best
 
 
-func can_retrieve_ball(_who: Node3D) -> bool:
-	return false
+func can_retrieve_ball(who: Node3D) -> bool:
+	if not GameSettings.is_coop_vs() or phase != Phase.RETRIEVE or who == null:
+		return false
+	var player := who as Player
+	var owned := _ball_for(player.peer_id if player != null else 0)
+	if owned == null or owned.is_stowed():
+		return false
+	var offset := who.global_position - owned.global_position
+	offset.y = 0.0
+	return offset.length() <= RETRIEVE_RANGE
 
 
-func retrieve_ball(_who: Node3D) -> void:
-	pass
+func retrieve_ball(who: Node3D) -> void:
+	if not GameSettings.is_coop_vs():
+		return
+	if NetSession.is_active() and not multiplayer.is_server():
+		_request_retrieve.rpc_id(1)
+		return
+	_do_retrieve(who as Player)
 
 
 func can_open_doors(who: Node3D) -> bool:
@@ -332,6 +425,8 @@ func buy_shop_item(item_id: String, buyer: Player = null) -> bool:
 
 
 func scorecard_text() -> String:
+	if GameSettings.is_coop_vs():
+		return _coop_scorecard()
 	if score == null:
 		return ""
 	if phase == Phase.PREP:
@@ -348,7 +443,33 @@ func scorecard_text() -> String:
 	]
 
 
+func _coop_scorecard() -> String:
+	var card := _local_team_card()
+	if card == null:
+		return ""
+	if phase == Phase.PREP:
+		return "Hole %d   Par %d   Warm up" % [card.hole_index + 1, card.par()]
+	if phase == Phase.RETRIEVE:
+		return "Pick up your ball   then drive to hole %d" % [card.hole_index + 1]
+	if phase == Phase.SHOP:
+		return "Clubhouse   next hole %d   %s" % [
+			card.hole_index + 1,
+			GameState.format_money(score.money) if score != null else "",
+		]
+	if phase == Phase.TRANSIT:
+		return "Drive to hole %d" % [card.hole_index + 1]
+	return "Hole %d   Par %d   Strokes %d/%d   %s" % [
+		card.hole_index + 1, card.par(), card.strokes, card.max_strokes(),
+		GameState.format_relative(card.relative_to_par()),
+	]
+
+
 func scoreboard_text() -> String:
+	if GameSettings.is_coop_vs():
+		if phase == Phase.PLAYING or phase == Phase.PREP:
+			return ""
+		var local_seat := NetSession.seat_for(multiplayer.get_unique_id())
+		return CoopVs.scoreboard_text(_team_scores.values(), local_seat)
 	var bits: PackedStringArray = []
 	for player in _players:
 		var card := score_for(player)
@@ -404,17 +525,39 @@ func _wire_players() -> void:
 		player.cart = cart_for(player)
 		if player.golf != null:
 			player.golf.club_kit = player.score.club_kit()
-			if not player.golf.stroke_taken.is_connected(_on_stroke_taken.bind(player)):
-				player.golf.stroke_taken.connect(_on_stroke_taken.bind(player))
-		var owned := _ball_for(player.peer_id)
-		if owned != null:
-			if not owned.holed.is_connected(_on_holed.bind(player)):
-				owned.holed.connect(_on_holed.bind(player))
-			if not owned.came_to_rest.is_connected(_on_ball_rest.bind(player)):
-				owned.came_to_rest.connect(_on_ball_rest.bind(player))
-			if not owned.entered_hazard.is_connected(_on_hazard.bind(player)):
-				owned.entered_hazard.connect(_on_hazard.bind(player))
+		if GameSettings.is_coop_vs():
+			_team_card(CoopVs.team_of(player.seat_index()))
+		if not GameSettings.is_coop_vs():
+			_connect_player_golf(player)
+	if GameSettings.is_coop_vs():
+		CoopVs.bind_partners(_players)
+		_wire_team_golf()
 	_sync_local_score()
+
+
+func _connect_player_golf(player: Player) -> void:
+	if player.golf != null:
+		if not player.golf.stroke_taken.is_connected(_on_stroke_taken.bind(player)):
+			player.golf.stroke_taken.connect(_on_stroke_taken.bind(player))
+	var owned := _ball_for(player.peer_id)
+	if owned == null:
+		return
+	if not owned.holed.is_connected(_on_holed.bind(player)):
+		owned.holed.connect(_on_holed.bind(player))
+	if not owned.came_to_rest.is_connected(_on_ball_rest.bind(player)):
+		owned.came_to_rest.connect(_on_ball_rest.bind(player))
+	if not owned.entered_hazard.is_connected(_on_hazard.bind(player)):
+		owned.entered_hazard.connect(_on_hazard.bind(player))
+
+
+func _wire_team_golf() -> void:
+	var seen := {}
+	for player in _players:
+		var team := CoopVs.team_of(player.seat_index())
+		if seen.has(team):
+			continue
+		seen[team] = true
+		_connect_player_golf(player)
 
 
 func _sync_local_score() -> void:
@@ -442,10 +585,7 @@ func _session_for(peer_id: int) -> GolfController:
 
 
 func _ball_for(peer_id: int) -> GolfBall:
-	for owned in _balls:
-		if owned.owner_peer == peer_id:
-			return owned
-	return null
+	return CoopVs.ball_for_peer(_balls, peer_id, NetSession.seats)
 
 
 func _guns(buyer: Player) -> Array[Weapon]:
@@ -487,7 +627,9 @@ func _do_start_play() -> void:
 	_Music.play_level()
 	_flash_message(
 		"Hole %d   Par %d" % [hole.index + 1, hole.par],
-		"Lowest strokes wins. Melee delays. Guns are for zombies."
+		"Lowest team total wins. Alternate shot. Melee delays. Guns are for zombies."
+		if GameSettings.is_coop_vs()
+		else "Lowest strokes wins. Melee delays. Guns are for zombies."
 	)
 	_replicate_event.rpc("play")
 	_broadcast_scores()
@@ -495,6 +637,9 @@ func _do_start_play() -> void:
 
 func _on_stroke_taken(player: Player) -> void:
 	if is_practice() or player == null:
+		return
+	if GameSettings.is_coop_vs():
+		_on_team_stroke(player)
 		return
 	var card := score_for(player)
 	card.add_stroke()
@@ -508,8 +653,33 @@ func _on_stroke_taken(player: Player) -> void:
 		_pickup(player)
 
 
+func _on_team_stroke(player: Player) -> void:
+	var card := team_score_for(player)
+	if card == null or card.done_this_hole:
+		return
+	card.add_stroke()
+	if player.golf != null and player.score != null:
+		player.golf.club_kit = player.score.club_kit()
+	scorecard_changed.emit()
+	_broadcast_scores()
+	if card.strokes == 1:
+		_summon_cart_girl()
+	if card.at_stroke_limit() and not card.done_this_hole:
+		_finish_team(player, false)
+
+
 func _on_ball_rest(_position: Vector3, player: Player) -> void:
 	if finished or is_practice() or player == null:
+		return
+	if GameSettings.is_coop_vs():
+		var team_card := team_score_for(player)
+		if team_card == null:
+			return
+		if team_card.at_stroke_limit():
+			_finish_team(player, false)
+		elif not team_card.done_this_hole:
+			team_card.advance_turn()
+			_broadcast_scores()
 		return
 	var card := score_for(player)
 	if card.at_stroke_limit():
@@ -526,6 +696,20 @@ func _on_hazard(kind: String, player: Player) -> void:
 		return
 	if kind == "water":
 		return
+	if GameSettings.is_coop_vs():
+		var team_card := team_score_for(player)
+		if team_card == null or team_card.done_this_hole:
+			return
+		team_card.add_stroke()
+		scorecard_changed.emit()
+		_broadcast_scores()
+		if owned != null:
+			owned.place_at(owned.last_safe_position)
+		if team_card.at_stroke_limit():
+			_finish_team(player, false)
+		else:
+			team_card.advance_turn()
+		return
 	var card := score_for(player)
 	card.add_stroke()
 	scorecard_changed.emit()
@@ -538,6 +722,9 @@ func _on_hazard(kind: String, player: Player) -> void:
 
 func _on_holed(player: Player) -> void:
 	if finished or is_practice() or player == null:
+		return
+	if GameSettings.is_coop_vs():
+		_finish_team(player, true)
 		return
 	_finish_player(player, true)
 
@@ -570,7 +757,37 @@ func _finish_player(player: Player, from_cup: bool) -> void:
 		_broadcast_scores()
 
 
+func _finish_team(player: Player, from_cup: bool) -> void:
+	var card := team_score_for(player)
+	if card == null or card.done_this_hole:
+		return
+	if from_cup:
+		card.finish_hole()
+	else:
+		card.settle_pickup()
+	var owned := _ball_for(player.peer_id)
+	if owned != null:
+		owned.close_for_pickup()
+	_release_team_golf(card.team)
+	scorecard_changed.emit()
+	if _all_done():
+		_complete_hole()
+	else:
+		_broadcast_scores()
+
+
+func _release_team_golf(team: int) -> void:
+	for player in _players:
+		if CoopVs.team_of(player.seat_index()) != team:
+			continue
+		if player.golf != null:
+			player.golf.release()
+
+
 func _all_done() -> bool:
+	if GameSettings.is_coop_vs():
+		_ensure_team_cards()
+		return TeamScore.everyone_done(_team_scores.values())
 	if _players.is_empty():
 		return false
 	for player in _players:
@@ -580,6 +797,18 @@ func _all_done() -> bool:
 
 
 func _timeout_hole() -> void:
+	if GameSettings.is_coop_vs():
+		_ensure_team_cards()
+		for card in _team_scores.values():
+			var team_card := card as TeamScore
+			if team_card.done_this_hole:
+				continue
+			team_card.settle_pickup()
+			var owned := _team_ball(team_card.team)
+			if owned != null:
+				owned.close_for_pickup()
+		_complete_hole()
+		return
 	for player in _players:
 		if not score_for(player).done_this_hole:
 			_pickup(player)
@@ -587,6 +816,9 @@ func _timeout_hole() -> void:
 
 func _complete_hole() -> void:
 	if phase != Phase.PLAYING:
+		return
+	if GameSettings.is_coop_vs():
+		_enter_retrieve()
 		return
 	spawner_ai.stop()
 	spawner_ai.clear_zombies()
@@ -610,6 +842,98 @@ func _complete_hole() -> void:
 	_flash_message("Next tee", "Eight carts. Steal the wheel. Follow the arrows.")
 	_broadcast_scores()
 	_Music.play_level()
+
+
+func _enter_retrieve() -> void:
+	spawner_ai.stop()
+	spawner_ai.clear_zombies()
+	if _teams_course_complete():
+		_end_run()
+		return
+	for card in _team_scores.values():
+		var team_card := card as TeamScore
+		team_card.advance_to(team_card.hole_index + 1)
+	for card in _scores.values():
+		(card as PlayerScore).advance_to((card as PlayerScore).hole_index + 1)
+	_sync_local_score()
+	phase = Phase.RETRIEVE
+	_rally_to_carts()
+	_replicate_event.rpc("retrieve")
+	scorecard_changed.emit()
+	_flash_message("Pick up your ball", "Walk to your team's ball, then take a cart.")
+	_broadcast_scores()
+
+
+func _do_retrieve(player: Player) -> void:
+	if player == null or not can_retrieve_ball(player):
+		return
+	var owned := _ball_for(player.peer_id)
+	if owned == null or owned.is_stowed():
+		return
+	owned.stow()
+	Sfx.play("grab_ball", self)
+	if _all_team_balls_stowed():
+		_begin_coop_transit()
+
+
+func _all_team_balls_stowed() -> bool:
+	if _balls.is_empty():
+		return false
+	for owned in _balls:
+		if owned != null and not owned.is_stowed():
+			return false
+	return true
+
+
+func _begin_coop_transit() -> void:
+	if phase != Phase.RETRIEVE:
+		return
+	phase = Phase.TRANSIT
+	_rally_to_carts()
+	course.begin_transit(_carts, _players)
+	_replicate_event.rpc("transit")
+	var next_hole := _local_team_card().hole_index if _local_team_card() != null else 0
+	spawner_ai.begin_transit(next_hole, course.cart_path.spawn_points)
+	scorecard_changed.emit()
+	_flash_message("Next tee", "Eight carts. Steal the wheel. Follow the arrows.")
+	_broadcast_scores()
+	_Music.play_level()
+
+
+func _teams_course_complete() -> bool:
+	_ensure_team_cards()
+	for card in _team_scores.values():
+		if not (card as TeamScore).is_course_complete():
+			return false
+	return true
+
+
+func _team_card(team: int) -> TeamScore:
+	var card := _team_scores.get(team) as TeamScore
+	if card == null:
+		card = TeamScore.new(HoleGenerator.pars())
+		card.team = team
+		_team_scores[team] = card
+	return card
+
+
+func _ensure_team_cards() -> void:
+	for team in CoopVs.TEAM_COUNT:
+		_team_card(team)
+
+
+func _local_team_card() -> TeamScore:
+	var seat := NetSession.seat_for(multiplayer.get_unique_id())
+	if seat < 0:
+		seat = 0
+	return _team_card(CoopVs.team_of(seat))
+
+
+func _team_ball(team: int) -> GolfBall:
+	for owned in _balls:
+		if owned != null and (owned.team == team or String(owned.name) == CoopVs.ball_name(team)):
+			return owned
+	return null
 
 
 func _rally_to_carts() -> void:
@@ -665,6 +989,8 @@ func _end_run() -> void:
 
 
 func _winner_line() -> String:
+	if GameSettings.is_coop_vs():
+		return CoopVs.winner_line(_team_scores.values())
 	var best: PlayerScore
 	for card in _scores.values():
 		var current := card as PlayerScore
@@ -687,10 +1013,7 @@ func _on_zombie_killed(bounty: int, killer: Player = null) -> void:
 
 
 func _seat_name(seat: int) -> String:
-	var names: PackedStringArray = [
-		"Cyan", "Amber", "Magenta", "Lime", "Violet", "Pink", "Blue", "Ice",
-	]
-	return names[posmod(seat, names.size())]
+	return CoopVs.seat_name(seat)
 
 
 func _flash_message(title: String, body: String) -> void:
@@ -721,6 +1044,15 @@ func _request_leave() -> void:
 
 
 @rpc("any_peer", "reliable")
+func _request_retrieve() -> void:
+	if not multiplayer.is_server():
+		return
+	var player := _player_for(multiplayer.get_remote_sender_id())
+	if can_retrieve_ball(player):
+		_do_retrieve(player)
+
+
+@rpc("any_peer", "reliable")
 func _request_buy(item_id: String) -> void:
 	if not multiplayer.is_server():
 		return
@@ -737,6 +1069,8 @@ func _replicate_event(kind: String) -> void:
 			course.close_shop(_players)
 			course.aim_play(_sessions())
 			_Music.play_level()
+		"retrieve":
+			phase = Phase.RETRIEVE
 		"transit":
 			phase = Phase.TRANSIT
 			course.begin_transit(_carts, _players)
@@ -830,7 +1164,7 @@ func _apply_loadout(peer_id: int, gun_index: int, paths: PackedStringArray) -> v
 
 
 @rpc("authority", "call_remote", "reliable")
-func _apply_scores(payload: Dictionary, clock: float, phase_value: int) -> void:
+func _apply_scores(payload: Dictionary, clock: float, phase_value: int, teams: Dictionary = {}) -> void:
 	hole_time_left = clock
 	phase = phase_value as Phase
 	for peer_id in payload.keys():
@@ -844,12 +1178,23 @@ func _apply_scores(payload: Dictionary, clock: float, phase_value: int) -> void:
 		card.money = int(row.get("money", 0))
 		card.hole_index = int(row.get("hole_index", 0))
 		card.done_this_hole = bool(row.get("done", false))
+		card.seat = int(row.get("seat", card.seat))
 		card.club_id = String(row.get("club_id", ClubKit.STARTER_ID))
 		card.barrier_charges = int(row.get("barrier", card.barrier_charges))
 		card.mech_bought = bool(row.get("mech", card.mech_bought))
 		var packed: PackedInt32Array = row.get("results", PackedInt32Array())
 		if packed.size() == card.results.size():
 			card.results = packed
+	for team in teams.keys():
+		var card := _team_card(int(team))
+		var row: Dictionary = teams[team]
+		card.strokes = int(row.get("strokes", 0))
+		card.hole_index = int(row.get("hole_index", 0))
+		card.done_this_hole = bool(row.get("done", false))
+		card.striker_slot = int(row.get("striker", card.striker_slot))
+		var team_packed: PackedInt32Array = row.get("results", PackedInt32Array())
+		if team_packed.size() == card.results.size():
+			card.results = team_packed
 	_sync_local_score()
 	scorecard_changed.emit()
 
@@ -871,7 +1216,17 @@ func _broadcast_scores() -> void:
 			"barrier": card.barrier_charges,
 			"mech": card.mech_bought,
 		}
-	_apply_scores.rpc(payload, hole_time_left, int(phase))
+	var teams := {}
+	for team in _team_scores.keys():
+		var card: TeamScore = _team_scores[team]
+		teams[team] = {
+			"strokes": card.strokes,
+			"hole_index": card.hole_index,
+			"done": card.done_this_hole,
+			"results": card.results,
+			"striker": card.striker_slot,
+		}
+	_apply_scores.rpc(payload, hole_time_left, int(phase), teams)
 
 
 func _on_pawn_entered(node: Node) -> void:

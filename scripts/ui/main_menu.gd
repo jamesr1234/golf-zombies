@@ -5,11 +5,12 @@ extends Control
 const GAMEPLAY := "res://scenes/main.tscn"
 const LOBBY := "res://scenes/net/lobby.tscn"
 const _Music := preload("res://scripts/fx/music.gd")
-const MODE_COPY := ["1 Player", "2 Player", "Online"]
+const MODE_COPY := ["1 Player", "2 Player", "Online", "Coop Multiplayer VS"]
 const MODE_BLURB := [
 	"You and a CPU partner. One screen. Hold Circle / E for the CPU to take a shot.",
 	"Local co-op. Player 1 uses the controller. Player 2 uses the keyboard.",
 	"Eight players. Own ball. Melee only. Host or join by IP.",
+	"Eight teams of two. One ball per team, alternate shot. Empty seats fill with CPU. Lowest team total wins.",
 ]
 const DIFF_BLURB := [
 	"More time, fewer zombies, gunners wait until hole 3.",
@@ -60,8 +61,11 @@ func move(delta: int) -> void:
 func confirm() -> void:
 	Sfx.play("ui_confirm", self)
 	if step == Step.MODE:
-		if mode_index == 2:
-			GameSettings.mode = GameSettings.Mode.ONLINE_VS
+		if mode_index >= 2:
+			GameSettings.mode = (
+				GameSettings.Mode.ONLINE_VS if mode_index == 2
+				else GameSettings.Mode.ONLINE_COOP_VS
+			)
 			start_lobby()
 			return
 		step = Step.DIFFICULTY
@@ -83,8 +87,10 @@ func apply_settings() -> void:
 		GameSettings.mode = GameSettings.Mode.SOLO
 	elif mode_index == 1:
 		GameSettings.mode = GameSettings.Mode.COOP
-	else:
+	elif mode_index == 2:
 		GameSettings.mode = GameSettings.Mode.ONLINE_VS
+	else:
+		GameSettings.mode = GameSettings.Mode.ONLINE_COOP_VS
 	GameSettings.difficulty = difficulty_index as GameSettings.Kind
 
 
