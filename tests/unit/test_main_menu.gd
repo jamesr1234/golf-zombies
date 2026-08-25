@@ -81,3 +81,21 @@ func test_coop_multiplayer_vs_opens_from_the_title() -> void:
 	assert_true(GameSettings.is_online())
 	assert_true(GameSettings.is_coop_vs())
 	assert_eq(GameSettings.online_max_players(), 16)
+
+
+func test_title_shows_all_four_modes() -> void:
+	var menu: MainMenu = MENU.instantiate()
+	add_child_autofree(menu)
+	await wait_frames(2)
+	assert_eq(menu._buttons.size(), 4)
+	assert_eq(menu._buttons[0].text, "1 PLAYER")
+	assert_eq(menu._buttons[1].text, "2 PLAYER")
+	assert_eq(menu._buttons[2].text, "ONLINE VS")
+	assert_eq(menu._buttons[3].text, "COOP VS")
+	assert_eq(menu._heading.text, "SELECT MODE")
+	var last := menu._buttons[3]
+	assert_true(last.visible)
+	assert_gt(last.size.y, 16.0)
+	var last_bottom := last.global_position.y + last.size.y
+	var panel_bottom := menu._panel.global_position.y + menu._panel.size.y
+	assert_lte(last_bottom, panel_bottom + 1.0, "Coop VS must sit inside the panel")
