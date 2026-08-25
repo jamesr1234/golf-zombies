@@ -9,9 +9,26 @@ var _sent_aim_loft := INF
 
 
 func can_claim(player: Node) -> bool:
+	if not _coop_may_play(player):
+		return false
 	if ball != null and not ball.is_owned_by(player):
 		return false
 	return super.can_claim(player)
+
+
+func _coop_may_play(player: Node) -> bool:
+	if not GameSettings.is_coop_vs():
+		return true
+	if ball != null and not ball.is_owned_by(player):
+		return false
+	var pawn := player as Player
+	if pawn == null or pawn.flow == null:
+		return true
+	if pawn.flow.has_method("is_practice") and pawn.flow.is_practice():
+		return true
+	if pawn.flow.has_method("can_strike"):
+		return pawn.flow.can_strike(pawn)
+	return true
 
 
 func try_toggle(player: Node) -> void:
@@ -106,7 +123,11 @@ func _request_strike(yaw: float, deviation: float, power: float, loft := 0.0) ->
 	if not multiplayer.is_server():
 		return
 	var sender := multiplayer.get_remote_sender_id()
-	if ball == null or ball.owner_peer != sender:
+	var player := _player_for(sender)
+	if GameSettings.is_coop_vs():
+		if not _coop_may_play(player):
+			return
+	elif ball == null or ball.owner_peer != sender:
 		return
 	if golfer == null or _peer_of(golfer) != sender:
 		return

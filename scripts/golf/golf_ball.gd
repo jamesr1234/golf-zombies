@@ -86,9 +86,13 @@ func apply_color(color: Color) -> void:
 
 
 func is_owned_by(player: Node) -> bool:
-	if owner_peer == 0:
+	if owner_peer == 0 and team < 0:
 		return true
-	return player != null and int(player.get("peer_id")) == owner_peer
+	if player == null:
+		return false
+	if GameSettings.is_coop_vs() and team >= 0:
+		return CoopVs.team_of(NetSession.seat_for(int(player.get("peer_id")))) == team
+	return int(player.get("peer_id")) == owner_peer
 
 
 func place_at(position: Vector3) -> void:

@@ -148,6 +148,20 @@ func test_one_ball_offset_per_team() -> void:
 	assert_eq(VsCourse.cart_index_for_seat(2), 1)
 
 
+func test_cart_tint_uses_the_team_color() -> void:
+	var cart: GolfCart = preload("res://scenes/vehicles/golf_cart.tscn").instantiate()
+	add_child_autofree(cart)
+	var color := Palette.seat_color(3)
+	cart.apply_tint(color)
+	var found := false
+	for mesh in cart.find_children("*", "MeshInstance3D", true, false):
+		var mat := (mesh as MeshInstance3D).get_active_material(0) as StandardMaterial3D
+		if mat != null and mat.albedo_color.is_equal_approx(color):
+			found = true
+			break
+	assert_true(found, "the cart body should pick up the team colour")
+
+
 func test_both_teammates_resolve_the_same_team_ball() -> void:
 	GameSettings.mode = GameSettings.Mode.ONLINE_COOP_VS
 	NetSession.seats = {1: 0, -1: 1}
@@ -158,6 +172,59 @@ func test_both_teammates_resolve_the_same_team_ball() -> void:
 	add_child_autofree(ball)
 	assert_eq(CoopVs.ball_for_peer([ball], 1, NetSession.seats), ball)
 	assert_eq(CoopVs.ball_for_peer([ball], -1, NetSession.seats), ball)
+
+
+func test_a_team_ball_belongs_to_both_seats() -> void:
+	GameSettings.mode = GameSettings.Mode.ONLINE_COOP_VS
+	NetSession.seats = {4: 0, 5: 1, 6: 2}
+	var ball: GolfBall = preload("res://scenes/golf/ball.tscn").instantiate()
+	add_child_autofree(ball)
+	ball.team = 0
+	ball.owner_peer = 4
+	ball.place_at(Vector3.ZERO)
+	var owner := _pawn(4, Vector3(1.0, 0.0, 0.0))
+	var mate := _pawn(5, Vector3(1.0, 0.0, 0.0))
+	var other := _pawn(6, Vector3(1.0, 0.0, 0.0))
+	assert_true(ball.is_owned_by(owner))
+	assert_true(ball.is_owned_by(mate))
+	assert_false(ball.is_owned_by(other))
+
+
+func test_only_the_striker_can_claim_the_team_ball() -> void:
+	GameSettings.mode = GameSettings.Mode.ONLINE_COOP_VS
+	NetSession.seats = {4: 0, 5: 1}
+	var ball: GolfBall = preload("res://scenes/golf/ball.tscn").instantiate()
+	add_child_autofree(ball)
+	ball.team = 0
+	ball.owner_peer = 4
+	ball.place_at(Vector3.ZERO)
+	var flow := VsMatchFlow.new()
+	add_child_autofree(flow)
+	var card := TeamScore.new()
+	card.team = 0
+	flow._team_scores[0] = card
+	var owner := _pawn(4, Vector3(1.0, 0.0, 0.0))
+	var mate := _pawn(5, Vector3(1.0, 0.0, 0.0))
+	owner.flow = flow
+	mate.flow = flow
+	var golf := GolfSession.new()
+	ball.add_child(golf)
+	golf.setup(ball, Vector3(0.0, 0.0, -20.0))
+	assert_true(golf.can_claim(owner), "slot A tees first")
+	assert_false(golf.can_claim(mate), "slot B waits")
+	card.advance_turn()
+	assert_false(golf.can_claim(owner))
+	assert_true(golf.can_claim(mate))
+
+
+func test_ffa_still_autopickups_at_plus_two() -> void:
+	GameSettings.mode = GameSettings.Mode.ONLINE_VS
+	var card := PlayerScore.new(PackedInt32Array([4]))
+	assert_eq(card.max_over, 2)
+	card.add_stroke(6)
+	card.settle_pickup()
+	assert_eq(card.strokes, 6)
+	assert_eq(card.relative_to_par(), 2)
 
 
 func test_host_rejects_a_taken_seat() -> void:
