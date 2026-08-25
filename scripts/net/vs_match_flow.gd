@@ -561,7 +561,9 @@ func _wire_team_golf() -> void:
 
 
 func _sync_local_score() -> void:
-	var local_id := multiplayer.get_unique_id()
+	var local_id := 0
+	if multiplayer != null:
+		local_id = multiplayer.get_unique_id()
 	score = _scores.get(local_id) as PlayerScore
 	ball = _ball_for(local_id)
 	if course != null:
@@ -940,7 +942,10 @@ func _ensure_team_cards() -> void:
 
 
 func _local_team_card() -> TeamScore:
-	var seat := NetSession.seat_for(multiplayer.get_unique_id())
+	var local_id := 0
+	if multiplayer != null:
+		local_id = multiplayer.get_unique_id()
+	var seat := NetSession.seat_for(local_id)
 	if seat < 0:
 		seat = 0
 	return _team_card(CoopVs.team_of(seat))

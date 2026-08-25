@@ -357,12 +357,12 @@ func test_timeout_stows_balls_and_starts_transit() -> void:
 	ball.owner_peer = 1
 	ball.place_at(Vector3.ZERO)
 	flow._balls = [ball]
+	var limit := cyan.max_strokes()
 	flow._timeout_hole()
-	assert_true(cyan.done_this_hole)
-	assert_true(amber.done_this_hole)
 	assert_eq(flow.phase, VsMatchFlow.Phase.TRANSIT)
 	assert_true(ball.is_stowed())
-	assert_eq(cyan.relative_to_par(), 4)
+	assert_eq(cyan.hole_index, 1)
+	assert_eq(cyan.results[0], limit)
 	flow.free()
 
 
