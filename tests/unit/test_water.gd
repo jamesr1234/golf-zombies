@@ -356,12 +356,15 @@ func _give_ball(player: Player) -> GolfBall:
 
 
 func _hole_with_water() -> HoleData:
-	for index in 9:
-		var hole := HoleGenerator.generate(index, SEED)
-		if _water_patch(hole) != {}:
-			return hole
-	fail_test("the nine-hole template should include a water hazard")
-	return HoleGenerator.generate(0, SEED)
+	for extra in 24:
+		for index in 9:
+			var hole := HoleGenerator.generate(index, SEED + extra * 17)
+			if hole.is_setpiece():
+				continue
+			if _water_patch(hole) != {}:
+				return hole
+	fail_test("a later hole should still roll a swimming pond")
+	return HoleGenerator.generate(3, SEED)
 
 
 func _water_patch(hole: HoleData) -> Dictionary:

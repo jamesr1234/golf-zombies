@@ -1,6 +1,6 @@
 extends GutTest
-## The hole-1 cart jump is a real ramp: a solid wedge, a glowing lip, and a
-## launch that actually clears the pond in front of it.
+## A cart jump is a real ramp: a solid wedge, a glowing lip, and a launch
+## that actually clears the pond in front of it.
 
 
 func test_the_ramp_is_solid_ground_the_cart_can_drive() -> void:
@@ -48,7 +48,7 @@ func test_slow_speed_drops_short_of_a_swimming_pond() -> void:
 
 
 func test_the_builder_puts_the_ramp_on_the_hole() -> void:
-	var hole := HoleGenerator.generate(0, 20260816)
+	var hole := HoleGenerator.generate(2, 20260816)
 	var root := HoleBuilder.build(hole)
 	add_child_autofree(root)
 	var ramps := root.find_children("*", "JumpRamp", true, false)
@@ -56,7 +56,7 @@ func test_the_builder_puts_the_ramp_on_the_hole() -> void:
 
 
 func test_the_ground_rises_to_the_lip() -> void:
-	var hole := HoleGenerator.generate(0, 20260816)
+	var hole := HoleGenerator.generate(2, 20260816)
 	var jump: Dictionary = hole.jumps[0]
 	var origin: Vector3 = jump["position"]
 	var yaw: float = deg_to_rad(jump["yaw"])

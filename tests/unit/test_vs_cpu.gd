@@ -240,6 +240,14 @@ func test_cpu_drives_to_the_ball_after_the_shot() -> void:
 	assert_false(_ghost.wants("interact"), "keep driving until the ball is close")
 
 
+func test_cpu_treads_out_to_the_ball_before_diving() -> void:
+	_wet_ball(Vector3(0.0, -1.0, -12.0))
+	_enter_swim()
+	_tick()
+	assert_false(_ghost.wants("shoot"), "open water is a swim, not an instant dive")
+	assert_gt(_ghost.move.length(), 0.3)
+
+
 func test_treading_cpu_dives_for_a_sunk_ball() -> void:
 	var ball := _wet_ball(Vector3(0.0, -1.0, -4.0))
 	_enter_swim()
@@ -279,6 +287,16 @@ func test_cpu_surfaces_then_throws_the_ball_at_the_pin() -> void:
 	_tick()
 	assert_true(_ghost.wants("shoot"), "R2 on the surface is the toss")
 	assert_false(_ghost.wants("grab"), "do not climb out with it")
+
+
+func test_cpu_swims_the_ball_toward_the_pin_before_throwing() -> void:
+	var ball := _wet_ball(Vector3.ZERO)
+	ball.pick_up(_player)
+	_enter_swim()
+	_player.flow.hole = _PondHole.new()
+	_tick()
+	assert_false(_ghost.wants("shoot"), "do not toss back into the middle of the pond")
+	assert_lt(_ghost.move.y, -0.3, "swim the ball toward the pin first")
 
 
 func test_cpu_walks_into_the_pond_when_the_ball_is_sunk() -> void:
@@ -387,6 +405,11 @@ class _FakeFlow:
 
 	func can_strike(_who: Node3D) -> bool:
 		return true
+
+
+class _PondHole:
+	func water_depth_at(at: Vector3) -> float:
+		return 0.0 if at.z < -20.0 else 6.0
 
 
 class _CartFlow:

@@ -137,10 +137,19 @@ func _map_for(hole: HoleData) -> HoleMap:
 
 
 func _hole_with_water() -> HoleData:
-	for index in 9:
-		var hole := HoleGenerator.generate(index, SEED)
-		for patch in hole.patches:
-			if patch["type"] == Surface.Type.WATER:
+	for extra in 24:
+		for index in 9:
+			var hole := HoleGenerator.generate(index, SEED + extra * 17)
+			if hole.is_setpiece():
+				continue
+			var water := false
+			var sand := false
+			for patch in hole.patches:
+				if patch["type"] == Surface.Type.WATER:
+					water = true
+				elif patch["type"] == Surface.Type.BUNKER:
+					sand = true
+			if water and sand:
 				return hole
-	fail_test("the nine-hole template should include a water hazard")
-	return HoleGenerator.generate(0, SEED)
+	fail_test("a later hole should still roll sand and a pond")
+	return HoleGenerator.generate(3, SEED)
