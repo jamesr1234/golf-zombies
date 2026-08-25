@@ -256,6 +256,114 @@ func test_cpu_waits_when_it_is_not_their_turn() -> void:
 	flow.free()
 
 
+func test_ball_rest_hands_the_club_to_the_partner() -> void:
+	GameSettings.mode = GameSettings.Mode.ONLINE_COOP_VS
+	NetSession.seats = {4: 0, 5: 1}
+	var flow := VsMatchFlow.new()
+	flow.phase = VsMatchFlow.Phase.PLAYING
+	var card := TeamScore.new()
+	card.team = 0
+	flow._team_scores[0] = card
+	var owner := _pawn(4, Vector3.ZERO)
+	var mate := _pawn(5, Vector3.ZERO)
+	owner.flow = flow
+	mate.flow = flow
+	assert_true(flow.can_strike(owner), "slot A tees first")
+	flow._on_ball_rest(Vector3.ZERO, owner)
+	assert_eq(card.striker_slot, 1)
+	assert_false(flow.can_strike(owner))
+	assert_true(flow.can_strike(mate))
+	flow.free()
+
+
+func test_finishing_a_team_leaves_the_ball_to_retrieve() -> void:
+	GameSettings.mode = GameSettings.Mode.ONLINE_COOP_VS
+	NetSession.seats = {1: 0, -1: 1, -2: 2, -3: 3}
+	var flow := VsMatchFlow.new()
+	flow.phase = VsMatchFlow.Phase.PLAYING
+	var cyan := TeamScore.new()
+	cyan.team = 0
+	var amber := TeamScore.new()
+	amber.team = 1
+	flow._team_scores[0] = cyan
+	flow._team_scores[1] = amber
+	var ball: GolfBall = preload("res://scenes/golf/ball.tscn").instantiate()
+	add_child_autofree(ball)
+	ball.team = 0
+	ball.owner_peer = 1
+	ball.place_at(Vector3.ZERO)
+	flow._balls = [ball]
+	var owner := _pawn(1, Vector3(1.0, 0.0, 0.0))
+	owner.flow = flow
+	flow._finish_team(owner, true)
+	assert_true(cyan.done_this_hole)
+	assert_false(amber.done_this_hole)
+	assert_true(ball.is_closed())
+	assert_false(ball.is_stowed(), "no autopickup; walk up after the hole")
+	assert_eq(flow.phase, VsMatchFlow.Phase.PLAYING)
+	flow.free()
+
+
+func test_retrieve_is_a_walk_up_during_retrieve_phase() -> void:
+	GameSettings.mode = GameSettings.Mode.ONLINE_COOP_VS
+	NetSession.seats = {1: 0, -1: 1}
+	var flow := VsMatchFlow.new()
+	flow.phase = VsMatchFlow.Phase.PLAYING
+	var ball: GolfBall = preload("res://scenes/golf/ball.tscn").instantiate()
+	add_child_autofree(ball)
+	ball.team = 0
+	ball.owner_peer = 1
+	ball.place_at(Vector3.ZERO)
+	var leftover := GolfBall.new()
+	leftover.team = 1
+	add_child_autofree(leftover)
+	leftover.place_at(Vector3(20.0, 0.0, 0.0))
+	flow._balls = [ball, leftover]
+	var owner := _pawn(1, Vector3(1.0, 0.0, 0.0))
+	owner.flow = flow
+	assert_false(flow.can_retrieve_ball(owner), "not during play")
+	flow.phase = VsMatchFlow.Phase.RETRIEVE
+	assert_true(flow.can_retrieve_ball(owner))
+	flow._do_retrieve(owner)
+	assert_true(ball.is_stowed())
+	assert_false(leftover.is_stowed())
+	assert_eq(flow.phase, VsMatchFlow.Phase.RETRIEVE, "other teams still have a ball out")
+	flow.free()
+
+
+func test_the_ninth_carded_hole_completes_the_course() -> void:
+	var pars := PackedInt32Array()
+	pars.resize(9)
+	pars.fill(4)
+	var card := TeamScore.new(pars)
+	for i in 8:
+		card.add_stroke(4)
+		card.finish_hole()
+		assert_false(card.is_course_complete(), "hole %d is not the ninth" % (i + 1))
+		card.advance_to(i + 1)
+	card.add_stroke(4)
+	card.finish_hole()
+	assert_true(card.is_course_complete())
+	assert_true(CoopVs.winner_line([card]).begins_with("Team Cyan wins"))
+
+
+func test_all_eight_ninth_cards_end_the_round() -> void:
+	var pars := PackedInt32Array()
+	pars.resize(9)
+	pars.fill(4)
+	var flow := VsMatchFlow.new()
+	for team in CoopVs.TEAM_COUNT:
+		var card := TeamScore.new(pars)
+		card.team = team
+		card.hole_index = 8
+		card.add_stroke(5)
+		card.finish_hole()
+		flow._team_scores[team] = card
+	assert_true(flow._teams_course_complete())
+	assert_eq(CoopVs.winning_team(flow._team_scores.values()), 0)
+	flow.free()
+
+
 func test_host_rejects_a_taken_seat() -> void:
 	GameSettings.mode = GameSettings.Mode.ONLINE_COOP_VS
 	NetSession.seats = {1: 0, 12: 2}
