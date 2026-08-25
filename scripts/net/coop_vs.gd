@@ -70,6 +70,16 @@ static func next_cpu_peer_id(seats: Dictionary) -> int:
 	return cpu_peer_id(index)
 
 
+static func takeover_seat(seats: Dictionary, peer_id: int) -> int:
+	if not seats.has(peer_id) or int(peer_id) == 1:
+		return 0
+	var seat: int = seats[peer_id]
+	var cpu_id := next_cpu_peer_id(seats)
+	seats.erase(peer_id)
+	seats[cpu_id] = seat
+	return cpu_id
+
+
 static func seat_name(seat: int) -> String:
 	return SEAT_NAMES[posmod(team_of(seat), SEAT_NAMES.size())]
 

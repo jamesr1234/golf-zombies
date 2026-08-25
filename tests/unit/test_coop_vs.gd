@@ -227,6 +227,34 @@ func test_ffa_still_autopickups_at_plus_two() -> void:
 	assert_eq(card.relative_to_par(), 2)
 
 
+func test_disconnect_takeover_keeps_the_seat() -> void:
+	var seats := {1: 0, 12: 1, -1: 2}
+	assert_eq(CoopVs.takeover_seat(seats, 1), 0, "host leave does not migrate")
+	assert_eq(seats[1], 0)
+	var cpu_id := CoopVs.takeover_seat(seats, 12)
+	assert_true(CoopVs.is_cpu_peer(cpu_id))
+	assert_eq(seats[cpu_id], 1)
+	assert_false(seats.has(12))
+	assert_eq(seats[-1], 2)
+
+
+func test_cpu_waits_when_it_is_not_their_turn() -> void:
+	GameSettings.mode = GameSettings.Mode.ONLINE_COOP_VS
+	NetSession.seats = {1: 0, -1: 1}
+	var flow := VsMatchFlow.new()
+	add_child_autofree(flow)
+	flow.phase = VsMatchFlow.Phase.PLAYING
+	var card := TeamScore.new()
+	card.team = 0
+	flow._team_scores[0] = card
+	var cpu := _pawn(-1, Vector3.ZERO)
+	cpu.flow = flow
+	cpu.cpu_filled = true
+	assert_false(flow.can_strike(cpu))
+	card.advance_turn()
+	assert_true(flow.can_strike(cpu))
+
+
 func test_host_rejects_a_taken_seat() -> void:
 	GameSettings.mode = GameSettings.Mode.ONLINE_COOP_VS
 	NetSession.seats = {1: 0, 12: 2}
@@ -235,3 +263,11 @@ func test_host_rejects_a_taken_seat() -> void:
 	assert_true(NetSession._try_claim_seat(12, 5))
 	assert_eq(NetSession.seat_for(12), 5)
 	assert_true(NetSession._try_claim_seat(1, 0), "keeping your seat is fine")
+
+
+func _pawn(peer_id: int, at: Vector3) -> Player:
+	var player: Player = preload("res://scenes/players/player.tscn").instantiate()
+	player.peer_id = peer_id
+	add_child_autofree(player)
+	player.global_position = at
+	return player

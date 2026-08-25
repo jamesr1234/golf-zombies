@@ -193,6 +193,9 @@ func mark_peer_gone(peer_id: int) -> void:
 
 
 func settle_disconnected(peer_id: int) -> void:
+	if GameSettings.is_coop_vs():
+		_replace_with_cpu(peer_id)
+		return
 	mark_peer_gone(peer_id)
 	var player := _player_for(peer_id)
 	if player != null:
@@ -218,6 +221,51 @@ func settle_disconnected(peer_id: int) -> void:
 		_broadcast_scores()
 		if _all_done():
 			_complete_hole()
+
+
+func _replace_with_cpu(peer_id: int) -> void:
+	if peer_id == 1:
+		return
+	var wallet := _scores.get(peer_id) as PlayerScore
+	var player := _player_for(peer_id)
+	var seat := wallet.seat if wallet != null else -1
+	if seat < 0 and player != null:
+		seat = player.seat_index()
+	if seat < 0:
+		return
+	var at := Vector3.ZERO
+	var yaw := 0.0
+	if player != null:
+		at = player.global_position
+		yaw = rad_to_deg(player.rotation.y)
+		_players.erase(player)
+		player.queue_free()
+	var players_root := get_node_or_null("../Players")
+	if players_root != null:
+		var leftover := players_root.get_node_or_null("P%d" % peer_id)
+		if leftover != null and leftover != player:
+			leftover.queue_free()
+	NetSession.seats.erase(peer_id)
+	var cpu: Player = null
+	if vs_spawner != null and multiplayer.is_server():
+		cpu = vs_spawner.spawn_cpu_for_seat(seat, self)
+	if cpu != null and at != Vector3.ZERO:
+		cpu.spawn_at(at, yaw)
+	var cpu_id := cpu.peer_id if cpu != null else CoopVs.next_cpu_peer_id(NetSession.seats)
+	if cpu == null:
+		NetSession.seats[cpu_id] = seat
+	if wallet != null:
+		wallet.peer_id = cpu_id
+		_scores[cpu_id] = wallet
+		_scores.erase(peer_id)
+	if NetSession.is_host() and NetSession.is_active():
+		NetSession._sync_seats.rpc(NetSession.seats, int(GameSettings.mode))
+	CoopVs.bind_partners(_players)
+	_wire_players()
+	_sync_local_score()
+	scorecard_changed.emit()
+	if multiplayer.is_server():
+		_broadcast_scores()
 
 
 func _on_peer_left(peer_id: int) -> void:
