@@ -504,7 +504,7 @@ func owns_clock() -> bool:
 
 
 func _physics_process(delta: float) -> void:
-	if phase != Phase.TRANSIT or course.cart_path == null:
+	if course == null or phase != Phase.TRANSIT or course.cart_path == null:
 		return
 	for cart in _carts:
 		course.cart_path.tick_crash(cart, delta)
@@ -564,8 +564,9 @@ func _sync_local_score() -> void:
 	var local_id := multiplayer.get_unique_id()
 	score = _scores.get(local_id) as PlayerScore
 	ball = _ball_for(local_id)
-	hole = course.hole
-	shop = course.shop
+	if course != null:
+		hole = course.hole
+		shop = course.shop
 
 
 func _sessions() -> Array:
@@ -818,10 +819,9 @@ func _complete_hole() -> void:
 	if phase != Phase.PLAYING:
 		return
 	if GameSettings.is_coop_vs():
-		_enter_retrieve()
+		_complete_coop_hole()
 		return
-	spawner_ai.stop()
-	spawner_ai.clear_zombies()
+	_stop_spawners()
 	var last := true
 	for card in _scores.values():
 		if not (card as PlayerScore).is_course_complete():
@@ -835,18 +835,19 @@ func _complete_hole() -> void:
 	_sync_local_score()
 	phase = Phase.TRANSIT
 	_rally_to_carts()
-	course.begin_transit(_carts, _players)
-	_replicate_event.rpc("transit")
-	spawner_ai.begin_transit(score.hole_index, course.cart_path.spawn_points)
+	if course != null:
+		course.begin_transit(_carts, _players)
+	_replicate_if_in_tree("transit")
+	if spawner_ai != null and course != null and course.cart_path != null:
+		spawner_ai.begin_transit(score.hole_index, course.cart_path.spawn_points)
 	scorecard_changed.emit()
 	_flash_message("Next tee", "Eight carts. Steal the wheel. Follow the arrows.")
 	_broadcast_scores()
 	_Music.play_level()
 
 
-func _enter_retrieve() -> void:
-	spawner_ai.stop()
-	spawner_ai.clear_zombies()
+func _complete_coop_hole() -> void:
+	_stop_spawners()
 	if _teams_course_complete():
 		_end_run()
 		return
@@ -856,12 +857,14 @@ func _enter_retrieve() -> void:
 	for card in _scores.values():
 		(card as PlayerScore).advance_to((card as PlayerScore).hole_index + 1)
 	_sync_local_score()
-	phase = Phase.RETRIEVE
-	_rally_to_carts()
-	_replicate_event.rpc("retrieve")
-	scorecard_changed.emit()
-	_flash_message("Pick up your ball", "Walk to your team's ball, then take a cart.")
-	_broadcast_scores()
+	_begin_coop_transit()
+
+
+func _stop_spawners() -> void:
+	if spawner_ai == null:
+		return
+	spawner_ai.stop()
+	spawner_ai.clear_zombies()
 
 
 func _do_retrieve(player: Player) -> void:
@@ -885,19 +888,33 @@ func _all_team_balls_stowed() -> bool:
 	return true
 
 
+func _stow_remaining_balls() -> void:
+	for owned in _balls:
+		if owned != null and not owned.is_stowed():
+			owned.stow()
+
+
 func _begin_coop_transit() -> void:
-	if phase != Phase.RETRIEVE:
+	if phase != Phase.PLAYING and phase != Phase.RETRIEVE:
 		return
+	_stow_remaining_balls()
 	phase = Phase.TRANSIT
 	_rally_to_carts()
-	course.begin_transit(_carts, _players)
-	_replicate_event.rpc("transit")
-	var next_hole := _local_team_card().hole_index if _local_team_card() != null else 0
-	spawner_ai.begin_transit(next_hole, course.cart_path.spawn_points)
+	if course != null:
+		course.begin_transit(_carts, _players)
+	_replicate_if_in_tree("transit")
+	if spawner_ai != null and course != null and course.cart_path != null:
+		var next_hole := _local_team_card().hole_index if _local_team_card() != null else 0
+		spawner_ai.begin_transit(next_hole, course.cart_path.spawn_points)
 	scorecard_changed.emit()
 	_flash_message("Next tee", "Eight carts. Steal the wheel. Follow the arrows.")
 	_broadcast_scores()
 	_Music.play_level()
+
+
+func _replicate_if_in_tree(kind: String) -> void:
+	if is_inside_tree():
+		_replicate_event.rpc(kind)
 
 
 func _teams_course_complete() -> bool:
@@ -979,13 +996,14 @@ func _do_leave() -> void:
 
 func _end_run() -> void:
 	finished = true
-	spawner_ai.stop()
+	_stop_spawners()
 	var winner := _winner_line()
 	message_changed.emit("COURSE COMPLETE", winner, true)
 	run_ended.emit(true)
 	Sfx.play("run_win", self)
 	_Music.play_lounge()
-	_replicate_end.rpc(winner)
+	if is_inside_tree():
+		_replicate_end.rpc(winner)
 
 
 func _winner_line() -> String:
@@ -1020,6 +1038,8 @@ func _flash_message(title: String, body: String) -> void:
 	_banner += 1
 	var shown := _banner
 	message_changed.emit(title, body, true)
+	if not is_inside_tree():
+		return
 	await get_tree().create_timer(HOLE_BANNER_TIME).timeout
 	if not finished and shown == _banner:
 		message_changed.emit("", "", false)
@@ -1200,7 +1220,7 @@ func _apply_scores(payload: Dictionary, clock: float, phase_value: int, teams: D
 
 
 func _broadcast_scores() -> void:
-	if multiplayer == null or not multiplayer.is_server():
+	if not is_inside_tree() or multiplayer == null or not multiplayer.is_server():
 		return
 	var payload := {}
 	for peer_id in _scores.keys():

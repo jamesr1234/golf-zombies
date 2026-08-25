@@ -278,22 +278,55 @@ func _transit_lot() -> Dictionary:
 
 
 func place_players_at_carts(players: Array[Player], carts: Array[GolfCart]) -> void:
+	var roster: Array[Player] = []
 	for player in players:
 		if player == null:
 			continue
 		if NetSession.is_active() and not player.is_multiplayer_authority():
 			continue
+		roster.append(player)
+	roster.sort_custom(func(a: Player, b: Player) -> bool:
+		var a_seat := _transit_seat(a)
+		var b_seat := _transit_seat(b)
+		if CoopVs.team_of(a_seat) != CoopVs.team_of(b_seat):
+			return CoopVs.team_of(a_seat) < CoopVs.team_of(b_seat)
+		return CoopVs.pair_index(a_seat) < CoopVs.pair_index(b_seat)
+	)
+	for player in roster:
 		place_player_at_carts(player, carts)
 
 
 func place_player_at_carts(player: Player, carts: Array[GolfCart]) -> void:
 	if player == null:
 		return
-	var seat := NetSession.seat_for(player.peer_id)
-	if seat < 0:
-		seat = 0
+	var seat := _transit_seat(player)
+	if _try_board_for_transit(player, carts, seat):
+		return
 	var pose := transit_player_pose(seat, carts)
 	player.spawn_at(pose["at"], pose["yaw"])
+
+
+func _transit_seat(player: Player) -> int:
+	var seat := NetSession.seat_for(player.peer_id)
+	return seat if seat >= 0 else 0
+
+
+func _try_board_for_transit(player: Player, carts: Array[GolfCart], seat: int) -> bool:
+	var cart := cart_for_seat(cart_index_for_seat(seat), carts)
+	if cart == null and not carts.is_empty():
+		cart = carts[0]
+	if cart == null:
+		return false
+	if not player.is_inside_tree() or not cart.is_inside_tree():
+		return false
+	if cart.seats.size() < 2:
+		return false
+	var origin := cart.global_position + Vector3.UP * 1.2
+	player.spawn_at(origin, rad_to_deg(cart.rotation.y))
+	if not cart.can_board(player):
+		return false
+	cart.board(player)
+	return true
 
 
 func transit_player_pose(seat: int, carts: Array[GolfCart]) -> Dictionary:
