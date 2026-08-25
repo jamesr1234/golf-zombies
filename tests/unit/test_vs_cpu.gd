@@ -34,7 +34,6 @@ func test_coop_cpu_skips_golf_off_turn() -> void:
 	_player.peer_id = 2
 	_player.cpu_filled = true
 	var flow := VsMatchFlow.new()
-	add_child_autofree(flow)
 	flow.phase = VsMatchFlow.Phase.PLAYING
 	var card := TeamScore.new()
 	card.team = 0
@@ -49,6 +48,7 @@ func test_coop_cpu_skips_golf_off_turn() -> void:
 	_tick()
 	assert_false(_ghost.wants("interact"), "the CPU waits for its turn")
 	assert_false(_ghost.wants("swing"))
+	flow.free()
 
 
 func test_prep_near_the_tee_requests_interact() -> void:

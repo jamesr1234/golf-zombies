@@ -199,7 +199,7 @@ func test_only_the_striker_can_claim_the_team_ball() -> void:
 	ball.owner_peer = 4
 	ball.place_at(Vector3.ZERO)
 	var flow := VsMatchFlow.new()
-	add_child_autofree(flow)
+	flow.phase = VsMatchFlow.Phase.PLAYING
 	var card := TeamScore.new()
 	card.team = 0
 	flow._team_scores[0] = card
@@ -215,6 +215,7 @@ func test_only_the_striker_can_claim_the_team_ball() -> void:
 	card.advance_turn()
 	assert_false(golf.can_claim(owner))
 	assert_true(golf.can_claim(mate))
+	flow.free()
 
 
 func test_ffa_still_autopickups_at_plus_two() -> void:
@@ -242,7 +243,6 @@ func test_cpu_waits_when_it_is_not_their_turn() -> void:
 	GameSettings.mode = GameSettings.Mode.ONLINE_COOP_VS
 	NetSession.seats = {1: 0, -1: 1}
 	var flow := VsMatchFlow.new()
-	add_child_autofree(flow)
 	flow.phase = VsMatchFlow.Phase.PLAYING
 	var card := TeamScore.new()
 	card.team = 0
@@ -253,6 +253,7 @@ func test_cpu_waits_when_it_is_not_their_turn() -> void:
 	assert_false(flow.can_strike(cpu))
 	card.advance_turn()
 	assert_true(flow.can_strike(cpu))
+	flow.free()
 
 
 func test_host_rejects_a_taken_seat() -> void:
