@@ -29,6 +29,8 @@ const PAY_DOUBLE_BOGEY := -40
 var pars: PackedInt32Array
 ## Strokes actually taken per hole, -1 until the hole is holed out.
 var results: PackedInt32Array
+## Per-card stroke cap above par. Online coop vs raises this to +4.
+var max_over := MAX_OVER_PAR
 var hole_index := 0
 var strokes := 0
 var money := 0
@@ -55,7 +57,7 @@ func par() -> int:
 
 
 func max_strokes() -> int:
-	return par() + MAX_OVER_PAR
+	return par() + max_over
 
 
 func strokes_remaining() -> int:

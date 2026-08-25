@@ -204,6 +204,12 @@ func cart_for(who: Node3D) -> GolfCart:
 	var riding := _riding_cart(who)
 	if riding != null:
 		return riding
+	if GameSettings.is_coop_vs() and course != null:
+		var player := who as Player
+		if player != null:
+			var team_cart := course.cart_for_seat(CoopVs.cart_slot(player.seat_index()), _carts)
+			if team_cart != null:
+				return team_cart
 	var best: GolfCart
 	var best_d := 999.0
 	for cart in _carts:
@@ -349,6 +355,9 @@ func scorecard_text() -> String:
 
 
 func scoreboard_text() -> String:
+	if GameSettings.is_coop_vs():
+		var local_seat := NetSession.seat_for(multiplayer.get_unique_id())
+		return CoopVs.scoreboard_text(_scores.values(), local_seat)
 	var bits: PackedStringArray = []
 	for player in _players:
 		var card := score_for(player)
@@ -414,6 +423,8 @@ func _wire_players() -> void:
 				owned.came_to_rest.connect(_on_ball_rest.bind(player))
 			if not owned.entered_hazard.is_connected(_on_hazard.bind(player)):
 				owned.entered_hazard.connect(_on_hazard.bind(player))
+	if GameSettings.is_coop_vs():
+		CoopVs.bind_partners(_players)
 	_sync_local_score()
 
 
@@ -487,7 +498,9 @@ func _do_start_play() -> void:
 	_Music.play_level()
 	_flash_message(
 		"Hole %d   Par %d" % [hole.index + 1, hole.par],
-		"Lowest strokes wins. Melee delays. Guns are for zombies."
+		"Lowest combined team strokes wins. Melee delays. Guns are for zombies."
+		if GameSettings.is_coop_vs()
+		else "Lowest strokes wins. Melee delays. Guns are for zombies."
 	)
 	_replicate_event.rpc("play")
 	_broadcast_scores()
@@ -665,6 +678,8 @@ func _end_run() -> void:
 
 
 func _winner_line() -> String:
+	if GameSettings.is_coop_vs():
+		return CoopVs.winner_line(_scores.values())
 	var best: PlayerScore
 	for card in _scores.values():
 		var current := card as PlayerScore
@@ -687,10 +702,7 @@ func _on_zombie_killed(bounty: int, killer: Player = null) -> void:
 
 
 func _seat_name(seat: int) -> String:
-	var names: PackedStringArray = [
-		"Cyan", "Amber", "Magenta", "Lime", "Violet", "Pink", "Blue", "Ice",
-	]
-	return names[posmod(seat, names.size())]
+	return CoopVs.seat_name(seat)
 
 
 func _flash_message(title: String, body: String) -> void:
@@ -844,6 +856,7 @@ func _apply_scores(payload: Dictionary, clock: float, phase_value: int) -> void:
 		card.money = int(row.get("money", 0))
 		card.hole_index = int(row.get("hole_index", 0))
 		card.done_this_hole = bool(row.get("done", false))
+		card.seat = int(row.get("seat", card.seat))
 		card.club_id = String(row.get("club_id", ClubKit.STARTER_ID))
 		card.barrier_charges = int(row.get("barrier", card.barrier_charges))
 		card.mech_bought = bool(row.get("mech", card.mech_bought))

@@ -33,7 +33,7 @@ static func register_for_mode(mode: int) -> void:
 		_register_keyboard("p2")
 		_ensure_keyboard_overrides("p2")
 		_register_gamepad_for("p1", -1)
-	elif mode == GameSettings.Mode.ONLINE_VS:
+	elif mode == GameSettings.Mode.ONLINE_VS or mode == GameSettings.Mode.ONLINE_COOP_VS:
 		_register_keyboard("p1")
 		_ensure_keyboard_overrides("p1")
 		_register_gamepad_for("p1", -1)

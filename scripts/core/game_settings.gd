@@ -3,7 +3,7 @@ extends Object
 ## Session picks from the title menu, plus the four difficulty tables.
 ## Static so the last mode and difficulty survive a scene reload.
 
-enum Mode { SOLO, COOP, ONLINE_VS }
+enum Mode { SOLO, COOP, ONLINE_VS, ONLINE_COOP_VS }
 enum Kind { EASY, MEDIUM, HARD, IMPOSSIBLE }
 
 const LABELS: PackedStringArray = ["Easy", "Medium", "Hard", "Impossible"]
@@ -17,7 +17,19 @@ static func is_solo() -> bool:
 
 
 static func is_online() -> bool:
-	return mode == Mode.ONLINE_VS
+	return mode == Mode.ONLINE_VS or mode == Mode.ONLINE_COOP_VS
+
+
+static func is_coop_vs() -> bool:
+	return mode == Mode.ONLINE_COOP_VS
+
+
+static func online_max_players() -> int:
+	return CoopVs.FIELD_SIZE if is_coop_vs() else 8
+
+
+static func max_over_par() -> int:
+	return CoopVs.MAX_OVER_PAR if is_coop_vs() else GameState.MAX_OVER_PAR
 
 
 static func hole_seconds() -> float:
