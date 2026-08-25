@@ -138,3 +138,33 @@ func test_coop_vs_mode_raises_the_stroke_cap() -> void:
 	assert_true(GameSettings.is_coop_vs())
 	assert_eq(GameSettings.online_max_players(), 16)
 	assert_eq(GameSettings.max_over_par(), 4)
+
+
+func test_one_ball_offset_per_team() -> void:
+	GameSettings.mode = GameSettings.Mode.ONLINE_COOP_VS
+	assert_almost_eq(VsCourse.ball_offset(0, 16), VsCourse.ball_offset(1, 16), 0.001)
+	assert_gt(absf(VsCourse.ball_offset(0, 16) - VsCourse.ball_offset(2, 16)), 1.0)
+	assert_eq(VsCourse.cart_index_for_seat(0), VsCourse.cart_index_for_seat(1))
+	assert_eq(VsCourse.cart_index_for_seat(2), 1)
+
+
+func test_both_teammates_resolve_the_same_team_ball() -> void:
+	GameSettings.mode = GameSettings.Mode.ONLINE_COOP_VS
+	NetSession.seats = {1: 0, -1: 1}
+	var ball := GolfBall.new()
+	ball.name = "TeamBall0"
+	ball.team = 0
+	ball.owner_peer = 1
+	add_child_autofree(ball)
+	assert_eq(CoopVs.ball_for_peer([ball], 1, NetSession.seats), ball)
+	assert_eq(CoopVs.ball_for_peer([ball], -1, NetSession.seats), ball)
+
+
+func test_host_rejects_a_taken_seat() -> void:
+	GameSettings.mode = GameSettings.Mode.ONLINE_COOP_VS
+	NetSession.seats = {1: 0, 12: 2}
+	assert_false(NetSession._try_claim_seat(12, 0))
+	assert_eq(NetSession.seat_for(12), 2)
+	assert_true(NetSession._try_claim_seat(12, 5))
+	assert_eq(NetSession.seat_for(12), 5)
+	assert_true(NetSession._try_claim_seat(1, 0), "keeping your seat is fine")

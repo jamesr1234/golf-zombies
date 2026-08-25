@@ -125,6 +125,10 @@ func _ready() -> void:
 	_wheel.rotation.x = -atan2(to_seat.y, to_seat.z)
 
 
+func apply_tint(color: Color) -> void:
+	CartVisuals.apply_tint(self, color)
+
+
 func place_at(position: Vector3, facing_yaw: float) -> void:
 	eject_all()
 	recover_at(position, facing_yaw)

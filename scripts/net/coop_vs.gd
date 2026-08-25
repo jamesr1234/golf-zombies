@@ -169,6 +169,23 @@ static func bind_partners(players: Array) -> void:
 		pawn.partner = partner_in(pawn, players)
 
 
+static func ball_for_peer(balls: Array, peer_id: int, seats: Dictionary) -> GolfBall:
+	if GameSettings.is_coop_vs():
+		var team := team_of(int(seats.get(peer_id, -1)))
+		for node in balls:
+			var owned := node as GolfBall
+			if owned == null:
+				continue
+			if owned.team == team or String(owned.name) == ball_name(team):
+				return owned
+		return null
+	for node in balls:
+		var owned := node as GolfBall
+		if owned != null and owned.owner_peer == peer_id:
+			return owned
+	return null
+
+
 static func partner_in(player: Player, players: Array) -> Player:
 	if player == null:
 		return null

@@ -42,18 +42,58 @@ func spawn_match(flow: VsMatchFlow) -> void:
 	if mech_spawner != null and mechs_root != null:
 		mech_spawner.spawn_path = mech_spawner.get_path_to(mechs_root)
 	var count := maxi(1, NetSession.player_count())
+	var spawned_teams := {}
 	for peer_id in NetSession.peer_ids():
 		var seat := NetSession.seat_for(peer_id)
-		var payload := {"peer_id": peer_id, "seat": seat}
+		var payload := {
+			"peer_id": peer_id,
+			"seat": seat,
+			"cpu": NetSession.is_cpu_peer(peer_id),
+		}
 		if flow != null and flow.course != null and flow.course.hole != null:
 			payload.merge(flow.course.player_pose(seat, count))
 		player_spawner.spawn(payload)
-		ball_spawner.spawn({"peer_id": peer_id, "seat": seat})
+		if GameSettings.is_coop_vs():
+			var team := CoopVs.team_of(seat)
+			if not spawned_teams.has(team):
+				ball_spawner.spawn({
+					"peer_id": peer_id,
+					"seat": CoopVs.tee_seat(team),
+					"team": team,
+					"cpu": payload["cpu"],
+				})
+				spawned_teams[team] = true
+		else:
+			ball_spawner.spawn({"peer_id": peer_id, "seat": seat, "cpu": payload["cpu"]})
 	for cart in carts_root.get_children():
 		if cart is GolfCart:
 			cart.set_multiplayer_authority(1)
 			NetSync.attach_cart(cart)
+			_tint_cart(cart)
 	flow.bind_spawned()
+
+
+func spawn_cpu_for_seat(seat: int, flow: VsMatchFlow) -> Player:
+	if not multiplayer.is_server():
+		return null
+	var peer_id := CoopVs.next_cpu_peer_id(NetSession.seats)
+	NetSession.seats[peer_id] = seat
+	var count := maxi(1, NetSession.player_count())
+	var payload := {
+		"peer_id": peer_id,
+		"seat": seat,
+		"cpu": true,
+	}
+	if flow != null and flow.course != null and flow.course.hole != null:
+		payload.merge(flow.course.player_pose(seat, count))
+	return player_spawner.spawn(payload) as Player
+
+
+func _tint_cart(cart: GolfCart) -> void:
+	if cart == null or not GameSettings.is_coop_vs():
+		return
+	var slot := VsCourse.cart_slot(cart, 0)
+	cart.apply_tint(Palette.seat_color(slot))
 
 
 func spawn_zombie_at(at: Vector3, stats: ZombieStats) -> Zombie:
@@ -70,18 +110,21 @@ func _spawn_player(data: Variant) -> Node:
 	var player: Player = PLAYER_SCENE.instantiate()
 	var peer_id := int(info.get("peer_id", 1))
 	var seat := int(info.get("seat", 0))
+	var cpu := bool(info.get("cpu", false)) or NetSession.is_cpu_peer(peer_id)
 	player.name = "P%d" % peer_id
 	player.peer_id = peer_id
 	player.net_driven = true
+	player.cpu_filled = cpu
 	player.input_prefix = "p1"
-	player.uses_mouse = true
-	player.body_color = Palette.seat_color(seat)
-	player.set_multiplayer_authority(peer_id)
+	player.uses_mouse = not cpu
+	player.body_color = Palette.seat_color(CoopVs.team_of(seat) if GameSettings.is_coop_vs() else seat)
+	var authority := 1 if cpu else peer_id
+	player.set_multiplayer_authority(authority)
 	var health := player.get_node_or_null("Health") as Health
 	if health != null:
 		health.set_multiplayer_authority(1)
 		NetSync.attach_health(health)
-	NetSync.attach_pawn(player, peer_id)
+	NetSync.attach_pawn(player, authority)
 	if info.has("at"):
 		player.spawn_at(info["at"] as Vector3, float(info.get("yaw", 0.0)))
 	return player
@@ -92,9 +135,15 @@ func _spawn_ball(data: Variant) -> Node:
 	var ball: GolfBall = BALL_SCENE.instantiate()
 	var peer_id := int(info.get("peer_id", 1))
 	var seat := int(info.get("seat", 0))
-	ball.name = "Ball%d" % peer_id
+	var team := int(info.get("team", -1))
+	if GameSettings.is_coop_vs() and team >= 0:
+		ball.name = CoopVs.ball_name(team)
+		ball.team = team
+	else:
+		ball.name = "Ball%d" % peer_id
 	ball.owner_peer = peer_id
-	ball.apply_color(Palette.seat_color(seat))
+	var tint_seat := team if team >= 0 else (CoopVs.team_of(seat) if GameSettings.is_coop_vs() else seat)
+	ball.apply_color(Palette.seat_color(tint_seat))
 	ball.set_multiplayer_authority(1)
 	var session := GolfSession.new()
 	session.name = "Golf"

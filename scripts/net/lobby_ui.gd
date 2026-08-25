@@ -1,6 +1,7 @@
 class_name LobbyUi
 extends Control
-## Host or join an 8-player listen-server, then wait for the host to start.
+## Host or join an online listen-server, then wait for the host to start.
+## Coop Multiplayer VS adds an 8×2 team-seat picker.
 
 const _Music := preload("res://scripts/fx/music.gd")
 
@@ -20,8 +21,16 @@ var _test_btn: Button
 var _diff: OptionButton
 var _probe: LanProbe
 var _busy := false
+var _title: Label
+var _seat_box: VBoxContainer
+var _seat_buttons: Array[Button] = []
 ## Holds a failure message so the next _refresh() does not overwrite it.
 var _notice := ""
+
+
+func _keep_online_mode() -> void:
+	if not GameSettings.is_online():
+		GameSettings.mode = GameSettings.Mode.ONLINE_VS
 
 
 func _ready() -> void:
@@ -56,7 +65,7 @@ func _host() -> void:
 	if _busy:
 		return
 	_busy = true
-	GameSettings.mode = GameSettings.Mode.ONLINE_VS
+	_keep_online_mode()
 	GameSettings.difficulty = _diff.selected as GameSettings.Kind
 	var err := NetSession.host(_port_value())
 	_busy = false
@@ -69,7 +78,7 @@ func _join() -> void:
 	if _busy:
 		return
 	_busy = true
-	GameSettings.mode = GameSettings.Mode.ONLINE_VS
+	_keep_online_mode()
 	var err := NetSession.join(_ip.text.strip_edges(), _port_value())
 	_busy = false
 	_settle(err, "Could not join.")
@@ -79,7 +88,7 @@ func _host_steam() -> void:
 	if _busy:
 		return
 	_busy = true
-	GameSettings.mode = GameSettings.Mode.ONLINE_VS
+	_keep_online_mode()
 	GameSettings.difficulty = _diff.selected as GameSettings.Kind
 	_status.text = HudStyle.chrome("Opening a Steam lobby...")
 	_refresh()
@@ -108,7 +117,7 @@ func _consume_invite() -> void:
 	if lobby_id == 0:
 		return
 	_busy = true
-	GameSettings.mode = GameSettings.Mode.ONLINE_VS
+	_keep_online_mode()
 	_status.text = HudStyle.chrome("Joining your friend's lobby...")
 	_refresh()
 	var err: Error = await NetSession.join_steam(lobby_id)
@@ -126,7 +135,7 @@ func _join_steam() -> void:
 		_refresh()
 		return
 	_busy = true
-	GameSettings.mode = GameSettings.Mode.ONLINE_VS
+	_keep_online_mode()
 	_status.text = HudStyle.chrome("Joining Steam lobby %d..." % lobby_id)
 	_refresh()
 	var err: Error = await NetSession.join_steam(lobby_id)
@@ -208,8 +217,15 @@ func _refresh() -> void:
 	_start_btn.visible = hosting
 	_start_btn.disabled = not hosting
 	_list.text = HudStyle.chrome(_roster()) if active else ""
+	_refresh_seats(active)
+	if _title != null:
+		_title.text = HudStyle.chrome(_title_copy())
 	if not _busy:
 		_status.text = HudStyle.chrome(_notice if _notice != "" else _status_copy(active))
+
+
+func _title_copy() -> String:
+	return "Coop Multiplayer VS" if GameSettings.is_coop_vs() else "Online VS"
 
 
 func _status_copy(active: bool) -> String:
@@ -225,9 +241,11 @@ func _status_copy(active: bool) -> String:
 		return "Connected. Waiting for the host to start."
 	var seated := NetSession.player_count()
 	var wired := NetSession.wire_count()
-	var count := "%d / %d" % [seated, NetSession.MAX_PLAYERS]
+	var count := "%d / %d" % [seated, NetSession.max_players()]
 	if wired != seated:
 		count += "   wire %d" % wired
+	if GameSettings.is_coop_vs():
+		count += "   %d CPU on start" % CoopVs.cpu_fill_count(seated)
 	if NetSession.is_steam():
 		return "Hosting on Steam.  Lobby %d.  %s" % [SteamLobby.lobby_id, count]
 	var ips := "  ".join(NetSession.lan_addresses())
@@ -243,7 +261,14 @@ func _roster() -> String:
 		var tag := "you" if peer_id == multiplayer.get_unique_id() else "peer %d" % peer_id
 		if peer_id == 1:
 			tag += "  host"
-		lines.append("%s   %s" % [_seat_name(seat), tag])
+		if NetSession.is_cpu_peer(peer_id):
+			tag = "CPU"
+		var label := CoopVs.player_label(seat) if GameSettings.is_coop_vs() else _seat_name(seat)
+		lines.append("%s   %s" % [label, tag])
+	if GameSettings.is_coop_vs() and NetSession.is_host():
+		var empty := CoopVs.cpu_fill_count(NetSession.human_count())
+		if empty > 0:
+			lines.append("%d empty seats fill with CPU" % empty)
 	if NetSession.is_steam() and NetSession.is_host():
 		var friends := SteamLobby.online_friend_names()
 		if friends.is_empty():
@@ -254,12 +279,79 @@ func _roster() -> String:
 
 
 func _seat_name(seat: int) -> String:
-	var names: PackedStringArray = [
-		"Cyan", "Amber", "Magenta", "Lime", "Violet", "Pink", "Blue", "Ice",
-	]
-	if seat < 0 or seat >= names.size():
-		return "Seat"
-	return names[seat]
+	return CoopVs.seat_name(seat)
+
+
+func _build_seats() -> VBoxContainer:
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 6)
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	var heading := LobbyChrome.heading("Pick a team seat")
+	heading.name = "SeatHeading"
+	box.add_child(heading)
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 18)
+	grid.add_theme_constant_override("v_separation", 6)
+	box.add_child(grid)
+	_seat_buttons.clear()
+	for team in CoopVs.TEAM_COUNT:
+		var row := LobbyChrome.team_row()
+		var color := Palette.seat_color(team)
+		row.add_child(LobbyChrome.color_chip(color))
+		var name := Label.new()
+		name.text = HudStyle.chrome(CoopVs.team_name(team))
+		name.label_settings = HudStyle.readout(color, 14)
+		row.add_child(name)
+		for slot in CoopVs.TEAM_SIZE:
+			var seat := CoopVs.seat_for_team(team, slot)
+			var letter := "A" if slot == 0 else "B"
+			var button := LobbyChrome.seat_button(letter, color)
+			button.pressed.connect(_on_seat_pressed.bind(seat))
+			row.add_child(button)
+			_seat_buttons.append(button)
+		grid.add_child(row)
+	return box
+
+
+func _on_seat_pressed(seat: int) -> void:
+	if not NetSession.is_active():
+		return
+	Sfx.play("ui_confirm", self)
+	NetSession.request_seat(seat)
+
+
+func _refresh_seats(active: bool) -> void:
+	if _seat_box == null:
+		return
+	var show := GameSettings.is_coop_vs() and active
+	_seat_box.visible = show
+	if not show:
+		return
+	var local_id := multiplayer.get_unique_id()
+	for i in _seat_buttons.size():
+		var button := _seat_buttons[i]
+		var team := i / CoopVs.TEAM_SIZE
+		var slot := i % CoopVs.TEAM_SIZE
+		var seat := CoopVs.seat_for_team(team, slot)
+		var holder := _peer_in_seat(seat)
+		var mine := holder == local_id
+		var taken := holder != 0 and not mine
+		button.disabled = taken
+		if mine:
+			button.text = HudStyle.chrome("%s you" % ("A" if slot == 0 else "B"))
+		elif taken:
+			var tag := "CPU" if NetSession.is_cpu_peer(holder) else "taken"
+			button.text = HudStyle.chrome("%s %s" % ["A" if slot == 0 else "B", tag])
+		else:
+			button.text = HudStyle.chrome("A" if slot == 0 else "B")
+
+
+func _peer_in_seat(seat: int) -> int:
+	for peer_id in NetSession.peer_ids():
+		if NetSession.seat_for(peer_id) == seat:
+			return peer_id
+	return 0
 
 
 func _build() -> void:
@@ -277,11 +369,11 @@ func _build() -> void:
 	root.alignment = BoxContainer.ALIGNMENT_CENTER
 	root.add_theme_constant_override("separation", 14)
 	add_child(root)
-	var title := Label.new()
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.label_settings = HudStyle.banner(Palette.MAGENTA, 52)
-	title.text = HudStyle.chrome("Online VS")
-	root.add_child(title)
+	_title = Label.new()
+	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_title.label_settings = HudStyle.banner(Palette.MAGENTA, 52)
+	_title.text = HudStyle.chrome(_title_copy())
+	root.add_child(_title)
 	_status = Label.new()
 	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_status.label_settings = HudStyle.readout(Palette.CYAN, 16)
@@ -291,6 +383,8 @@ func _build() -> void:
 	_list.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_list.label_settings = HudStyle.readout(Palette.ICE, 16)
 	root.add_child(_list)
+	_seat_box = _build_seats()
+	root.add_child(_seat_box)
 	_start_btn = LobbyChrome.button("Start match")
 	_start_btn.pressed.connect(_start)
 	root.add_child(_start_btn)

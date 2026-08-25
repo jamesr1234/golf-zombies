@@ -73,6 +73,8 @@ func bind_spawned() -> void:
 			_carts.append(node)
 			node.set_multiplayer_authority(1)
 			NetSync.attach_cart(node)
+			if GameSettings.is_coop_vs():
+				node.apply_tint(Palette.seat_color(VsCourse.cart_slot(node, _carts.size() - 1)))
 	_carts.sort_custom(func(a, b): return String(a.name) < String(b.name))
 	_wire_players()
 
@@ -453,10 +455,7 @@ func _session_for(peer_id: int) -> GolfController:
 
 
 func _ball_for(peer_id: int) -> GolfBall:
-	for owned in _balls:
-		if owned.owner_peer == peer_id:
-			return owned
-	return null
+	return CoopVs.ball_for_peer(_balls, peer_id, NetSession.seats)
 
 
 func _guns(buyer: Player) -> Array[Weapon]:
