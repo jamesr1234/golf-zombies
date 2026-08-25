@@ -331,6 +331,15 @@ func predicts_locally() -> bool:
 	return driver != null and not NetSession.should_simulate(self)
 
 
+## Remote humans publish report_drive onto sync_stick. Local humans and
+## host-owned CPUs write CpuInput / PlayerInput on this machine — their
+## peer_id is often negative, so comparing it to unique_id would stall them.
+func _uses_replicated_stick() -> bool:
+	if driver == null or not driver.net_driven:
+		return false
+	return not driver.is_multiplayer_authority()
+
+
 func fling(direction: Vector3, speed: float, lift := 14.0, lock := 1.0) -> void:
 	var dir := Vector3(direction.x, 0.0, direction.z)
 	if dir.length_squared() < 0.0001:
@@ -356,7 +365,7 @@ func _drive(delta: float) -> void:
 	var steer := 0.0
 	var boosting := false
 	if driver != null and driver.health.is_alive():
-		if driver.net_driven and driver.peer_id != multiplayer.get_unique_id():
+		if _uses_replicated_stick():
 			steer = sync_stick.x
 			throttle = sync_stick.y
 			boosting = sync_boost

@@ -324,3 +324,28 @@ func test_a_forward_stick_reads_as_forward_throttle() -> void:
 	assert_almost_eq(GolfCart.stick_drive(Vector2(0.0, -1.0)).y, 1.0, 0.001, "up the screen")
 	assert_almost_eq(GolfCart.stick_drive(Vector2(0.0, 1.0)).y, -1.0, 0.001, "and back is reverse")
 	assert_almost_eq(GolfCart.stick_drive(Vector2(0.5, 0.0)).x, 0.5, 0.001, "steer rides as given")
+
+
+func test_a_host_cpu_driver_throttles_from_its_own_stick() -> void:
+	var cart: GolfCart = preload("res://scenes/vehicles/golf_cart.tscn").instantiate()
+	add_child_autofree(cart)
+	cart.set_physics_process(false)
+	var driver: Player = preload("res://scenes/players/player.tscn").instantiate()
+	add_child_autofree(driver)
+	driver.set_physics_process(false)
+	driver.set_process(false)
+	driver.net_driven = true
+	driver.peer_id = -1
+	driver.cpu_filled = true
+	var pad := CpuInput.new("p1", false)
+	pad.move = Vector2(0.0, -1.0)
+	driver.input = pad
+	cart.global_position = Vector3(0.0, 0.4, 0.0)
+	cart.rotation = Vector3.ZERO
+	cart.driver = driver
+	driver.cart = cart
+	driver.enter_ride()
+	for _i in 12:
+		cart._drive(0.05)
+	assert_gt(cart.drive_speed, 2.0, "a host CPU at the wheel has to roll")
+	assert_gt(cart.sync_stick.y, 0.5, "and publish that throttle for watchers")

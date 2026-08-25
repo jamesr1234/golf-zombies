@@ -79,14 +79,16 @@ func _go_to_ball(delta: float) -> bool:
 	if ball == null or ball.is_holed() or ball.is_stowed() or ball.is_closed():
 		_lined_up = false
 		return false
-	if ball.is_in_play():
-		_lined_up = false
-		return false
 	var dest := ball.global_position
 	var range := _flat_range(dest)
 	if _player.is_golfing():
 		_swing(_player.golf, delta)
 		return true
+	if ball.is_in_play():
+		_lined_up = false
+		if range > HOP_RANGE or _player.is_riding():
+			return _ride_to(dest)
+		return false
 	if range > WALK_RANGE:
 		return _ride_to(dest)
 	if _player.is_riding():
@@ -158,12 +160,15 @@ func _ride_to(dest: Vector3) -> bool:
 
 
 func _drive_toward(world_point: Vector3) -> void:
-	var dir := world_point - _player.global_position
+	var cart := _player.cart
+	var from := cart.global_position if cart != null else _player.global_position
+	var heading := cart.rotation.y if cart != null else _player.rotation.y
+	var dir := world_point - from
 	dir.y = 0.0
 	if dir.length_squared() < 0.04:
 		return
-	_look_at(_player.global_position + dir.normalized() * LOOK_AHEAD)
-	_ghost.move = CpuBuddy.local_move(_player.global_transform.basis, dir.normalized())
+	_look_at(from + dir.normalized() * LOOK_AHEAD)
+	_ghost.move = CpuBuddy.cart_move(heading, dir)
 	if dir.length() > 22.0:
 		_ghost.hold("shoot")
 
