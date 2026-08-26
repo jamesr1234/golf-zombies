@@ -57,6 +57,22 @@ func test_a_stalled_frame_cannot_carry_the_shot_past_one_metre() -> void:
 	assert_almost_eq(at.length(), DoorShot.RANGE, 0.15)
 
 
+func test_physics_ticks_land_the_shot_without_a_manual_step() -> void:
+	DoorShot.spawn_flight(self, Vector3(0.0, 1.55, 0.0), Vector3.FORWARD, 20.0)
+	await wait_physics_frames(10)
+	assert_eq(get_tree().get_nodes_in_group("warp_doors").size(), 1)
+
+
+func test_an_air_shot_stands_the_door_on_the_ground() -> void:
+	var shot := DoorShot.spawn_flight(self, Vector3(0.0, 1.55, 0.0), Vector3.FORWARD, 20.0)
+	shot._physics_process(1.0)
+	await wait_physics_frames(1)
+	var doors := get_tree().get_nodes_in_group("warp_doors")
+	assert_eq(doors.size(), 1)
+	var door := doors[0] as Node3D
+	assert_lt(door.global_position.y, 0.2, "a chest-height door is above the walk")
+
+
 func test_a_floor_hit_plants_the_door_on_its_feet() -> void:
 	var at := Vector3(3.0, 1.2, -4.0)
 	var planted := WarpDoor.plant_point(at, Vector3.UP)

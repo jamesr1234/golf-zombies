@@ -1,7 +1,7 @@
 class_name DoorShot
 extends Node3D
-## Thrown door frame. Flies one metre, then plants a warp door. Hits a wall or
-## the floor sooner? It plants there.
+## Thrown door frame. Flies one metre, then plants a warp door on the ground.
+## Hits a wall sooner? It plants on that wall. Hits the floor sooner? Same spot.
 
 const SPEED := 36.0
 const RANGE := 1.0
@@ -84,13 +84,35 @@ func _land(at: Vector3, normal: Vector3) -> void:
 	if _dead:
 		return
 	_dead = true
+	var plant_at := at
+	var plant_n := normal
+	if normal.y > 0.5:
+		var floor_hit := _floor_under(at)
+		if floor_hit.is_empty():
+			plant_at = Vector3(at.x, 0.0, at.z)
+			plant_n = Vector3.UP
+		else:
+			plant_at = floor_hit["position"]
+			plant_n = floor_hit["normal"]
 	if not visual_only:
 		var root := get_tree().get_first_node_in_group("fx_root")
 		if root == null:
 			root = get_parent()
-		var door := WarpDoor.spawn(root, at, normal, direction, duration, shooter_peer)
+		var door := WarpDoor.spawn(root, plant_at, plant_n, direction, duration, shooter_peer)
 		if door != null:
 			_WorldFx.announce_door(
 				self, door.global_position, door.facing(), duration, shooter_peer
 			)
 	queue_free()
+
+
+func _floor_under(at: Vector3) -> Dictionary:
+	if not is_inside_tree():
+		return {}
+	var space := get_world_3d().direct_space_state
+	if space == null:
+		return {}
+	var from := at + Vector3.UP * 0.4
+	var to := at + Vector3.DOWN * 24.0
+	var query := PhysicsRayQueryParameters3D.create(from, to, Layers.BULLET_MASK)
+	return space.intersect_ray(query)
