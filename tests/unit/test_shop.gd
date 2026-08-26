@@ -46,7 +46,15 @@ func test_the_flare_driver_and_cart_nailer_are_on_the_armory_shelf() -> void:
 	assert_eq(String(nailer["name"]), "Cart Nailer")
 	assert_eq(int(nailer["price"]), 320)
 	assert_true((nailer["stats"] as WeaponStats).has_cart_bonus())
-	assert_eq(shop.count(Shop.Dept.WEAPONS), 3)
+	assert_eq(shop.count(Shop.Dept.WEAPONS), 4)
+
+
+func test_the_warp_door_is_on_the_armory_shelf() -> void:
+	var door := _find("warp_door")
+	assert_eq(String(door["name"]), "Warp Door")
+	assert_eq(int(door["price"]), 350)
+	assert_true((door["stats"] as WeaponStats).is_door())
+	assert_string_contains(shop.info(door), "ball")
 
 
 func test_buying_the_flare_driver_puts_it_in_the_bag() -> void:

@@ -5,6 +5,7 @@ extends Object
 const ROCKET: WeaponStats = preload("res://resources/weapons/rocket.tres")
 const FLARE_DRIVER: WeaponStats = preload("res://resources/weapons/flare_driver.tres")
 const CART_NAILER: WeaponStats = preload("res://resources/weapons/cart_nailer.tres")
+const WARP_DOOR: WeaponStats = preload("res://resources/weapons/warp_door.tres")
 
 
 static func wear_by_id(item_id: String) -> Dictionary:
@@ -65,6 +66,14 @@ static func weapons() -> Array[Dictionary]:
 			"kind": "weapon",
 			"stats": CART_NAILER,
 			"info": "A fast SMG that hits harder near the golf cart, or while you are riding it.",
+		},
+		{
+			"id": "warp_door",
+			"name": "Warp Door",
+			"price": 350,
+			"kind": "weapon",
+			"stats": WARP_DOOR,
+			"info": "Shoots a neon doorway a few metres out. Walk through and you stand next to your ball.",
 		},
 	]
 

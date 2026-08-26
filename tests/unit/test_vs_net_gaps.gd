@@ -11,7 +11,7 @@ func after_each() -> void:
 	NetSession.close()
 	NetSession.seats.clear()
 	GameSettings.reset()
-	for group in ["rockets", "net_shots", "net_traps", "thrown_beers", "fireworks", "sniper_beams", "grapple_hooks"]:
+	for group in ["rockets", "net_shots", "net_traps", "door_shots", "warp_doors", "thrown_beers", "fireworks", "sniper_beams", "grapple_hooks"]:
 		for node in get_tree().get_nodes_in_group(group):
 			node.remove_from_group(group)
 			node.queue_free()
@@ -380,6 +380,18 @@ func test_a_visual_net_shot_does_not_deploy_a_live_trap() -> void:
 	shot._land(zombie.global_position)
 	assert_eq(get_tree().get_nodes_in_group("net_traps").size(), before)
 	assert_false(zombie.is_netted())
+
+
+func test_a_visual_door_shot_does_not_plant_a_door() -> void:
+	var world := _world_fx()
+	var before := get_tree().get_nodes_in_group("warp_doors").size()
+	var shot := world.apply_door_shot(Vector3.ZERO, Vector3.FORWARD, 20.0, 0)
+	assert_true(shot.visual_only)
+	shot._land(Vector3(0.0, 0.0, 4.0), Vector3.UP)
+	assert_eq(get_tree().get_nodes_in_group("warp_doors").size(), before)
+	var door := world.apply_door(Vector3(1.0, 0.0, 2.0), Vector3.FORWARD, 20.0, 7)
+	assert_true(door.visual_only)
+	assert_eq(door.shooter_peer, 7)
 
 
 func test_a_visual_ammo_drop_does_not_grant() -> void:

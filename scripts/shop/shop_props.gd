@@ -32,6 +32,7 @@ static func armory(root: Node3D) -> void:
 	_shotgun(_bob(root, Vector3(2.35, 0.92, 0.42), 0.6, 2.8))
 	_flare(_bob(root, Vector3(-1.15, 1.45, 0.42), 0.5, 1.9))
 	_nailer(_bob(root, Vector3(1.15, 1.42, 0.42), -0.45, 2.5))
+	_door(_bob(root, Vector3(0.0, 0.52, 0.42), 0.48, 3.2))
 
 
 static func items(root: Node3D) -> void:
@@ -61,6 +62,8 @@ static func preview(parent: Node3D, item: Dictionary) -> void:
 			_flare(parent)
 		"cart_nailer":
 			_nailer(parent)
+		"warp_door":
+			_door(parent)
 		"ammo":
 			_ammo(parent)
 		"barrier":
@@ -202,6 +205,20 @@ static func _nailer(parent: Node3D) -> void:
 	var grip := _box(parent, Vector3(0.08, 0.2, 0.09), metal, 0.0, Vector3(0.0, -0.16, 0.16))
 	grip.rotation.x = deg_to_rad(-18.0)
 	_box(parent, Vector3(0.05, 0.04, 0.28), Palette.CART, Palette.GLOW_SOFT, Vector3(0.0, 0.1, -0.08))
+
+
+static func _door(parent: Node3D) -> void:
+	parent.rotation.y = deg_to_rad(-18.0)
+	parent.rotation.z = deg_to_rad(8.0)
+	var metal := Palette.DOOR.darkened(0.35)
+	_box(parent, Vector3(0.12, 0.14, 0.42), metal, 0.0, Vector3.ZERO)
+	_box(parent, Vector3(0.08, 0.09, 0.48), metal, 0.0, Vector3(0.0, 0.02, -0.38))
+	for x: float in [-0.09, 0.09]:
+		_box(parent, Vector3(0.04, 0.28, 0.04), Palette.DOOR, Palette.GLOW_STRONG, Vector3(x, 0.02, -0.7))
+	_box(parent, Vector3(0.22, 0.04, 0.04), Palette.DOOR, Palette.GLOW_STRONG, Vector3(0.0, 0.14, -0.7))
+	_box(parent, Vector3(0.16, 0.2, 0.03), Palette.ICE, Palette.GLOW_STRONG, Vector3(0.0, 0.02, -0.7))
+	var grip := _box(parent, Vector3(0.08, 0.22, 0.1), metal, 0.0, Vector3(0.0, -0.18, 0.16))
+	grip.rotation.x = deg_to_rad(-16.0)
 
 
 static func _ammo(parent: Node3D) -> void:
