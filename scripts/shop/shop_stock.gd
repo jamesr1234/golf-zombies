@@ -73,7 +73,7 @@ static func weapons() -> Array[Dictionary]:
 			"price": 350,
 			"kind": "weapon",
 			"stats": WARP_DOOR,
-			"info": "Shoots a neon doorway a few metres out. Walk through and you stand next to your ball.",
+			"info": "Shoots a neon doorway one metre out. Walk through and you stand next to your ball.",
 		},
 	]
 
