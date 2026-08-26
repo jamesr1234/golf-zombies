@@ -44,6 +44,7 @@ var _sniper: Node3D
 var _net: Node3D
 var _flare: Node3D
 var _nailer: Node3D
+var _door: Node3D
 var _phase := 0.0
 var _amount := 0.0
 var _steady_left := 0.0
@@ -78,6 +79,9 @@ func build(color: Color) -> void:
 	_nailer = Node3D.new()
 	add_child(_nailer)
 	_build_nailer(_nailer, color)
+	_door = Node3D.new()
+	add_child(_door)
+	_build_door(_door, color)
 	_paint_view(self)
 	show_gun("rifle")
 
@@ -101,6 +105,8 @@ func show_gun(kind: String) -> void:
 		_flare.visible = kind == "flare"
 	if _nailer != null:
 		_nailer.visible = kind == "nailer"
+	if _door != null:
+		_door.visible = kind == "door"
 
 
 func is_shotgun() -> bool:
@@ -127,6 +133,10 @@ func is_nailer() -> bool:
 	return _nailer != null and _nailer.visible
 
 
+func is_door() -> bool:
+	return _door != null and _door.visible
+
+
 ## Farthest the visible gun reaches down the barrel, used to tell the two meshes apart.
 func forward_extent() -> float:
 	var root := _rifle
@@ -140,6 +150,8 @@ func forward_extent() -> float:
 		root = _flare
 	elif is_nailer():
 		root = _nailer
+	elif is_door():
+		root = _door
 	elif is_shotgun():
 		root = _shotgun
 	if root == null:
@@ -451,6 +463,30 @@ func _build_nailer(parent: Node3D, color: Color) -> void:
 	var rail := MeshFactory.box(Vector3(0.03, 0.02, 0.12), Palette.CART, Palette.GLOW_SOFT)
 	rail.position = Vector3(0.0, 0.05, -0.04)
 	parent.add_child(rail)
+
+
+func _build_door(parent: Node3D, color: Color) -> void:
+	var metal := Palette.DOOR.darkened(0.4)
+	var body := MeshFactory.box(Vector3(0.07, 0.08, 0.16), metal)
+	body.position = Vector3(0.0, 0.0, 0.02)
+	parent.add_child(body)
+	var barrel := MeshFactory.box(Vector3(0.045, 0.05, 0.18), metal)
+	barrel.position.z = -0.14
+	parent.add_child(barrel)
+	for x: float in [-0.04, 0.04]:
+		var post := MeshFactory.box(Vector3(0.018, 0.12, 0.018), Palette.DOOR, Palette.GLOW_MEDIUM)
+		post.position = Vector3(x, 0.0, -0.28)
+		parent.add_child(post)
+	var lintel := MeshFactory.box(Vector3(0.1, 0.018, 0.018), Palette.DOOR, Palette.GLOW_MEDIUM)
+	lintel.position = Vector3(0.0, 0.054, -0.28)
+	parent.add_child(lintel)
+	var pane := MeshFactory.box(Vector3(0.07, 0.09, 0.012), color, Palette.GLOW_STRONG)
+	pane.position.z = -0.28
+	parent.add_child(pane)
+	var grip := MeshFactory.box(Vector3(0.045, 0.11, 0.05), metal)
+	grip.position = Vector3(0.0, -0.085, 0.07)
+	grip.rotation.x = deg_to_rad(-16.0)
+	parent.add_child(grip)
 
 
 func _paint_view(node: Node) -> void:

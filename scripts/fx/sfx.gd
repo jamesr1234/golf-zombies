@@ -22,6 +22,9 @@ const CUES := {
 	"net_fire": [0, 480.0, 140.0, 0.18, 0.28],
 	"net_catch": [1, 360.0, 160.0, 0.16, 0.26],
 	"net_burst": [2, 150.0, 45.0, 0.3, 0.42],
+	"door_fire": [0, 220.0, 880.0, 0.2, 0.28],
+	"door_open": [0, 360.0, 980.0, 0.22, 0.26],
+	"door_warp": [0, 180.0, 720.0, 0.28, 0.3],
 	"melee_swing": [0, 420.0, 160.0, 0.16, 0.24],
 	"melee_hit": [1, 110.0, 45.0, 0.12, 0.4],
 	"zombie_hit": [0, 240.0, 90.0, 0.08, 0.28],
@@ -111,6 +114,8 @@ static func fire_cue(visual: String) -> String:
 			return "flare_fire"
 		"nailer":
 			return "nailer_fire"
+		"door":
+			return "door_fire"
 		_:
 			return "rifle_fire"
 

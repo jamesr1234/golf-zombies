@@ -13,6 +13,7 @@ const VIOLET := Color(0.62, 0.28, 1.0)
 const HOT_PINK := Color(1.0, 0.24, 0.5)
 const ICE := Color(0.8, 0.97, 1.0)
 const NET: Color = Color(0.42, 1.0, 0.62)
+const DOOR := Color(0.52, 0.32, 1.0)
 const NIGHT := Color(0.03, 0.03, 0.06)
 
 const PLAYER_ONE := CYAN

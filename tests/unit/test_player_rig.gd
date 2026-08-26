@@ -273,6 +273,18 @@ func test_the_cart_nailer_is_its_own_mesh() -> void:
 	assert_lt(gun.forward_extent(), -0.2, "the spike barrel should stick out")
 
 
+func test_the_warp_door_gun_is_its_own_mesh() -> void:
+	var gun := Raygun.new()
+	add_child_autofree(gun)
+	gun.build(Palette.PLAYER_ONE)
+	assert_false(gun.is_door())
+	gun.show_gun("door")
+	assert_true(gun.is_door())
+	assert_false(gun.is_nailer())
+	assert_false(gun.is_rocket())
+	assert_lt(gun.forward_extent(), -0.2, "the door frame should stick out")
+
+
 func test_a_shotgun_kick_throws_the_gun_back_then_recovers() -> void:
 	var gun := Raygun.new()
 	add_child_autofree(gun)

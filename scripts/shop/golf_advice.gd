@@ -16,6 +16,7 @@ const USEFUL: PackedStringArray = [
 	"The cart is a weapon on the path. Run them down, then shop.",
 	"Grapple a cart or mech and ride it down the hole. Jump lets go near the ball.",
 	"Hex barriers are cover you drop with gear. Charges stack across holes.",
+	"The Warp Door shoots a doorway. Walk through it and you are back at your ball.",
 	"Par or better: leftover seconds pay five dollars each. Speed is money.",
 ]
 
@@ -66,7 +67,7 @@ static func is_useful_line(line: String) -> bool:
 	for token in [
 		"click", "yardage", "flag", "tap-tap", "chip", "putt", "rough", "bunker",
 		"double bogey", "swim", "cpu", "club", "cart", "barrier", "dollar", "seconds",
-		"grapple", "hook",
+		"grapple", "hook", "warp", "doorway",
 	]:
 		if text.contains(token):
 			return true

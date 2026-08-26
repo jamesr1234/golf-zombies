@@ -5,7 +5,7 @@ extends Resource
 
 @export var display_name := "Rifle"
 ## Which first-person mesh the raygun should show. "rifle", "shotgun", "rocket",
-## "net", "sniper", "flare", "nailer".
+## "net", "sniper", "flare", "nailer", "door".
 @export var visual := "rifle"
 @export var damage := 24.0
 @export var pellets := 1
@@ -39,6 +39,8 @@ extends Resource
 @export var cart_damage_mult := 1.0
 ## Metres from a golf cart that unlocks cart_damage_mult. 0 disables the bonus.
 @export var cart_bonus_range := 0.0
+## 0 is a regular gun. Above 0 shoots a door that warps you to your ball.
+@export var door_duration := 0.0
 
 
 func shot_interval() -> float:
@@ -63,6 +65,10 @@ func is_flare() -> bool:
 
 func has_cart_bonus() -> bool:
 	return cart_bonus_range > 0.0 and cart_damage_mult > 1.0
+
+
+func is_door() -> bool:
+	return door_duration > 0.0
 
 
 func zoom_at(step: int) -> float:

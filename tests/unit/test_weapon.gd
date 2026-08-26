@@ -9,6 +9,7 @@ const ROCKET: WeaponStats = preload("res://resources/weapons/rocket.tres")
 const NET: WeaponStats = preload("res://resources/weapons/net.tres")
 const FLARE: WeaponStats = preload("res://resources/weapons/flare_driver.tres")
 const NAILER: WeaponStats = preload("res://resources/weapons/cart_nailer.tres")
+const DOOR: WeaponStats = preload("res://resources/weapons/warp_door.tres")
 
 
 func test_the_rifle_still_waits_its_full_interval_after_every_shot() -> void:
@@ -95,11 +96,13 @@ func test_swapping_steps_forward_and_back_through_the_loadout() -> void:
 	gun.swap(1)
 	assert_eq(gun.stats(), SNIPER)
 	gun.swap(1)
+	assert_eq(gun.stats(), DOOR)
+	gun.swap(1)
 	assert_eq(gun.stats(), FLARE)
 	gun.swap(-1)
-	assert_eq(gun.stats(), SNIPER)
+	assert_eq(gun.stats(), DOOR)
 	gun.swap(-1)
-	assert_eq(gun.stats(), SHOTGUN)
+	assert_eq(gun.stats(), SNIPER)
 
 
 func test_the_flare_and_nailer_start_in_the_bag() -> void:
@@ -109,6 +112,16 @@ func test_the_flare_and_nailer_start_in_the_bag() -> void:
 	assert_eq(gun.stats(), FLARE, "hole one starts on the Flare Driver")
 	assert_false(gun.add_gun(FLARE), "owning it once is enough")
 	assert_false(gun.add_gun(NAILER), "owning it once is enough")
+
+
+func test_the_warp_door_starts_in_the_bag() -> void:
+	var gun := _gun()
+	assert_true(gun.has_gun(DOOR))
+	assert_true(DOOR.is_door())
+	assert_false(DOOR.is_net())
+	assert_false(DOOR.is_explosive())
+	assert_eq(DOOR.visual, "door")
+	assert_false(gun.add_gun(DOOR), "owning it once is enough")
 
 
 func test_the_sniper_cycles_2x_5x_10x_then_hip() -> void:

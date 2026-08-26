@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="WeaponStats" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/player/weapon_stats.gd" id="1_stats"]
+
+[resource]
+script = ExtResource("1_stats")
+display_name = "Warp Door"
+visual = "door"
+damage = 0.0
+pellets = 1
+rounds_per_minute = 48.0
+automatic = false
+mag_size = 2
+reserve_start = 6
+reserve_max = 12
+spread_deg = 0.3
+ads_spread_deg = 0.1
+range_m = 7.2
+reload_time = 2.0
+pickup_amount = 2
+burst = 1
+kick = 0.75
+blast_radius = 0.0
+trap_radius = 0.0
+door_duration = 20.0

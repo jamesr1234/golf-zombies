@@ -23,6 +23,7 @@ var loadout: Array[WeaponStats] = [
 	preload("res://resources/weapons/rifle.tres"),
 	preload("res://resources/weapons/shotgun.tres"),
 	preload("res://resources/weapons/sniper.tres"),
+	preload("res://resources/weapons/warp_door.tres"),
 ]
 
 var index := 0
@@ -267,7 +268,7 @@ func _fire(view: Transform3D, ads: bool) -> void:
 		var owner := get_parent() as Player
 		if owner != null:
 			owner.request_host_fire(view, ads, index)
-		if stats().is_net() or stats().is_explosive():
+		if stats().is_net() or stats().is_explosive() or stats().is_door():
 			return
 		var spread := deg_to_rad(stats().ads_spread_deg if ads else stats().spread_deg)
 		for _pellet in stats().pellets:
@@ -301,6 +302,9 @@ func _commit_fire(view: Transform3D, ads: bool) -> void:
 	if current.is_explosive():
 		_launch_rocket(view, scaled_stats(current, power_mult))
 		return
+	if current.is_door():
+		_launch_door(view, current)
+		return
 	var spread := deg_to_rad(current.ads_spread_deg if ads else current.spread_deg)
 	for _pellet in current.pellets:
 		_trace(view, spread, current)
@@ -325,6 +329,14 @@ func _launch_net(view: Transform3D, current: WeaponStats) -> void:
 		_WorldFx.announce_net(
 			self, origin, direction, shot.radius, shot.duration, shot.max_range
 		)
+
+
+func _launch_door(view: Transform3D, current: WeaponStats) -> void:
+	var direction := -view.basis.z
+	var origin := view.origin + direction * 0.9
+	var shot := DoorShot.spawn(_fx_root(), origin, direction, current, _shooter_peer())
+	if shot != null:
+		_WorldFx.announce_door_shot(self, origin, direction, shot.duration, shot.shooter_peer)
 
 
 func _fx_root() -> Node:
