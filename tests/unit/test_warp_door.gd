@@ -52,7 +52,8 @@ func test_a_stalled_frame_cannot_carry_the_shot_past_a_fifth_of_a_second() -> vo
 	await wait_physics_frames(1)
 	var doors := get_tree().get_nodes_in_group("warp_doors")
 	assert_eq(doors.size(), 1)
-	var at := doors[0].global_position
+	var door := doors[0] as Node3D
+	var at := door.global_position
 	at.y = 0.0
 	assert_almost_eq(at.length(), DoorShot.flight_distance(), 0.15)
 
