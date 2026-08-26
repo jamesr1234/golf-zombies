@@ -188,8 +188,24 @@ func test_players_start_at_the_carts_for_the_next_hole() -> void:
 		"seat 1 starts at Cart1"
 	)
 	assert_gt(players[0].global_position.distance_to(Vector3(80.0, 0.0, 80.0)), 20.0)
+	assert_false(players[0].is_riding(), "a cart with no seats stays a spawn marker")
 	for cart in carts:
 		cart.free()
+	course.free()
+
+
+func test_transit_puts_players_in_scene_carts() -> void:
+	var course := VsCourse.new()
+	course.hole = HoleGenerator.generate(0, 20260816)
+	var cart: GolfCart = preload("res://scenes/vehicles/golf_cart.tscn").instantiate()
+	cart.name = "Cart0"
+	add_child_autofree(cart)
+	cart.place_at(Vector3(10.0, 0.4, 0.0), 0.0)
+	var player := _pawn(1, Vector3(80.0, 0.0, 80.0))
+	NetSession.seats[1] = 0
+	course.place_players_at_carts([player], [cart])
+	assert_true(player.is_riding())
+	assert_eq(cart.driver, player)
 	course.free()
 
 
