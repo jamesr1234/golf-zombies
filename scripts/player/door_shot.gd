@@ -55,7 +55,7 @@ static func flight_distance() -> float:
 
 
 func _build() -> void:
-	process_always = true
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	set_process(true)
 	set_physics_process(false)
 	var frame := MeshFactory.box(Vector3(0.55, 0.95, 0.06), COLOR, Palette.GLOW_MEDIUM)
