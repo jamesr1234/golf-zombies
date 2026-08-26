@@ -18,15 +18,6 @@ func after_each() -> void:
 	await wait_physics_frames(1)
 
 
-func _freeze(shot: DoorShot) -> void:
-	shot.set_process(false)
-	shot._born_msec = 0
-	for child in shot.get_children():
-		var timer := child as Timer
-		if timer != null:
-			timer.stop()
-
-
 func test_the_warp_door_is_a_projectile_not_a_net_or_blast() -> void:
 	assert_true(DOOR.is_door())
 	assert_false(DOOR.is_net())
@@ -35,58 +26,35 @@ func test_the_warp_door_is_a_projectile_not_a_net_or_blast() -> void:
 	assert_eq(DOOR.visual, "door")
 	assert_false(DOOR.automatic)
 	assert_eq(DOOR.mag_size, 2)
+	assert_almost_eq(DOOR.range_m, 1.0, 0.001)
 
 
-func test_the_shot_only_flies_for_a_fifth_of_a_second() -> void:
-	assert_almost_eq(DoorShot.FLIGHT_TIME, 0.2, 0.001)
-	assert_almost_eq(DoorShot.flight_distance(), DoorShot.SPEED * 0.2, 0.001)
+func test_the_shot_only_goes_one_metre() -> void:
+	assert_almost_eq(DoorShot.RANGE, 1.0, 0.001)
 	var shot := DoorShot.spawn_flight(self, Vector3.ZERO, Vector3.FORWARD, 20.0)
 	assert_not_null(shot)
-	_freeze(shot)
-	shot._tick(0.19)
-	assert_false(shot._dead, "still in the air at 0.19s")
+	var half := (DoorShot.RANGE * 0.5) / DoorShot.SPEED
+	shot._physics_process(half)
+	assert_false(shot._dead, "still in the air at half a metre")
 	assert_eq(get_tree().get_nodes_in_group("warp_doors").size(), 0)
-	shot._tick(0.01)
-	assert_true(shot._dead, "the door has to appear at 0.2s")
+	shot._physics_process(half)
+	assert_true(shot._dead, "the door appears after one metre")
 	await wait_physics_frames(1)
 	assert_eq(get_tree().get_nodes_in_group("door_shots").size(), 0)
 	assert_eq(get_tree().get_nodes_in_group("warp_doors").size(), 1)
 
 
-func test_a_stalled_frame_cannot_carry_the_shot_past_a_fifth_of_a_second() -> void:
+func test_a_stalled_frame_cannot_carry_the_shot_past_one_metre() -> void:
 	var shot := DoorShot.spawn_flight(self, Vector3.ZERO, Vector3.FORWARD, 20.0)
-	_freeze(shot)
-	shot._tick(1.0)
-	assert_true(shot._dead, "a hitch cannot keep the shot in the air")
+	shot._physics_process(1.0)
+	assert_true(shot._dead, "a hitch cannot throw the door further")
 	await wait_physics_frames(1)
 	var doors := get_tree().get_nodes_in_group("warp_doors")
 	assert_eq(doors.size(), 1)
 	var door := doors[0] as Node3D
 	var at := door.global_position
 	at.y = 0.0
-	assert_almost_eq(at.length(), DoorShot.flight_distance(), 0.15)
-
-
-func test_the_door_opens_a_fifth_of_a_second_after_the_shot() -> void:
-	DoorShot.spawn_flight(self, Vector3.ZERO, Vector3.FORWARD, 20.0)
-	assert_eq(get_tree().get_nodes_in_group("warp_doors").size(), 0)
-	await wait_seconds(0.12)
-	assert_eq(get_tree().get_nodes_in_group("warp_doors").size(), 0, "too early")
-	await wait_seconds(0.12)
-	assert_eq(get_tree().get_nodes_in_group("warp_doors").size(), 1, "door at 0.2s, even in the air")
-
-
-func test_a_hit_still_waits_a_fifth_of_a_second_before_the_door() -> void:
-	var shot := DoorShot.spawn_flight(self, Vector3.ZERO, Vector3.FORWARD, 20.0)
-	_freeze(shot)
-	shot._stick(Vector3(0.0, 1.2, -2.0), Vector3.BACK)
-	shot._tick(0.19)
-	assert_false(shot._dead, "the shot has happened, the door has not")
-	assert_eq(get_tree().get_nodes_in_group("warp_doors").size(), 0)
-	shot._tick(0.01)
-	assert_true(shot._dead, "the door appears 0.2s after the shot")
-	await wait_physics_frames(1)
-	assert_eq(get_tree().get_nodes_in_group("warp_doors").size(), 1)
+	assert_almost_eq(at.length(), DoorShot.RANGE, 0.15)
 
 
 func test_a_floor_hit_plants_the_door_on_its_feet() -> void:
