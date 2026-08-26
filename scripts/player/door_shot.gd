@@ -14,6 +14,7 @@ var shooter_peer := 0
 
 var visual_only := false
 var _age := 0.0
+var _born_msec := 0
 var _dead := false
 
 
@@ -39,6 +40,7 @@ static func spawn_flight(
 	shot.add_to_group("door_shots")
 	root.add_child(shot)
 	shot.global_position = origin
+	shot._born_msec = Time.get_ticks_msec()
 	shot._build()
 	return shot
 
@@ -65,7 +67,7 @@ func _build() -> void:
 func _physics_process(delta: float) -> void:
 	if _dead:
 		return
-	var remain := FLIGHT_TIME - _age
+	var remain := FLIGHT_TIME - _elapsed()
 	if remain <= 0.0:
 		_land(global_position, Vector3.UP)
 		return
@@ -80,8 +82,15 @@ func _physics_process(delta: float) -> void:
 	global_position = to
 	rotate_object_local(Vector3.UP, delta * 6.0)
 	_age += delta
-	if _age >= FLIGHT_TIME:
+	if _elapsed() >= FLIGHT_TIME:
 		_land(to, Vector3.UP)
+
+
+func _elapsed() -> float:
+	var wall := 0.0
+	if _born_msec > 0:
+		wall = float(Time.get_ticks_msec() - _born_msec) * 0.001
+	return maxf(_age, wall)
 
 
 func _land(at: Vector3, normal: Vector3) -> void:
