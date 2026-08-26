@@ -58,6 +58,19 @@ func test_a_stalled_frame_cannot_carry_the_shot_past_a_fifth_of_a_second() -> vo
 	assert_almost_eq(at.length(), DoorShot.flight_distance(), 0.15)
 
 
+func test_a_hit_still_waits_a_fifth_of_a_second_before_the_door() -> void:
+	var shot := DoorShot.spawn_flight(self, Vector3.ZERO, Vector3.FORWARD, 20.0)
+	shot._born_msec = 0
+	shot._stick(Vector3(0.0, 1.2, -2.0), Vector3.BACK)
+	shot._physics_process(0.19)
+	assert_false(shot._dead, "the shot has happened, the door has not")
+	assert_eq(get_tree().get_nodes_in_group("warp_doors").size(), 0)
+	shot._physics_process(0.01)
+	assert_true(shot._dead, "the door appears 0.2s after the shot")
+	await wait_physics_frames(1)
+	assert_eq(get_tree().get_nodes_in_group("warp_doors").size(), 1)
+
+
 func test_a_floor_hit_plants_the_door_on_its_feet() -> void:
 	var at := Vector3(3.0, 1.2, -4.0)
 	var planted := WarpDoor.plant_point(at, Vector3.UP)
