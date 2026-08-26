@@ -387,7 +387,7 @@ func test_a_visual_door_shot_does_not_plant_a_door() -> void:
 	var before := get_tree().get_nodes_in_group("warp_doors").size()
 	var shot := world.apply_door_shot(Vector3.ZERO, Vector3.FORWARD, 20.0, 0)
 	assert_true(shot.visual_only)
-	shot._land(Vector3(0.0, 0.0, 4.0), Vector3.UP)
+	shot._open()
 	assert_eq(get_tree().get_nodes_in_group("warp_doors").size(), before)
 	var door := world.apply_door(Vector3(1.0, 0.0, 2.0), Vector3.FORWARD, 20.0, 7)
 	assert_true(door.visual_only)
