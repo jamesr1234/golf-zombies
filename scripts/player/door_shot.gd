@@ -1,7 +1,6 @@
 class_name DoorShot
 extends Node3D
-## Thrown door frame. Flies until it hits something or 0.2s is up. The warp
-## door always appears 0.2s after the shot, even if the frame stuck early.
+## Shot picks the landing spot immediately. The warp door always opens 0.2s later.
 
 const SPEED := 36.0
 const FLIGHT_TIME := 0.2
@@ -15,7 +14,8 @@ var shooter_peer := 0
 var visual_only := false
 var _age := 0.0
 var _born_msec := 0
-var _stuck := false
+var _origin := Vector3.ZERO
+var _plant_at := Vector3.ZERO
 var _plant_normal := Vector3.UP
 var _dead := false
 
@@ -42,8 +42,11 @@ static func spawn_flight(
 	shot.add_to_group("door_shots")
 	root.add_child(shot)
 	shot.global_position = origin
+	shot._origin = origin
 	shot._born_msec = Time.get_ticks_msec()
 	shot._build()
+	shot._lock_plant()
+	shot._start_timer()
 	return shot
 
 
@@ -52,6 +55,9 @@ static func flight_distance() -> float:
 
 
 func _build() -> void:
+	process_always = true
+	set_process(true)
+	set_physics_process(false)
 	var frame := MeshFactory.box(Vector3(0.55, 0.95, 0.06), COLOR, Palette.GLOW_MEDIUM)
 	add_child(frame)
 	var pane := MeshFactory.box(Vector3(0.38, 0.72, 0.02), Palette.ICE, Palette.GLOW_STRONG)
@@ -66,36 +72,50 @@ func _build() -> void:
 		look_at(global_position + direction)
 
 
-func _physics_process(delta: float) -> void:
+func _lock_plant() -> void:
+	var from := global_position
+	var to := from + direction * flight_distance()
+	_plant_at = to
+	_plant_normal = Vector3.UP
+	if not is_inside_tree():
+		return
+	var space := get_world_3d().direct_space_state
+	if space == null:
+		return
+	var query := PhysicsRayQueryParameters3D.create(from, to, Layers.BULLET_MASK)
+	var hit := space.intersect_ray(query)
+	if hit.is_empty():
+		return
+	_stick(hit["position"], hit["normal"])
+
+
+func _start_timer() -> void:
+	var timer := Timer.new()
+	timer.wait_time = FLIGHT_TIME
+	timer.one_shot = true
+	timer.autostart = true
+	timer.process_callback = Timer.TIMER_PROCESS_IDLE
+	timer.timeout.connect(_open)
+	add_child(timer)
+
+
+func _process(delta: float) -> void:
+	_tick(delta)
+
+
+func _tick(delta: float) -> void:
 	if _dead:
 		return
-	if not _stuck:
-		_advance(delta)
 	_age += delta
+	var t := clampf(_elapsed() / FLIGHT_TIME, 0.0, 1.0)
+	global_position = _origin.lerp(_plant_at, t)
 	if _elapsed() >= FLIGHT_TIME:
 		_open()
 
 
-func _advance(delta: float) -> void:
-	var remain := FLIGHT_TIME - _elapsed()
-	if remain <= 0.0:
-		return
-	var step := minf(SPEED * delta, SPEED * remain)
-	var from := global_position
-	var to := from + direction * step
-	var query := PhysicsRayQueryParameters3D.create(from, to, Layers.BULLET_MASK)
-	var hit := get_world_3d().direct_space_state.intersect_ray(query)
-	if not hit.is_empty():
-		_stick(hit["position"], hit["normal"])
-		return
-	global_position = to
-	rotate_object_local(Vector3.UP, delta * 6.0)
-
-
 func _stick(at: Vector3, normal: Vector3) -> void:
-	global_position = at
+	_plant_at = at
 	_plant_normal = normal
-	_stuck = true
 
 
 func _elapsed() -> float:
@@ -114,7 +134,7 @@ func _open() -> void:
 		if root == null:
 			root = get_parent()
 		var door := WarpDoor.spawn(
-			root, global_position, _plant_normal, direction, duration, shooter_peer
+			root, _plant_at, _plant_normal, direction, duration, shooter_peer
 		)
 		if door != null:
 			_WorldFx.announce_door(
