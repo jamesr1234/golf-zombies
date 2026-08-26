@@ -15,6 +15,7 @@ func after_each() -> void:
 	for group in ["door_shots", "warp_doors"]:
 		for node in get_tree().get_nodes_in_group(group):
 			node.queue_free()
+	await wait_physics_frames(1)
 
 
 func test_the_warp_door_is_a_projectile_not_a_net_or_blast() -> void:
