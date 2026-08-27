@@ -328,6 +328,8 @@ func start_hole(index: int) -> void:
 
 
 func _warmup_copy(index: int) -> String:
+	if cpu_drives_at_start:
+		return "Buddy is on the cart.\nGrapple on when you are ready."
 	if index == 1:
 		return "The hill blocks the drive.\nTake the cart through the culvert."
 	if index == 2:
@@ -396,6 +398,8 @@ func _place_players() -> void:
 	var lateral := forward.cross(Vector3.UP).normalized()
 	var yaw := rad_to_deg(atan2(-forward.x, -forward.z))
 	for i in _players.size():
+		if cpu_drives_at_start and _players[i].is_cpu():
+			continue
 		var side := -1.0 if i == 0 else 1.0
 		var spot := hole.practice_tee + forward * 1.8 + lateral * side * PLAYER_TEE_SPREAD
 		_players[i].spawn_at(hole.lift(spot) + Vector3.UP * 1.2, yaw)
