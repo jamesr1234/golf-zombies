@@ -420,6 +420,8 @@ func _do_knockback(from: Vector3, speed: float) -> void:
 
 @rpc("any_peer", "reliable")
 func _receive_knockback(from: Vector3, speed: float) -> void:
+	if not NetSession.rpc_from_host(multiplayer.get_remote_sender_id()):
+		return
 	if is_multiplayer_authority():
 		_do_knockback(from, speed)
 
