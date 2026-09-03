@@ -135,6 +135,10 @@ func try_grab_ball(player: Player) -> void:
 	if player.global_position.distance_to(player.golf.ball.global_position) > SWIM_GRAB_RANGE:
 		return
 	player.golf.ball.pick_up(player)
+	# Fishing the ball out settles the shot it was still resolving. Without this
+	# the ball leaves play without ever coming to rest, so the golfer who played
+	# it keeps the claim and stays rooted at their stance with zombies incoming.
+	player.golf.release()
 	Sfx.play("grab_ball", player)
 
 
