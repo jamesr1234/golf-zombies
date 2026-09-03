@@ -131,10 +131,9 @@ func _request_strike(yaw: float, deviation: float, power: float, loft := 0.0) ->
 		return
 	if golfer == null or _peer_of(golfer) != sender:
 		return
-	aim_yaw = yaw
-	aim_loft = loft
-	meter.deviation_deg = deviation
-	meter.power = power
+	aim_yaw = yaw if is_finite(yaw) else aim_yaw
+	aim_loft = clampf(loft, Shot.LOFT_BIAS_MIN, Shot.LOFT_BIAS_MAX) if is_finite(loft) else 0.0
+	meter.accept_remote(power, deviation)
 	super._strike()
 
 

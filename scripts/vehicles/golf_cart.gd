@@ -663,6 +663,8 @@ func _broadcast_seats() -> void:
 func _request_board(peer_id: int) -> void:
 	if not is_multiplayer_authority():
 		return
+	if not NetSession.rpc_speaks_for(multiplayer.get_remote_sender_id(), peer_id):
+		return
 	var player := _player_by_peer(peer_id)
 	if player != null:
 		_do_board(player)
@@ -672,6 +674,8 @@ func _request_board(peer_id: int) -> void:
 @rpc("any_peer", "reliable")
 func _request_eject(peer_id: int) -> void:
 	if not is_multiplayer_authority():
+		return
+	if not NetSession.rpc_speaks_for(multiplayer.get_remote_sender_id(), peer_id):
 		return
 	var player := _player_by_peer(peer_id)
 	if player != null:

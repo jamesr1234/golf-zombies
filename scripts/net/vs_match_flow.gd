@@ -1033,13 +1033,13 @@ func _request_start() -> void:
 
 @rpc("any_peer", "reliable")
 func _request_arrive() -> void:
-	if multiplayer.is_server():
+	if multiplayer.is_server() and can_open_doors(_player_for(multiplayer.get_remote_sender_id())):
 		_do_arrive()
 
 
 @rpc("any_peer", "reliable")
 func _request_leave() -> void:
-	if multiplayer.is_server():
+	if multiplayer.is_server() and can_open_exit(_player_for(multiplayer.get_remote_sender_id())):
 		_do_leave()
 
 

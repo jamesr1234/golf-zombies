@@ -280,6 +280,27 @@ func test_circle_grabs_a_nearby_sunk_ball() -> void:
 	assert_eq(ball.carrier(), player)
 
 
+## The shot is only over once the ball resolves, and a ball fished out of a pond
+## never comes to rest. Leaving the claim on stranded the partner who played it
+## at their stance: rooted, unable to shoot, and still worth eating.
+func test_grabbing_a_partners_ball_lets_them_off_their_stance() -> void:
+	var swimmer := _swimmer()
+	var ball := _give_ball(swimmer)
+	var golfer: Player = PLAYER_SCENE.instantiate()
+	add_child_autofree(golfer)
+	golfer.golf = swimmer.golf
+	golfer.global_position = ball.global_position + Vector3(0.5, 0.0, 0.0)
+	swimmer.golf.try_toggle(golfer)
+	assert_eq(swimmer.golf.golfer, golfer, "the partner is addressing the ball")
+	assert_true(golfer.is_golfing())
+	ball.enter_surface(Surface.Type.WATER)
+	ball.global_position = swimmer.global_position + Vector3(0.4, -0.8, 0.0)
+	swimmer.swim.try_grab_ball(swimmer)
+	assert_true(swimmer.is_carrying_ball())
+	assert_null(swimmer.golf.golfer, "the shot is settled, so the claim goes with it")
+	assert_false(golfer.is_golfing(), "and they can walk and shoot again")
+
+
 func test_r2_on_the_surface_throws_a_carried_ball() -> void:
 	var player := _swimmer()
 	var ball := _give_ball(player)

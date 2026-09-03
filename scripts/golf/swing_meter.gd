@@ -68,6 +68,18 @@ func tick(delta: float) -> void:
 				_finish_missed()
 
 
+## Takes a swing that was timed on someone else's machine. The golfer runs their
+## own meter, so the host has to hold what arrives to what a real swing can
+## produce before it strikes: no club sends a ball further than a full backswing,
+## and a shank tops out at MISS_DEVIATION_DEG.
+func accept_remote(p_power: float, p_deviation_deg: float) -> void:
+	power = clampf(p_power, MIN_POWER, 1.0) if is_finite(p_power) else MIN_POWER
+	deviation_deg = (
+		clampf(p_deviation_deg, -MISS_DEVIATION_DEG, MISS_DEVIATION_DEG)
+		if is_finite(p_deviation_deg) else 0.0
+	)
+
+
 func _contact_window() -> float:
 	return CONTACT_WINDOW * kit.contact_scale
 

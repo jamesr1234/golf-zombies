@@ -574,6 +574,8 @@ func _accept_pilot_rpc() -> bool:
 func _request_close(peer_id: int) -> void:
 	if not is_multiplayer_authority():
 		return
+	if not NetSession.rpc_speaks_for(multiplayer.get_remote_sender_id(), peer_id):
+		return
 	var who := _player_with_peer(peer_id)
 	if who != null:
 		_do_close(who)
