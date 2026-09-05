@@ -3,7 +3,7 @@ extends Node3D
 ## Articulated giant suit. Same stride idea as the player robot: pace fades the
 ## walk in, arms counter-swing, and a parked suit idles with a hydraulic bob.
 
-const Parts := preload("res://scripts/course/items/mech_mesh.gd")
+const MODEL_PATH := "res://assets/mechs/mech_suit.glb"
 const SCALE := 4.0
 const HEIGHT := 5.0 * SCALE
 const WIDTH := 2.4 * SCALE
@@ -145,31 +145,137 @@ func pose(pace: float) -> void:
 
 
 func _assemble() -> void:
+	_build_rig()
+	add_child(_stairs())
+	pose(0.0)
+
+
+func _ready() -> void:
+	_skin()
+
+
+func _build_rig() -> void:
 	hips = Node3D.new()
+	hips.name = "Hips"
 	hips.position.y = HIP_Y * SCALE
 	add_child(hips)
 	torso = Node3D.new()
+	torso.name = "Torso"
 	hips.add_child(torso)
-	Parts.torso(torso)
 	head = Node3D.new()
 	head.position = Vector3(0.0, 1.95, -0.06) * SCALE
 	torso.add_child(head)
-	Parts.head(head)
-	hatch = Parts.hatch(torso)
+	var visor := Node3D.new()
+	visor.name = "Visor"
+	head.add_child(visor)
+	hatch = Node3D.new()
+	hatch.name = HATCH
+	hatch.position = Vector3(0.0, 0.82, 0.62) * SCALE
+	torso.add_child(hatch)
 	for side: float in [-1.0, 1.0]:
 		var leg := Node3D.new()
 		leg.position = Vector3(side * 0.58, 0.0, 0.0) * SCALE
 		hips.add_child(leg)
 		legs.append(leg)
-		knees.append(Parts.leg(leg, side))
+		var knee := Node3D.new()
+		knee.position = Vector3(0.0, -1.28, 0.0) * SCALE
+		leg.add_child(knee)
+		knees.append(knee)
 		var arm := Node3D.new()
 		arm.name = "RightArm" if side > 0.0 else "LeftArm"
 		arm.position = Vector3(side * 1.18, 1.48, -0.04) * SCALE
 		torso.add_child(arm)
 		arms.append(arm)
-		elbows.append(Parts.arm(arm, side, RIGHT_POD if side > 0.0 else LEFT_POD))
-	add_child(_stairs())
-	pose(0.0)
+		var elbow := Node3D.new()
+		elbow.position = Vector3(0.0, -1.02, 0.0) * SCALE
+		arm.add_child(elbow)
+		elbows.append(elbow)
+
+
+func _skin() -> void:
+	var packed := load(MODEL_PATH) as PackedScene
+	if packed == null:
+		return
+	var model: Node = packed.instantiate()
+	add_child(model)
+	var root := model.find_child("MechRoot", true, false) as Node3D
+	if root == null and model.name == "MechRoot":
+		root = model as Node3D
+	if root == null:
+		model.free()
+		return
+	root.position = Vector3.ZERO
+	root.rotation.y = PI
+	_steal(_part(root, "Torso"), torso, ["Head", "Hatch", "LArm", "RArm"])
+	_steal(_part(root, "Head"), head, ["Visor"])
+	_steal(_part(root, "Visor"), head.get_node("Visor"))
+	_steal(_part(root, "Hatch"), hatch)
+	_steal(_part(root, "RLeg"), legs[0], ["RKnee"])
+	_steal(_part(root, "LLeg"), legs[1], ["LKnee"])
+	_steal(_part(root, "RKnee"), knees[0])
+	_steal(_part(root, "LKnee"), knees[1])
+	_steal(_part(root, "RArm"), arms[0], ["RElbow"])
+	_steal(_part(root, "LArm"), arms[1], ["LElbow"])
+	_steal(_part(root, "RElbow"), elbows[0])
+	_steal(_part(root, "LElbow"), elbows[1])
+	_rename(arms[0].find_child("RightPod", true, false), LEFT_POD)
+	_rename(arms[1].find_child("LeftPod", true, false), RIGHT_POD)
+	model.free()
+	_paint()
+
+
+func _part(from: Node, node_name: String) -> Node3D:
+	return from.find_child(node_name, true, false) as Node3D
+
+
+func _rename(node: Node, node_name: String) -> void:
+	if node != null:
+		node.name = node_name
+
+
+func _steal(from: Node, to: Node3D, skip: Array[String] = []) -> void:
+	if from == null or to == null:
+		return
+	var kids: Array[Node] = []
+	kids.assign(from.get_children())
+	for child in kids:
+		if skip.has(child.name):
+			continue
+		var node := child as Node3D
+		if node != null:
+			_take(node, to)
+
+
+func _take(node: Node3D, to: Node3D) -> void:
+	var xf := node.global_transform
+	var parent := node.get_parent()
+	if parent != null:
+		parent.remove_child(node)
+	node.owner = null
+	to.add_child(node)
+	node.global_transform = xf
+
+
+func _paint() -> void:
+	var looks := {
+		"MechArmor": MeshFactory.material(Palette.MECH, false, Palette.GLOW_FAINT),
+		"MechFrame": MeshFactory.material(Palette.MECH_FRAME, false, Palette.GLOW_FAINT),
+		"MechIce": MeshFactory.material(Palette.ICE, false, Palette.GLOW_FAINT),
+		"MechAmber": MeshFactory.material(Palette.AMBER, false, Palette.GLOW_MEDIUM),
+		"MechLed": MeshFactory.material(Palette.LED_RED, false, Palette.GLOW_STRONG),
+		"MechWell": MeshFactory.material(Palette.MECH_FRAME),
+	}
+	for node in find_children("*", "MeshInstance3D", true, false):
+		var mesh := node as MeshInstance3D
+		var src := mesh.get_active_material(0)
+		if src == null:
+			continue
+		var key := src.resource_name
+		if key.is_empty():
+			key = src.get_name()
+		var painted: Material = looks.get(key)
+		if painted != null:
+			mesh.material_override = painted
 
 
 func _swing_legs(pace: float) -> void:

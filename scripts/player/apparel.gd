@@ -2,16 +2,8 @@ class_name Apparel
 extends Object
 ## Neon clothes the robot wears, and the bigger hanging versions on the shop wall.
 ## Chevrons, sleeves and streamers are what stop a bought shirt from reading as
-## another box on the chest. Browsing the rack pulls the camera in front so you
-## can see the try-on.
-
-const InspectCam := preload("res://scripts/shop/shop_inspect.gd")
-
-## Close enough to read the chevrons, far enough that the whole robot is in frame.
-const CAM_DISTANCE := InspectCam.CAM_DISTANCE
-const CAM_HEIGHT := InspectCam.CAM_HEIGHT
-const CAM_LOOK := InspectCam.CAM_LOOK
-const CAM_FOV := InspectCam.CAM_FOV
+## another box on the chest. The shop inspect spins these hung garments, not the
+## robot wearing them.
 
 
 static func trim(color: Color) -> Color:
@@ -70,9 +62,21 @@ static func wear_bottom(body, style: String, color: Color) -> Array[MeshInstance
 	return pieces
 
 
-## In front of the robot, slid left so the listing can sit on the left.
-static func view_transform(origin: Vector3, yaw_deg: float, _pitch_deg := 0.0) -> Transform3D:
-	return InspectCam.view_transform(origin, yaw_deg)
+## Hung garment for the shop inspect, centered on the spin so you can turn it.
+static func preview(parent: Node3D, item: Dictionary) -> bool:
+	if parent == null or String(item.get("kind", "")) != "apparel":
+		return false
+	var color: Color = item.get("color", Palette.CYAN)
+	match String(item.get("slot", "")):
+		"headband":
+			hang_headband(parent, Vector3.ZERO, color)
+		"shirt":
+			hang_shirt(parent, Vector3.ZERO, color)
+		"bottom":
+			hang_bottom(parent, Vector3.ZERO, color, String(item.get("style", "")) == "pants")
+		_:
+			return false
+	return true
 
 
 static func hang_wall(root: Node3D) -> void:

@@ -5,10 +5,9 @@ extends Node3D
 
 const Props := preload("res://scripts/shop/shop_props.gd")
 
-const CAM_DISTANCE := 3.2
-const CAM_HEIGHT := 1.65
-const CAM_LOOK := 1.05
-const CAM_LEFT := 1.4
+const CAM_DISTANCE := 2.4
+const CAM_HEIGHT := 0.28
+const CAM_LEFT := 1.05
 const CAM_FOV := 70.0
 const HOLD := Vector3(0.0, 1.12, -0.58)
 
@@ -24,13 +23,12 @@ func _ready() -> void:
 	visible = false
 
 
-## In front of the shopper, slid left so the subject lands on the right of frame.
-static func view_transform(origin: Vector3, yaw_deg: float) -> Transform3D:
+## In front of the stock, slid left so the subject lands on the right of frame.
+static func view_transform(target: Vector3, yaw_deg: float) -> Transform3D:
 	var facing_yaw := deg_to_rad(yaw_deg)
 	var facing := Vector3.FORWARD.rotated(Vector3.UP, facing_yaw)
 	var right := Vector3.RIGHT.rotated(Vector3.UP, facing_yaw)
-	var target := origin + Vector3.UP * CAM_LOOK
-	var eye := origin + facing * CAM_DISTANCE - right * CAM_LEFT + Vector3.UP * CAM_HEIGHT
+	var eye := target + facing * CAM_DISTANCE - right * CAM_LEFT + Vector3.UP * CAM_HEIGHT
 	return Transform3D(Basis(), eye).looking_at(target, Vector3.UP)
 
 
@@ -61,13 +59,13 @@ func clear() -> void:
 
 func _rebuild(item: Dictionary) -> void:
 	_drop_pose()
-	if item.is_empty() or String(item.get("kind", "")) == "apparel":
+	if item.is_empty():
 		visible = false
 		return
 	_pose = Node3D.new()
 	add_child(_pose)
 	Props.preview(_pose, item)
-	visible = true
+	visible = _pose.get_child_count() > 0
 	_apply_spin()
 
 

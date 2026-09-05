@@ -9,6 +9,9 @@ const _Tree := preload("res://scripts/course/tree_prop.gd")
 const _Overlay := preload("res://scripts/course/hole_overlay.gd")
 const _Box := preload("res://scripts/course/box_prop.gd")
 const _MillDesk := preload("res://scripts/course/windmill_control.gd")
+const _FairwayField := preload("res://scripts/course/fairway_field.gd")
+const _RaceLane := preload("res://scripts/course/race_lane.gd")
+const _RaceCar := preload("res://scenes/vehicles/race_car.tscn")
 
 const NAV_NAME := "Nav"
 
@@ -39,13 +42,35 @@ static func build(data: HoleData) -> Node3D:
 		if bool(jump.get("authored", false)):
 			continue
 		region.add_child(JumpRamp.create(jump))
+	for boost in data.boosts:
+		region.add_child(
+			CartPathBoost.create(
+				boost["from"],
+				boost["to"],
+				float(boost.get("width", CartPathBoost.WIDTH)),
+				float(boost.get("fill", 0.42))
+			)
+		)
 	_Overlay.attach(region, data)
+	if ArenaHole.applies(data):
+		ArenaBuild.dress(region, data)
+	else:
+		region.add_child(_FairwayField.create(data))
 	for patch in data.patches:
 		root.add_child(SurfacePatch.create(patch, data.height))
-	root.add_child(Cup.create(data.cup))
-	root.add_child(_flag(data.cup))
+	if data.has_soccer_goal():
+		root.add_child(SoccerGoal.create(data))
+	elif not ArenaHole.applies(data):
+		root.add_child(Cup.create(data.cup))
+		root.add_child(_flag(data.cup))
+	if data.has_race_hoop():
+		root.add_child(RaceHoop.create(data))
+		root.add_child(_RaceLane.create(data))
+		for car in _race_cars(data):
+			root.add_child(car)
 	root.add_child(_tee_sign(data))
-	root.add_child(PracticeGreen.create(data))
+	if not ArenaHole.applies(data):
+		root.add_child(PracticeGreen.create(data))
 	for barrier in _barriers(data):
 		root.add_child(barrier)
 	return root
@@ -90,7 +115,7 @@ static func _navigation_region(data: HoleData) -> NavigationRegion3D:
 	mesh.agent_max_climb = 1.5
 	mesh.agent_max_slope = 60.0
 	mesh.geometry_parsed_geometry_type = NavigationMesh.PARSED_GEOMETRY_STATIC_COLLIDERS
-	mesh.geometry_collision_mask = Layers.WORLD | Layers.PROP
+	mesh.geometry_collision_mask = Layers.WORLD | Layers.PROP | Layers.FORCEFIELD
 	mesh.geometry_source_geometry_mode = NavigationMesh.SOURCE_GEOMETRY_ROOT_NODE_CHILDREN
 	var floor_y := data.height.min_height - HeightField.SKIRT - 1.0
 	var span_y := data.height.max_height - floor_y + 12.0
@@ -125,6 +150,19 @@ static func create_prop(prop: Dictionary) -> Node3D:
 			var wall := prop.duplicate()
 			wall["kind"] = "wall"
 			return _Box.create(wall)
+
+
+static func _race_cars(data: HoleData) -> Array[Node3D]:
+	var cars: Array[Node3D] = []
+	var names: PackedStringArray = ["TrackRaceCar", "DropRaceCar"]
+	var poses := RaceHole.car_poses(data)
+	for i in poses.size():
+		var car: GolfCart = _RaceCar.instantiate()
+		car.name = names[i] if i < names.size() else "TrackRaceCar%d" % i
+		var at: Vector3 = poses[i]["position"]
+		car.place_at(at + Vector3.UP * 0.4, float(poses[i]["yaw"]))
+		cars.append(car)
+	return cars
 
 
 static func _tee_sign(data: HoleData) -> Node3D:

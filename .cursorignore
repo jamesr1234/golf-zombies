@@ -1,0 +1,27 @@
+# Exports and editor cache
+build/
+.godot/
+android/
+
+# Cursor debug session logs
+.cursor/debug-*.log
+
+# OS junk
+.DS_Store
+
+# Blender sources (game uses exported GLBs)
+blender/
+
+# Binary meshes
+**/*.glb
+
+# Steam native SDK
+addons/godotsteam/
+
+# Card textures and music
+assets/cards/
+assets/music/
+
+# Godot generated sidecars
+**/*.import
+**/*.uid

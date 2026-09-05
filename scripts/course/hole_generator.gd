@@ -1,10 +1,10 @@
 class_name HoleGenerator
 extends Object
-## Deterministic hole layout. Par comes from a fixed nine-hole template and the
+## Deterministic hole layout. Par comes from a fixed template and the
 ## length is then drawn from the band that matches that par, so par always
 ## agrees with how far the one club can actually hit the ball.
 
-const PAR_TEMPLATE: PackedInt32Array = [4, 4, 4, 5, 4, 3, 4, 5, 4]
+const PAR_TEMPLATE: PackedInt32Array = [4, 4, 4, 5, 4, 3, 4, 5, 4, 4, 5, 5]
 const BOUNDS_MARGIN := 58.0
 const PROP_KINDS: PackedStringArray = ["tree", "rock", "wall"]
 const _SniperTower := preload("res://scripts/course/sniper_tower.gd")
@@ -17,6 +17,8 @@ const WATER_MIN_SPAN := 1.8 * 6.0
 const FRINGE_WIDTH := 3.0
 const GREEN_RADIUS_MIN := 8.0
 const GREEN_RADIUS_MAX := 11.0
+## Hole 10 is a blank double-wide landing strip. Overlay props go on later.
+const WIDE_HOLE := 9
 
 
 static func _setpiece(data: HoleData) -> bool:
@@ -47,8 +49,13 @@ static func length_range(par: int) -> Vector2:
 			return Vector2(carry * 2.1, carry * 2.75)
 
 
-static func fairway_width(par: int) -> float:
-	return 26.0 if par == 3 else (23.0 if par == 4 else 21.0)
+static func fairway_width(par: int, index := -1) -> float:
+	if RaceHole.applies_index(index):
+		return RaceHole.WIDTH
+	var width := 26.0 if par == 3 else (23.0 if par == 4 else 21.0)
+	if index == WIDE_HOLE or SoccerHole.applies_index(index):
+		return width * 2.0
+	return width
 
 
 static func generate(index: int, base_seed: int) -> HoleData:
@@ -58,11 +65,35 @@ static func generate(index: int, base_seed: int) -> HoleData:
 	var data := HoleData.new()
 	data.index = index
 	data.par = PAR_TEMPLATE[index % PAR_TEMPLATE.size()]
-	var width := fairway_width(data.par)
+	var soccer := SoccerHole.applies(data)
+	var race := RaceHole.applies(data)
+	var arena := ArenaHole.applies(data)
+	if soccer:
+		data.soccer_goal = true
+		data.par = SoccerHole.PAR
+	if race:
+		data.par = RaceHole.PAR
+	if arena:
+		data.par = ArenaHole.PAR
+	var width := fairway_width(data.par, data.index)
 	var band := length_range(data.par)
-	var segment_count := 1 if data.par == 3 or CulvertHole.applies(data) else (2 if data.par == 4 else 3)
-	var headings := _headings(segment_count, rng)
-	var lengths := _split(rng.randf_range(band.x, band.y), segment_count, rng)
+	var headings: Array[float] = []
+	var lengths: Array[float] = []
+	if soccer:
+		headings.append(0.0)
+		lengths.append(SoccerHole.LENGTH)
+	elif race:
+		var track: Dictionary = RaceHole.path()
+		headings.append_array(track["headings"])
+		lengths.append_array(track["lengths"])
+	elif arena:
+		headings.append(0.0)
+		lengths.append(ArenaHole.floor_radius())
+	else:
+		var pieces := 1 if data.par == 3 or CulvertHole.applies(data) else (2 if data.par == 4 else 3)
+		headings = _headings(pieces, rng)
+		lengths = _split(rng.randf_range(band.x, band.y), pieces, rng)
+	var segment_count := headings.size()
 
 	var point := Vector3.ZERO
 	data.centerline.append(point)
@@ -78,7 +109,12 @@ static func generate(index: int, base_seed: int) -> HoleData:
 
 	data.tee = data.centerline[0]
 	data.cup = data.centerline[data.centerline.size() - 1]
-	data.green_radius = rng.randf_range(GREEN_RADIUS_MIN, GREEN_RADIUS_MAX)
+	if soccer:
+		data.green_radius = SoccerHole.GREEN_RADIUS
+	elif arena:
+		data.green_radius = ArenaHole.GREEN_RADIUS
+	else:
+		data.green_radius = rng.randf_range(GREEN_RADIUS_MIN, GREEN_RADIUS_MAX)
 	data.patches.append(_patch(Surface.Type.TEE, data.tee, Vector2(8.0, 10.0), headings[0]))
 	var fringe_radius := data.green_radius + FRINGE_WIDTH
 	data.patches.append(_patch(
@@ -90,21 +126,76 @@ static func generate(index: int, base_seed: int) -> HoleData:
 		Vector2(data.green_radius * 2.0, data.green_radius * 2.0), 0.0, true
 	))
 	_add_practice_green(data, headings[0])
-	_add_climb_wall(data, headings[0])
 	if MountainHole.applies(data):
 		MountainHole.layout(data, headings, width)
 	elif CulvertHole.applies(data):
 		CulvertHole.layout(data, headings, width)
+	elif soccer:
+		SoccerHole.layout(data, headings, width)
+	elif race:
+		RaceHole.layout(data, headings, width)
+	elif arena:
+		ArenaHole.layout(data, headings, width)
 	else:
 		_add_hazards(data, rng, width, headings)
 	data.bounds = _bounds(data)
 	_Overlay.harvest(data)
-	if not _setpiece(data):
-		_add_towers(data, width)
-		_add_props(data, rng, width)
-		_Trees.plant(data, rng, width, func(spot): return blocks_prop(data, spot, width))
-	_add_spawn_points(data, rng, width)
+	if not _setpiece(data) and not arena:
+		if not race:
+			_add_towers(data, width)
+			_add_props(data, rng, width)
+		_Trees.plant(
+			data, rng, width, func(spot): return blocks_prop(data, spot, width), race
+		)
+	if not arena:
+		_add_spawn_points(data, rng, width)
+	# #region agent log
+	var _t_h := Time.get_ticks_msec()
+	var _dbg8 := FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-8cf7b5.log", FileAccess.READ_WRITE)
+	if _dbg8 == null:
+		_dbg8 = FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-8cf7b5.log", FileAccess.WRITE)
+	else:
+		_dbg8.seek_end()
+	if _dbg8 != null:
+		_dbg8.store_line(JSON.stringify({
+			"sessionId": "8cf7b5",
+			"hypothesisId": "A",
+			"location": "hole_generator.gd:generate",
+			"message": "before heightmap",
+			"data": {
+				"index": data.index,
+				"centerline": data.centerline.size(),
+				"patches": data.patches.size(),
+				"bounds": [data.bounds.size.x, data.bounds.size.y],
+				"boosts": data.boosts.size(),
+				"jumps": data.jumps.size(),
+			},
+			"timestamp": _t_h,
+		}))
+		_dbg8.close()
+	# #endregion
 	data.height = HeightField.generate(data, rng)
+	# #region agent log
+	_dbg8 = FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-8cf7b5.log", FileAccess.READ_WRITE)
+	if _dbg8 == null:
+		_dbg8 = FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-8cf7b5.log", FileAccess.WRITE)
+	else:
+		_dbg8.seek_end()
+	if _dbg8 != null:
+		_dbg8.store_line(JSON.stringify({
+			"sessionId": "8cf7b5",
+			"hypothesisId": "A",
+			"location": "hole_generator.gd:generate",
+			"message": "after heightmap",
+			"data": {
+				"elapsed_ms": Time.get_ticks_msec() - _t_h,
+				"height_w": data.height.width,
+				"height_d": data.height.depth,
+			},
+			"timestamp": Time.get_ticks_msec(),
+		}))
+		_dbg8.close()
+	# #endregion
 	_lift(data)
 	return data
 
@@ -136,6 +227,9 @@ static func _lift(data: HoleData) -> void:
 		jump["position"] = Vector3(
 			origin.x, data.height.height_at(rear.x, rear.z), origin.z
 		)
+	for boost in data.boosts:
+		boost["from"] = data.height.lift(boost["from"])
+		boost["to"] = data.height.lift(boost["to"])
 	for i in data.spawn_points.size():
 		data.spawn_points[i] = data.height.lift(data.spawn_points[i])
 	data.practice_tee = data.height.lift(data.practice_tee)
@@ -148,6 +242,8 @@ static func _lift(data: HoleData) -> void:
 		data.cart_pad = data.height.lift(data.cart_pad)
 	if data.has_mech_pad():
 		data.mech_pad = data.height.lift(data.mech_pad)
+	if data.has_race_hoop():
+		data.race_hoop = data.height.lift(data.race_hoop)
 
 
 ## Every hole opens with somewhere to warm up. It shares the flat shelf the tee
@@ -168,13 +264,6 @@ static func _add_practice_green(data: HoleData, heading: float) -> void:
 		Vector2(PracticeGreen.WIDTH, PracticeGreen.LENGTH), heading
 	))
 	data.patches[-1]["practice"] = true
-
-
-## Hole 1 only: a climb wall beside the practice tee, before you start the hole.
-static func _add_climb_wall(data: HoleData, heading: float) -> void:
-	if data.index != 0:
-		return
-	data.props.append(ClimbingWall.at_practice(data.practice_tee, heading))
 
 
 static func _headings(count: int, rng: RandomNumberGenerator) -> Array[float]:
@@ -243,6 +332,43 @@ static func _add_water(
 	return patch
 
 
+## Most zombies walk in down the landing strip, not out of the trees. A few
+## still come from the rough so a packed fairway is not the only threat.
+static func _add_spawn_points(data: HoleData, rng: RandomNumberGenerator, width: float) -> void:
+	var steps := 10
+	var half := width * 0.5
+	for i in steps:
+		var t := lerpf(0.28, 0.8, float(i) / float(steps - 1))
+		var center := _point_along(data, t)
+		if center.distance_to(data.cup) < data.green_radius + 4.0:
+			continue
+		var lateral := _lateral_at(data, t)
+		for _i in 2:
+			var offset := rng.randf_range(-half * 0.72, half * 0.72)
+			_try_spawn_point(data, center + lateral * offset)
+		if i % 3 != 0 or _setpiece(data):
+			continue
+		var side := 1.0 if rng.randf() < 0.5 else -1.0
+		_try_spawn_point(data, center + lateral * side * (half + rng.randf_range(10.0, 18.0)))
+
+
+static func _try_spawn_point(data: HoleData, spot: Vector3) -> void:
+	if not data.bounds.has_point(Vector2(spot.x, spot.z)):
+		return
+	if MountainHole.applies(data) and not MountainHole.keeps(data, spot):
+		return
+	if CulvertHole.applies(data) and not CulvertHole.keeps(data, spot):
+		return
+	if spot.distance_to(data.cup) < data.green_radius + 2.0:
+		return
+	# Walkers arrive on dry land, not wading up out of a pond.
+	if _in_a_pond(data, spot, HeightField.WATER_BANK + HeightField.CELL):
+		return
+	if _on_a_jump(data, spot):
+		return
+	data.spawn_points.append(spot)
+
+
 static func _add_props(data: HoleData, rng: RandomNumberGenerator, width: float) -> void:
 	var target := 18 + data.index * 3
 	var placed := 0
@@ -274,26 +400,6 @@ static func _add_props(data: HoleData, rng: RandomNumberGenerator, width: float)
 		placed += 1
 
 
-## Most zombies walk in down the landing strip, not out of the trees. A few
-## still come from the rough so a packed fairway is not the only threat.
-static func _add_spawn_points(data: HoleData, rng: RandomNumberGenerator, width: float) -> void:
-	var steps := 10
-	var half := width * 0.5
-	for i in steps:
-		var t := lerpf(0.28, 0.8, float(i) / float(steps - 1))
-		var center := _point_along(data, t)
-		if center.distance_to(data.cup) < data.green_radius + 4.0:
-			continue
-		var lateral := _lateral_at(data, t)
-		for _i in 2:
-			var offset := rng.randf_range(-half * 0.72, half * 0.72)
-			_try_spawn_point(data, center + lateral * offset)
-		if i % 3 != 0 or _setpiece(data):
-			continue
-		var side := 1.0 if rng.randf() < 0.5 else -1.0
-		_try_spawn_point(data, center + lateral * side * (half + rng.randf_range(10.0, 18.0)))
-
-
 static func _patch(
 	type: Surface.Type, position: Vector3, size: Vector2, yaw: float, round_shape := false
 ) -> Dictionary:
@@ -319,23 +425,6 @@ static func _bounds(data: HoleData) -> Rect2:
 	return rect.grow(BOUNDS_MARGIN)
 
 
-static func _try_spawn_point(data: HoleData, spot: Vector3) -> void:
-	if not data.bounds.has_point(Vector2(spot.x, spot.z)):
-		return
-	if MountainHole.applies(data) and not MountainHole.keeps(data, spot):
-		return
-	if CulvertHole.applies(data) and not CulvertHole.keeps(data, spot):
-		return
-	if spot.distance_to(data.cup) < data.green_radius + 2.0:
-		return
-	# Walkers arrive on dry land, not wading up out of a pond.
-	if _in_a_pond(data, spot, HeightField.WATER_BANK + HeightField.CELL):
-		return
-	if _on_a_jump(data, spot):
-		return
-	data.spawn_points.append(spot)
-
-
 static func _lateral_at(data: HoleData, t: float) -> Vector3:
 	var here := _point_along(data, t)
 	var ahead := _point_along(data, minf(1.0, t + 0.03))
@@ -349,6 +438,31 @@ static func _lateral_at(data: HoleData, t: float) -> Vector3:
 
 static func patch_covers(patch: Dictionary, point: Vector3) -> bool:
 	return _patch_covers(patch, point)
+
+
+## The four steps below are shared with CustomLayout, which lays out its own
+## centerline from creator pieces and then finishes the hole exactly the way a
+## generated one is finished.
+static func surface_patch(
+	type: Surface.Type, position: Vector3, size: Vector2, yaw: float, round_shape := false
+) -> Dictionary:
+	return _patch(type, position, size, yaw, round_shape)
+
+
+static func add_practice_green(data: HoleData, heading: float) -> void:
+	_add_practice_green(data, heading)
+
+
+static func bounds_of(data: HoleData) -> Rect2:
+	return _bounds(data)
+
+
+static func lift_to_ground(data: HoleData) -> void:
+	_lift(data)
+
+
+static func add_spawn_points(data: HoleData, rng: RandomNumberGenerator, width: float) -> void:
+	_add_spawn_points(data, rng, width)
 
 
 ## Fairway, greens, water, ramps and the tee stay clear so a tree never sits

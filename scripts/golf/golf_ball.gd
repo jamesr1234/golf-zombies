@@ -214,6 +214,32 @@ func try_hole_out(cup: Node3D = null) -> void:
 	_begin_sink(cup)
 
 
+## Soccer goal: speed is the point, so a drive through the net counts.
+func try_score_goal() -> void:
+	if not _in_play or is_carried() or is_holed() or _sinking:
+		return
+	_in_play = false
+	_holed = true
+	_putting = false
+	freeze = true
+	collision_mask = 0
+	linear_velocity = Vector3.ZERO
+	angular_velocity = Vector3.ZERO
+	Sfx.play("hole_out", self)
+	holed.emit()
+
+
+## Race hoop: the ball stays in play, just further down the hole.
+func try_race_warp(at: Vector3) -> bool:
+	if not _in_play or is_carried() or is_holed() or _sinking:
+		return false
+	if not NetSession.should_simulate(self):
+		return false
+	Sfx.play("door_warp", self)
+	place_at(at)
+	return true
+
+
 func _begin_sink(cup: Node3D) -> void:
 	_sinking = true
 	_putting = false
@@ -426,7 +452,9 @@ func _check_grounded() -> bool:
 	return not get_world_3d().direct_space_state.intersect_ray(query).is_empty()
 
 
-func _on_body_hit(_body: Node) -> void:
+func _on_body_hit(body: Node) -> void:
+	if body != null and body.is_in_group("fairway_field") and body.has_method("pulse"):
+		body.pulse(global_position)
 	if not _in_play or _bounce_cool > 0.0:
 		return
 	if linear_velocity.length() < BOUNCE_MIN:

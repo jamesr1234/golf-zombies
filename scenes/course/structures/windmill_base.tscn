@@ -1,0 +1,32 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="PackedScene" uid="uid://ca86kbsman8fu" path="res://assets/obstacles/cube_large.glb" id="1_cube_large"]
+[ext_resource type="PackedScene" uid="uid://bqv1kqkcvufhw" path="res://assets/obstacles/pillar_extra_large.glb" id="2_pillar_extra_large"]
+[ext_resource type="PackedScene" uid="uid://cbq1a3mrwoitm" path="res://assets/obstacles/platform_medium.glb" id="3_platform_medium"]
+[ext_resource type="PackedScene" uid="uid://ds2ko2se24nna" path="res://assets/obstacles/steps_medium.glb" id="4_steps_medium"]
+[ext_resource type="PackedScene" uid="uid://ba8fjnsbkn18s" path="res://assets/obstacles/wall_medium.glb" id="5_wall_medium"]
+[ext_resource type="PackedScene" uid="uid://cbbs48ffxgq1a" path="res://assets/obstacles/cube_small.glb" id="6_cube_small"]
+[ext_resource type="PackedScene" uid="uid://pfp86xbuqujd" path="res://assets/obstacles/ladder_medium.glb" id="7_ladder_medium"]
+
+[node name="WindmillBase" type="Node3D"]
+
+[node name="cube_large" parent="." instance=ExtResource("1_cube_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.35, 0, -1.35)
+
+[node name="pillar_extra_large" parent="." instance=ExtResource("2_pillar_extra_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 6.75, -4.05)
+
+[node name="platform_medium" parent="." instance=ExtResource("3_platform_medium")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.7, 6.75, -2.7)
+
+[node name="steps_medium" parent="." instance=ExtResource("4_steps_medium")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.7, 0, -1.35)
+
+[node name="wall_medium" parent="." instance=ExtResource("5_wall_medium")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.35, 0, -1.35)
+
+[node name="cube_small" parent="." instance=ExtResource("6_cube_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 16.2, -4.05)
+
+[node name="ladder_medium" parent="." instance=ExtResource("7_ladder_medium")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.1, 6.75, -4.05)

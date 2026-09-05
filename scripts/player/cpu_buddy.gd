@@ -19,6 +19,7 @@ const COVER_PLANT := 1.25
 const CONTACT_CLICK := 0.05
 const CART_END := 16.0
 const LOOK_AHEAD := 8.0
+const _CpuPoker := preload("res://scripts/player/cpu_poker.gd")
 
 var shot_requested := false
 
@@ -46,12 +47,16 @@ func tick(_delta: float) -> void:
 		shot_requested = false
 		return
 	pad.begin_frame()
+	if _grab_gun(pad):
+		return
 	var partner := _player.partner
 	if partner != null and partner.health.is_downed():
 		_revive(pad, partner)
 		return
 	if shot_requested:
 		_play_shot(pad)
+		return
+	if _CpuPoker.tick(_player, pad):
 		return
 	if _player.is_driving():
 		_drive(pad)
@@ -178,12 +183,19 @@ func _ride(pad: CpuInput, partner: Player) -> void:
 
 
 func _should_board(partner: Player) -> bool:
+	if _arena_hole():
+		return false
+	if _player.is_floored() or _player.motion.fling_left > 0.0:
+		return false
 	if partner == null or not partner.is_riding() or _player.cart == null:
 		return false
 	return not _player.cart.is_riding(_player)
 
 
 func _board(pad: CpuInput) -> void:
+	if _player.cart.can_right(_player):
+		pad.tap("interact")
+		return
 	if _player.cart.can_board(_player):
 		pad.tap("interact")
 		return
@@ -192,7 +204,9 @@ func _board(pad: CpuInput) -> void:
 			_player.cart.global_position + Vector3.UP * 1.0,
 			rad_to_deg(_player.cart.rotation.y)
 		)
-		if _player.cart.can_board(_player):
+		if _player.cart.can_right(_player):
+			_player.cart.try_right(_player)
+		elif _player.cart.can_board(_player):
 			_player.cart.board(_player)
 		return
 	_walk_toward(pad, _player.cart.global_position)
@@ -205,6 +219,9 @@ func _follow_and_fight(pad: CpuInput, partner: Player) -> void:
 			_cover(pad, partner, threat)
 			return
 		partner.wants_cover = false
+	if _player.is_floored() or _player.motion.fling_left > 0.0:
+		_fight(pad, true)
+		return
 	if partner != null:
 		var gap := _player._distance_to(partner)
 		if gap > CATCH_UP:
@@ -252,8 +269,29 @@ static func cover_point(partner_at: Vector3, threat_at: Vector3, partner: Player
 	return partner_at + away.normalized() * COVER_STANDOFF
 
 
+func _grab_gun(pad: CpuInput) -> bool:
+	if not ArenaHole.needs_gun(_player):
+		return false
+	var gun := ArenaHole.nearest_gun(_player)
+	if gun == null:
+		return false
+	_walk_toward(pad, gun.global_position)
+	pad.hold("sprint", true)
+	_look_at(pad, gun.global_position)
+	return true
+
+
+func _arena_hole() -> bool:
+	return _player.flow != null and ArenaHole.applies(_player.flow.hole)
+
+
+func _hunt_range() -> float:
+	return ArenaHole.HUNT_RANGE if _arena_hole() else SHOOT_RANGE
+
+
 func _fight(pad: CpuInput, can_melee: bool) -> void:
-	if _player.weapon.mag() <= 0:
+	var armed := _player.weapon != null and _player.weapon.has_weapon()
+	if armed and _player.weapon.mag() <= 0:
 		pad.tap("reload")
 	var zombie := _nearest_zombie()
 	if zombie == null:
@@ -266,7 +304,7 @@ func _fight(pad: CpuInput, can_melee: bool) -> void:
 	pad.look = look_stick(yaw_err, pitch_err)
 	var range := _player.global_position.distance_to(zombie.global_position)
 	var on_target := absf(yaw_err) < AIM_OK_DEG and absf(pitch_err) < AIM_OK_DEG
-	if SHOOT_ENEMIES and on_target and range <= SHOOT_RANGE:
+	if armed and SHOOT_ENEMIES and on_target and range <= _hunt_range():
 		pad.hold("shoot")
 	if can_melee and on_target and range <= MELEE_RANGE:
 		pad.tap("melee")
@@ -290,7 +328,7 @@ func _look_at(pad: CpuInput, world_point: Vector3) -> void:
 
 func _nearest_zombie() -> Zombie:
 	var best: Zombie
-	var best_dist := SHOOT_RANGE
+	var best_dist := _hunt_range()
 	for node in _player.get_tree().get_nodes_in_group("zombies"):
 		var zombie := node as Zombie
 		if zombie == null or not is_instance_valid(zombie):

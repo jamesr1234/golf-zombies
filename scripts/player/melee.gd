@@ -4,6 +4,9 @@ extends Node
 ## pop them up, low hits send them sliding, and a blow off to one side spins
 ## them that way. A shove always pops them into fireworks after a short flight.
 
+const _WorldFx := preload("res://scripts/net/world_fx.gd")
+const _ShapeDrop := preload("res://scripts/player/shape_drop.gd")
+
 const RANGE := 2.9
 const ARC_DEG := 70.0
 const DAMAGE := 40.0
@@ -54,6 +57,8 @@ func shove(origin: Vector3, forward: Vector3, strength := 1.0, attacker: Player 
 		if not in_arc(origin, flat_forward, player.global_position, RANGE, ARC_DEG):
 			continue
 		shove_player(attacker, player, origin, strength)
+	if _ShapeDrop.yeet_in_arc(get_tree(), origin, flat_forward, strength, RANGE, ARC_DEG) > 0:
+		_WorldFx.announce_shape_kick(self, origin, flat_forward, strength)
 	return true
 
 

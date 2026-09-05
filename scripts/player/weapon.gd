@@ -11,24 +11,31 @@ const FLARE_COLOR := Palette.LIME
 const BLOOD_COLOR := Palette.HIT_ZOMBIE
 const DUST_COLOR := Palette.HIT_WORLD
 const _WorldFx := preload("res://scripts/net/world_fx.gd")
+const _ShapeDrop := preload("res://scripts/player/shape_drop.gd")
 const CART_GROUP := "golf_carts"
 
-## Flare and nailer lead so hole one starts with the new toys in hand. Net and
-## rocket follow for the trap combo.
-var loadout: Array[WeaponStats] = [
-	preload("res://resources/weapons/flare_driver.tres"),
-	preload("res://resources/weapons/cart_nailer.tres"),
-	preload("res://resources/weapons/net.tres"),
-	preload("res://resources/weapons/rocket.tres"),
+## The bag you walk in with. Pickups and the shop can still add more later.
+const STARTER_GUNS: Array[WeaponStats] = [
 	preload("res://resources/weapons/rifle.tres"),
 	preload("res://resources/weapons/shotgun.tres"),
 	preload("res://resources/weapons/sniper.tres"),
+	preload("res://resources/weapons/rocket.tres"),
+	preload("res://resources/weapons/net.tres"),
+	preload("res://resources/weapons/flare_driver.tres"),
+	preload("res://resources/weapons/cart_nailer.tres"),
 	preload("res://resources/weapons/warp_door.tres"),
+	preload("res://resources/weapons/shape_remote.tres"),
 ]
+
+## Starts empty. A match fills the starter stash; pickups call add_gun.
+var loadout: Array[WeaponStats] = []
 
 var index := 0
 var mags: Array[int] = []
 var reserves: Array[int] = []
+## How far down the hole each gun still works. -1 is the whole hole. Set from
+## the pickup, so only guns dropped by a hole creator ever carry a limit.
+var gates: Array[float] = []
 ## -1 is hip fire. 0..n-1 indexes stats.zoom_levels.
 var zoom_step := -1
 
@@ -47,6 +54,7 @@ func _ready() -> void:
 	for stats in loadout:
 		mags.append(stats.mag_size)
 		reserves.append(stats.reserve_start)
+		gates.append(CustomHole.NO_GATE)
 	_flash = OmniLight3D.new()
 	_flash.light_energy = 0.0
 	_flash.omni_range = 6.0
@@ -54,20 +62,36 @@ func _ready() -> void:
 	add_child(_flash)
 
 
+func has_weapon() -> bool:
+	return not loadout.is_empty()
+
+
 func stats() -> WeaponStats:
+	if not has_weapon() or index < 0 or index >= loadout.size():
+		return null
 	return loadout[index]
 
 
 func mag() -> int:
+	if not has_weapon() or index < 0 or index >= mags.size():
+		return 0
 	return mags[index]
 
 
 func reserve() -> int:
+	if not has_weapon() or index < 0 or index >= reserves.size():
+		return 0
 	return reserves[index]
 
 
 func is_reloading() -> bool:
 	return _reload_left > 0.0
+
+
+func gate() -> float:
+	if not has_weapon() or index < 0 or index >= gates.size():
+		return CustomHole.NO_GATE
+	return gates[index]
 
 
 ## Trigger down with something in the mag, which is what the held raygun watches so
@@ -77,7 +101,7 @@ func is_firing() -> bool:
 
 
 func reload_fraction() -> float:
-	if not is_reloading():
+	if not is_reloading() or stats() == null:
 		return 0.0
 	return 1.0 - _reload_left / stats().reload_time
 
@@ -96,7 +120,8 @@ func swap(step := 1) -> void:
 
 
 func zoom_mult() -> float:
-	return stats().zoom_at(zoom_step)
+	var current := stats()
+	return 1.0 if current == null else current.zoom_at(zoom_step)
 
 
 func is_scoped() -> bool:
@@ -117,9 +142,12 @@ static func zoom_after(step: int, current: WeaponStats) -> int:
 
 
 func start_reload() -> void:
-	if is_reloading() or mags[index] >= stats().mag_size or reserves[index] <= 0:
+	var current := stats()
+	if not has_weapon() or current == null:
 		return
-	_reload_left = stats().reload_time
+	if is_reloading() or mags[index] >= current.mag_size or reserves[index] <= 0:
+		return
+	_reload_left = current.reload_time
 	Sfx.play("reload", self)
 	if NetSession.defers_world():
 		var owner := get_parent() as Player
@@ -146,7 +174,8 @@ func apply_replicated_index(gun_index: int) -> void:
 
 func apply_replicated_pose(firing: bool, reload: float, scoped: bool) -> void:
 	_firing = firing
-	if scoped and stats().has_scope():
+	var current := stats()
+	if current != null and scoped and current.has_scope():
 		if zoom_step < 0:
 			zoom_step = 0
 	else:
@@ -155,25 +184,30 @@ func apply_replicated_pose(firing: bool, reload: float, scoped: bool) -> void:
 	# fill when the clock runs out.
 	if NetSession.is_active() and multiplayer.is_server():
 		return
-	if reload <= 0.0:
+	if reload <= 0.0 or current == null:
 		_reload_left = 0.0
 	else:
-		_reload_left = (1.0 - clampf(reload, 0.0, 1.0)) * maxf(0.001, stats().reload_time)
+		_reload_left = (1.0 - clampf(reload, 0.0, 1.0)) * maxf(0.001, current.reload_time)
 
 
-func apply_replicated_loadout(gun_index: int, paths: PackedStringArray) -> void:
+func apply_replicated_loadout(
+	gun_index: int, paths: PackedStringArray, limits := PackedFloat32Array()
+) -> void:
 	if paths.is_empty():
 		return
 	loadout.clear()
 	mags.clear()
 	reserves.clear()
-	for path in paths:
+	gates.clear()
+	for i in paths.size():
+		var path := paths[i]
 		if not ResourceLoader.exists(path):
 			continue
 		var next: WeaponStats = load(path)
 		loadout.append(next)
 		mags.append(next.mag_size)
 		reserves.append(next.reserve_start)
+		gates.append(limits[i] if i < limits.size() else CustomHole.NO_GATE)
 	if loadout.is_empty():
 		return
 	index = clampi(gun_index, 0, loadout.size() - 1)
@@ -184,25 +218,59 @@ func apply_replicated_loadout(gun_index: int, paths: PackedStringArray) -> void:
 	ammo_changed.emit()
 
 
-func add_gun(stats: WeaponStats) -> bool:
+## Every gun in the catalog, first slot selected so you start on the rifle.
+func fill_stash() -> void:
+	for stats in STARTER_GUNS:
+		add_gun(stats)
+	if loadout.is_empty():
+		return
+	index = 0
+	_reset_hold()
+	ammo_changed.emit()
+
+
+func add_gun(stats: WeaponStats, gun_gate := CustomHole.NO_GATE) -> bool:
 	if stats == null or has_gun(stats):
 		return false
 	loadout.append(stats)
 	mags.append(stats.mag_size)
 	reserves.append(stats.reserve_start)
+	gates.append(gun_gate)
 	index = loadout.size() - 1
+	_reset_hold()
+	ammo_changed.emit()
+	return true
+
+
+## Thrown past its gate, the gun is gone: it leaves the bag and nothing puts it
+## back. The only caller is WeaponGate, so a normal gun is never lost.
+func drop_gun(gun_index: int) -> WeaponStats:
+	if gun_index < 0 or gun_index >= loadout.size():
+		return null
+	var dropped := loadout[gun_index]
+	loadout.remove_at(gun_index)
+	mags.remove_at(gun_index)
+	reserves.remove_at(gun_index)
+	gates.remove_at(gun_index)
+	index = 0 if loadout.is_empty() else clampi(index, 0, loadout.size() - 1)
+	_firing = false
+	_reset_hold()
+	ammo_changed.emit()
+	return dropped
+
+
+func _reset_hold() -> void:
 	_reload_left = 0.0
 	_pair_shots = 0
 	_pair_idle = 0.0
 	zoom_step = -1
-	ammo_changed.emit()
-	return true
 
 
 func tick_timers(delta: float) -> void:
 	_cooldown = maxf(0.0, _cooldown - delta)
 	_pair_idle += delta
-	if pair_expired(stats(), _pair_shots, _pair_idle):
+	var current := stats()
+	if current != null and pair_expired(current, _pair_shots, _pair_idle):
 		_pair_shots = 0
 	_flash_time = maxf(0.0, _flash_time - delta)
 	if _flash != null:
@@ -215,11 +283,15 @@ func tick_timers(delta: float) -> void:
 
 func tick(delta: float, view: Transform3D, trigger_held: bool, trigger_pulled: bool, ads: bool) -> void:
 	tick_timers(delta)
+	var current := stats()
+	if current == null:
+		_firing = false
+		return
 	if is_reloading():
 		_firing = false
 		return
 	_firing = trigger_held and mags[index] > 0
-	var wants_shot := trigger_held if stats().automatic else trigger_pulled
+	var wants_shot := trigger_held if current.automatic else trigger_pulled
 	if not wants_shot or _cooldown > 0.0:
 		return
 	if mags[index] <= 0:
@@ -254,7 +326,10 @@ func _finish_reload() -> void:
 	_reload_left = 0.0
 	_pair_shots = 0
 	_pair_idle = 0.0
-	var needed: int = stats().mag_size - mags[index]
+	var current := stats()
+	if current == null:
+		return
+	var needed: int = current.mag_size - mags[index]
 	var loaded: int = mini(needed, reserves[index])
 	mags[index] += loaded
 	reserves[index] -= loaded
@@ -268,7 +343,7 @@ func _fire(view: Transform3D, ads: bool) -> void:
 		var owner := get_parent() as Player
 		if owner != null:
 			owner.request_host_fire(view, ads, index)
-		if stats().is_net() or stats().is_explosive() or stats().is_door():
+		if stats().is_net() or stats().is_explosive() or stats().is_door() or stats().is_drop():
 			return
 		var spread := deg_to_rad(stats().ads_spread_deg if ads else stats().spread_deg)
 		for _pellet in stats().pellets:
@@ -305,6 +380,9 @@ func _commit_fire(view: Transform3D, ads: bool) -> void:
 	if current.is_door():
 		_launch_door(view, current)
 		return
+	if current.is_drop():
+		_launch_drop(view, current)
+		return
 	var spread := deg_to_rad(current.ads_spread_deg if ads else current.spread_deg)
 	for _pellet in current.pellets:
 		_trace(view, spread, current)
@@ -339,6 +417,15 @@ func _launch_door(view: Transform3D, current: WeaponStats) -> void:
 		_WorldFx.announce_door_shot(self, origin, direction, shot.duration, shot.shooter_peer)
 
 
+func _launch_drop(view: Transform3D, current: WeaponStats) -> void:
+	var at := _ShapeDrop.aim_point(get_world_3d(), view.origin, -view.basis.z, current.range_m)
+	var seed := randi()
+	if seed == 0:
+		seed = 1
+	_ShapeDrop.rain(_fx_root(), at, current.drop_count, seed)
+	_WorldFx.announce_shape_drop(self, at, current.drop_count, seed)
+
+
 func _fx_root() -> Node:
 	var root := get_tree().get_first_node_in_group("fx_root")
 	return root if root != null else get_tree().current_scene
@@ -367,7 +454,7 @@ static func pair_shots_after(current: WeaponStats, pair_shots: int) -> int:
 ## Wait the long interval after a lone first shot and the pair is fresh again,
 ## so you can always dump two quick ones.
 static func pair_expired(current: WeaponStats, pair_shots: int, idle: float) -> bool:
-	return pair_shots > 0 and idle >= current.shot_interval()
+	return current != null and pair_shots > 0 and idle >= current.shot_interval()
 
 
 func _trace(view: Transform3D, spread: float, current: WeaponStats) -> void:

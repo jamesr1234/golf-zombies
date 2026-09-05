@@ -48,6 +48,7 @@ func test_gun_visuals_pick_matching_shot_cues() -> void:
 	assert_eq(Sfx.fire_cue("flare"), "flare_fire")
 	assert_eq(Sfx.fire_cue("nailer"), "nailer_fire")
 	assert_eq(Sfx.fire_cue("door"), "door_fire")
+	assert_eq(Sfx.fire_cue("remote"), "remote_fire")
 
 
 func test_the_sniper_shot_is_a_heavier_boom() -> void:
@@ -65,7 +66,8 @@ func test_the_sniper_shot_is_a_heavier_boom() -> void:
 func test_firing_the_rifle_plays_the_rifle_shot() -> void:
 	var gun := Weapon.new()
 	add_child_autofree(gun)
-	gun.index = gun.loadout.find(preload("res://resources/weapons/rifle.tres"))
+	var rifle: WeaponStats = preload("res://resources/weapons/rifle.tres")
+	assert_true(gun.add_gun(rifle))
 	gun.tick(0.0, Transform3D.IDENTITY, true, true, false)
 	assert_eq(Sfx.last_cue, "rifle_fire")
 
@@ -73,7 +75,8 @@ func test_firing_the_rifle_plays_the_rifle_shot() -> void:
 func test_firing_the_shotgun_plays_the_shotgun_shot() -> void:
 	var gun := Weapon.new()
 	add_child_autofree(gun)
-	gun.index = gun.loadout.find(preload("res://resources/weapons/shotgun.tres"))
+	var shotgun: WeaponStats = preload("res://resources/weapons/shotgun.tres")
+	assert_true(gun.add_gun(shotgun))
 	gun.tick(0.5, Transform3D.IDENTITY, false, false, false)
 	Sfx.clear_log()
 	gun.tick(0.0, Transform3D.IDENTITY, false, true, false)
@@ -83,6 +86,8 @@ func test_firing_the_shotgun_plays_the_shotgun_shot() -> void:
 func test_an_empty_gun_with_no_reserve_clicks() -> void:
 	var gun := Weapon.new()
 	add_child_autofree(gun)
+	var rifle: WeaponStats = preload("res://resources/weapons/rifle.tres")
+	assert_true(gun.add_gun(rifle))
 	gun.mags[0] = 0
 	gun.reserves[0] = 0
 	gun.tick(0.0, Transform3D.IDENTITY, true, true, false)
@@ -92,6 +97,8 @@ func test_an_empty_gun_with_no_reserve_clicks() -> void:
 func test_a_reload_plays_the_start_and_the_close() -> void:
 	var gun := Weapon.new()
 	add_child_autofree(gun)
+	var rifle: WeaponStats = preload("res://resources/weapons/rifle.tres")
+	assert_true(gun.add_gun(rifle))
 	gun.mags[0] = 1
 	gun.start_reload()
 	assert_eq(Sfx.last_cue, "reload")

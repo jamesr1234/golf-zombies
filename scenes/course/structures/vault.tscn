@@ -1,0 +1,30 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="PackedScene" uid="uid://ds2uqgfrs23r5" path="res://assets/obstacles/tunnel_extra_large.glb" id="1_tunnel_extra_large"]
+[ext_resource type="PackedScene" uid="uid://bifjp6glqcw13" path="res://assets/obstacles/arch_extra_large.glb" id="2_arch_extra_large"]
+[ext_resource type="PackedScene" uid="uid://ca86kbsman8fu" path="res://assets/obstacles/cube_large.glb" id="3_cube_large"]
+[ext_resource type="PackedScene" uid="uid://bmnsybxxauqal" path="res://assets/obstacles/pillar_medium.glb" id="4_pillar_medium"]
+[ext_resource type="PackedScene" uid="uid://c5ug3qe6erff8" path="res://assets/obstacles/ladder_large.glb" id="5_ladder_large"]
+
+[node name="Vault" type="Node3D"]
+
+[node name="tunnel_extra_large" parent="." instance=ExtResource("1_tunnel_extra_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="arch_extra_large" parent="." instance=ExtResource("2_arch_extra_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="arch_extra_large2" parent="." instance=ExtResource("2_arch_extra_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -10.8)
+
+[node name="cube_large" parent="." instance=ExtResource("3_cube_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.35, 0, -2.7)
+
+[node name="cube_large2" parent="." instance=ExtResource("3_cube_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.45, 0, -2.7)
+
+[node name="pillar_medium" parent="." instance=ExtResource("4_pillar_medium")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 12.15, -5.4)
+
+[node name="ladder_large" parent="." instance=ExtResource("5_ladder_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.2, 0, -5.4)

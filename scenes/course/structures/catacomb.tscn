@@ -1,0 +1,30 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="PackedScene" uid="uid://ftwwe5v604kq" path="res://assets/obstacles/tunnel_medium.glb" id="1_tunnel_medium"]
+[ext_resource type="PackedScene" uid="uid://b12fq52akx5pe" path="res://assets/obstacles/tunnel_small.glb" id="2_tunnel_small"]
+[ext_resource type="PackedScene" uid="uid://cbbs48ffxgq1a" path="res://assets/obstacles/cube_small.glb" id="3_cube_small"]
+[ext_resource type="PackedScene" uid="uid://bvywikjp6p81e" path="res://assets/obstacles/pillar_extra_small.glb" id="4_pillar_extra_small"]
+[ext_resource type="PackedScene" uid="uid://cow1vnvymyyu7" path="res://assets/obstacles/wall_extra_small.glb" id="5_wall_extra_small"]
+
+[node name="Catacomb" type="Node3D"]
+
+[node name="tunnel_medium" parent="." instance=ExtResource("1_tunnel_medium")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="tunnel_medium2" parent="." instance=ExtResource("1_tunnel_medium")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 0, 0, 0)
+
+[node name="tunnel_small" parent="." instance=ExtResource("2_tunnel_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 0, -4.05)
+
+[node name="cube_small" parent="." instance=ExtResource("3_cube_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="cube_small2" parent="." instance=ExtResource("3_cube_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.75, 0, -6.75)
+
+[node name="pillar_extra_small" parent="." instance=ExtResource("4_pillar_extra_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.7, 6.75, -2.7)
+
+[node name="wall_extra_small" parent="." instance=ExtResource("5_wall_extra_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 0, -8.1)

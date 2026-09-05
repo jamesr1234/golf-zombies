@@ -71,6 +71,17 @@ func test_a_seated_robot_folds_up_instead_of_standing() -> void:
 	assert_almost_eq(body.legs[0].rotation.x, 0.0, 0.001)
 
 
+func test_a_zipline_pose_reaches_both_hands_up() -> void:
+	var body := PlayerBody.new()
+	add_child_autofree(body)
+	body.build(Palette.PLAYER_ONE)
+	body.global_position = Vector3.ZERO
+	body.zip(Vector3(-0.17, 2.0, 0.0), Vector3(0.17, 2.0, 0.0))
+	assert_gt(body.arm_hands[0].global_position.y, body.hips.global_position.y)
+	assert_gt(body.arm_hands[1].global_position.y, body.hips.global_position.y)
+	assert_lt(body.arm_hands[0].global_position.x, body.arm_hands[1].global_position.x)
+
+
 func test_a_celebration_puts_both_arms_up() -> void:
 	var body := PlayerBody.new()
 	add_child_autofree(body)
@@ -97,21 +108,20 @@ func test_a_player_celebration_pulls_the_camera_back() -> void:
 	assert_almost_eq(player.get_view_fov(), Player.CHEER_FOV, 0.001)
 
 
-func test_browsing_apparel_pulls_the_camera_back() -> void:
+func test_browsing_stock_hides_the_robot() -> void:
 	var player: Player = preload("res://scenes/players/player.tscn").instantiate()
 	add_child_autofree(player)
 	player.stand_at(Vector3.ZERO, 0.0)
 	var fps := player.get_view_transform()
 	player.shopping = true
-	player.shop_dept = Shop.Dept.APPAREL
+	player.shop_dept = Shop.Dept.WEAPONS
 	var tps := player.get_view_transform()
-	assert_true(player.trying_on_apparel())
 	assert_gt(fps.origin.distance_to(tps.origin), 2.0, "the lens leaves the head")
 	assert_gt(tps.origin.y, player.head.global_position.y - 0.2)
 	assert_almost_eq(player.get_view_fov(), InspectScript.CAM_FOV, 0.001)
 	player._animate(STEP)
-	assert_false(player.raygun.visible, "stow the gun so the shirt can read")
-	assert_ne(player.view_cull_mask() & player.cabin_layer(), 0, "the robot has to stay in frame")
+	assert_false(player.raygun.visible, "stow the gun so the stock can read")
+	assert_eq(player.view_cull_mask() & player.cabin_layer(), 0, "the robot stays out of the inspect")
 	assert_lt(
 		player.get_view_transform().origin.x, player.global_position.x,
 		"camera slides left so the listing can sit there"
@@ -283,6 +293,18 @@ func test_the_warp_door_gun_is_its_own_mesh() -> void:
 	assert_false(gun.is_nailer())
 	assert_false(gun.is_rocket())
 	assert_lt(gun.forward_extent(), -0.2, "the door frame should stick out")
+
+
+func test_the_shape_remote_is_its_own_mesh() -> void:
+	var gun := Raygun.new()
+	add_child_autofree(gun)
+	gun.build(Palette.PLAYER_ONE)
+	assert_false(gun.is_remote())
+	gun.show_gun("remote")
+	assert_true(gun.is_remote())
+	assert_false(gun.is_door())
+	assert_false(gun.is_rocket())
+	assert_lt(gun.forward_extent(), -0.2, "the antenna should stick out")
 
 
 func test_a_shotgun_kick_throws_the_gun_back_then_recovers() -> void:

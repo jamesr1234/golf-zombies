@@ -1,21 +1,19 @@
 class_name Shop
 extends RefCounted
-## Clubhouse catalogues. Shared wallet; apparel and medkits apply to the buyer.
+## Clubhouse catalogues. Shared wallet; apparel applies to the buyer.
 ## A bought gun still goes into both loadouts.
 
 signal purchased(item_id: String)
 
 enum Dept { APPAREL, CLUBS, WEAPONS, ITEMS, CART }
 
-const ROCKET: WeaponStats = preload("res://resources/weapons/rocket.tres")
-const ROCKET_PRICE := 400
 const AMMO_PRICE := 60
 const AMMO_AMOUNT := 40
 const BARRIER_PRICE := 150
+const LADDER_PRICE := 80
 const MECH_PRICE := 500
 const BARRIER_AMOUNT := 2
-const TIME_BONUS_SECONDS := 30
-const FREEZE_SECONDS := 15.0
+const LADDER_AMOUNT := 1
 const TITLES: PackedStringArray = ["Apparel", "Club Sets", "Armory", "Items", "Cart"]
 
 
@@ -87,11 +85,6 @@ func can_buy(item_id: String, score: GameState, weapons: Array[Weapon], buyer: P
 		return false
 	if String(item["kind"]) == "club":
 		if ClubKit.by_id(item_id).tier() <= score.club_kit().tier():
-			return false
-	if String(item["kind"]) == "medkit":
-		if buyer == null or not buyer.health.is_alive():
-			return false
-		if buyer.health.hp >= buyer.health.max_hp:
 			return false
 	return score.money >= int(item["price"])
 
@@ -193,6 +186,10 @@ func _extra(
 		return "   owned" if kind != "club" else "   equipped"
 	if kind == "fort" and barrier > 0:
 		return "   $%d   (%d held)" % [int(item["price"]), barrier]
+	if kind == "ladder":
+		var held := 0 if score == null else score.ladder_charges
+		if held > 0:
+			return "   $%d   (%d held)" % [int(item["price"]), held]
 	return "   $%d" % int(item["price"])
 
 
@@ -208,16 +205,13 @@ func _grant(
 				gun.add_ammo(AMMO_AMOUNT)
 		"fort":
 			score.add_barrier_charges(BARRIER_AMOUNT)
+		"ladder":
+			score.add_ladder_charges(LADDER_AMOUNT)
 		"club":
 			score.equip_club(String(item["id"]))
 		"apparel":
 			if buyer != null:
 				buyer.wear_apparel(item)
-		"medkit":
-			if buyer != null:
-				buyer.health.heal()
-		"revive":
-			_grant_revive(buyer)
 		"cart_turbo":
 			if cart != null:
 				cart.install_turbo()
@@ -227,21 +221,8 @@ func _grant(
 		"cart_armor":
 			if cart != null:
 				cart.install_armor()
-		"time_bonus":
-			score.add_bonus_seconds(TIME_BONUS_SECONDS)
-		"time_freeze":
-			score.add_freeze_seconds(FREEZE_SECONDS)
 		"mech":
 			score.mech_bought = true
-
-
-func _grant_revive(buyer: Player) -> void:
-	if buyer == null:
-		return
-	if buyer.partner != null and buyer.partner.health.is_downed():
-		buyer.partner.health.revive_now()
-		return
-	buyer.health.add_auto_revive()
 
 
 func _find(item_id: String) -> Dictionary:

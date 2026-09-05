@@ -9,7 +9,7 @@ func test_starter_matches_the_old_club() -> void:
 	assert_eq(kit.deviation_scale, 1.0)
 	assert_eq(kit.speed_scale, 1.0)
 	assert_eq(kit.putt_speed_scale, 1.0)
-	assert_almost_eq(kit.scaled_carry(), Shot.max_carry(), 0.001)
+	assert_almost_eq(kit.scaled_carry(), Shot.max_carry() * Shot.DISTANCE_SCALE, 0.001)
 
 
 func test_better_sets_forgive_more_and_hit_farther() -> void:

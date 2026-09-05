@@ -1,8 +1,8 @@
 class_name HeightField
 extends RefCounted
-## Ground height for one hole. The course is a sampled heightmap so the fairway
-## can drop away from the tee, the green can sit on a rise, and the rough is
-## never a bowling alley.
+## Ground height for one hole. The fairway is a flat deck at Y=0 so obstacle
+## blocks snap flush. The rough keeps its hills, blended in so the lip is a
+## slope, not a shelf.
 
 const CELL := 2.5
 const SKIRT := 4.0
@@ -19,9 +19,10 @@ const WATER_BANK := 6.0
 const WATER_SHELF := 3.0
 ## Run the floor takes to fall from the shelf to full depth.
 const WATER_SLOPE := 4.5
+## Blocks snap to this plane. Tee, fairway and green all sit on it.
+const DECK := 0.0
 ## The landing strip stays playable. Off it, the rough can actually rise and fall.
 const NOISE_OFF_FAIRWAY := 3.8
-const NOISE_ON_FAIRWAY := 0.22
 const HILL_BLEND := 14.0
 
 enum Profile { DOWNHILL, UPHILL, VALLEY, RIDGE, ROLLING }
@@ -106,30 +107,64 @@ static func generate(data: HoleData, rng: RandomNumberGenerator) -> HeightField:
 	noise.seed = rng.randi()
 	noise.frequency = 0.018
 	noise.fractal_octaves = 2
-	var tee_h := _profile_at(0.0, profile, rise)
-	var cup_h := _profile_at(1.0, profile, rise)
-	var fairway := HoleGenerator.fairway_width(data.par) * 0.5
+	var fairway := data.fairway_width() * 0.5
 	field.samples.resize(field.width * field.depth)
+	# #region agent log
+	var _t_hf := Time.get_ticks_msec()
+	var _dbg8 := FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-8cf7b5.log", FileAccess.READ_WRITE)
+	if _dbg8 == null:
+		_dbg8 = FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-8cf7b5.log", FileAccess.WRITE)
+	else:
+		_dbg8.seek_end()
+	if _dbg8 != null:
+		_dbg8.store_line(JSON.stringify({
+			"sessionId": "8cf7b5",
+			"hypothesisId": "A",
+			"location": "height_field.gd:generate",
+			"message": "sample loop start",
+			"data": {
+				"index": data.index,
+				"w": field.width,
+				"d": field.depth,
+				"cells": field.width * field.depth,
+				"centerline": data.centerline.size(),
+			},
+			"timestamp": _t_hf,
+		}))
+		_dbg8.close()
+	# #endregion
 	for z in field.depth:
 		for x in field.width:
 			var wx := field.origin.x + float(x) * CELL
 			var wz := field.origin.y + float(z) * CELL
 			var point := Vector3(wx, 0.0, wz)
 			var t := _along_t(data, point)
-			var profile_h := _profile_at(t, profile, rise)
-			var linear_h := lerpf(tee_h, cup_h, t)
+			var sloped := _profile_at(t, profile, rise)
+			sloped += noise.get_noise_2d(wx, wz) * NOISE_OFF_FAIRWAY
+			sloped += noise.get_noise_2d(wx * 2.3, wz * 2.3) * NOISE_OFF_FAIRWAY * 0.55
 			var off := HoleGenerator.distance_to_centerline(data, point)
-			# The fairway still follows the hole's grade, but never walls up in
-			# front of a drive the way the rough is allowed to.
-			var fairway_w := 1.0 - clampf((off - 2.0) / maxf(4.0, fairway), 0.0, 1.0)
-			var h := lerpf(profile_h, linear_h, fairway_w * 0.7)
 			var hill := clampf((off - fairway) / HILL_BLEND, 0.0, 1.0)
-			var noise_amp := lerpf(NOISE_ON_FAIRWAY, NOISE_OFF_FAIRWAY, hill)
-			h += noise.get_noise_2d(wx, wz) * noise_amp
-			# Shorter mounds only in the rough, so the fairway does not inherit them.
-			h += noise.get_noise_2d(wx * 2.3, wz * 2.3) * NOISE_OFF_FAIRWAY * 0.55 * hill
-			field.samples[z * field.width + x] = _flatten(h, point, data, tee_h, cup_h)
+			var h := lerpf(DECK, sloped, smoothstep(0.0, 1.0, hill))
+			field.samples[z * field.width + x] = _flatten(h, point, data)
+	# #region agent log
+	_dbg8 = FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-8cf7b5.log", FileAccess.READ_WRITE)
+	if _dbg8 == null:
+		_dbg8 = FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-8cf7b5.log", FileAccess.WRITE)
+	else:
+		_dbg8.seek_end()
+	if _dbg8 != null:
+		_dbg8.store_line(JSON.stringify({
+			"sessionId": "8cf7b5",
+			"hypothesisId": "A",
+			"location": "height_field.gd:generate",
+			"message": "sample loop end",
+			"data": {"elapsed_ms": Time.get_ticks_msec() - _t_hf},
+			"timestamp": Time.get_ticks_msec(),
+		}))
+		_dbg8.close()
+	# #endregion
 	MountainHole.raise(field, data)
+	ArenaHole.flatten(field, data)
 	CulvertHole.raise(field, data)
 	CulvertHole.cut(field, data)
 	field._sink_ponds(data)
@@ -216,7 +251,7 @@ func _raise_jumps(data: HoleData) -> void:
 ## Flat cart lane from just past the green to the fence, so the drive off the
 ## hole is not a climb through the rough.
 func _pave_exit(data: HoleData) -> void:
-	var along := data.cup - data.tee
+	var along := data.along_cup() if RaceHole.applies(data) else data.cup - data.tee
 	along.y = 0.0
 	if along.length_squared() < 0.0001:
 		return
@@ -250,7 +285,7 @@ func _pave_exit(data: HoleData) -> void:
 ## through the floor. Paved after ponds so a water cut cannot leave a bowl
 ## inside the rooms.
 func _pave_clubhouse(data: HoleData) -> void:
-	var forward := data.cup - data.tee
+	var forward := data.along_tee() if RaceHole.applies(data) else data.cup - data.tee
 	forward.y = 0.0
 	if forward.length_squared() < 0.0001:
 		return
@@ -343,28 +378,26 @@ static func _along_t(data: HoleData, point: Vector3) -> float:
 	return clampf(best, 0.0, 1.0)
 
 
-## Tee, practice green, green and fringe stay locally flat so a drive and a putt
-## do not sit on a slope. The warm-up green is held at tee height, which keeps
-## the whole tee complex one level shelf.
-static func _flatten(
-	h: float, point: Vector3, data: HoleData, tee_h: float, cup_h: float
-) -> float:
+## Tee, practice green, green and fringe stay on the same deck as the fairway
+## so a drive and a putt do not sit on a slope, and the warm-up green stays
+## one level with the tee.
+static func _flatten(h: float, point: Vector3, data: HoleData) -> float:
 	var tee_d := point.distance_to(data.tee)
 	if tee_d < 10.0:
-		h = tee_h
+		h = DECK
 	else:
-		h = lerpf(h, tee_h, 1.0 - clampf((tee_d - 10.0) / 8.0, 0.0, 1.0))
+		h = lerpf(h, DECK, 1.0 - clampf((tee_d - 10.0) / 8.0, 0.0, 1.0))
 	var practice_d := point.distance_to(data.practice_center())
 	if practice_d < PracticeGreen.FLAT:
-		h = tee_h
+		h = DECK
 	else:
-		h = lerpf(h, tee_h, 1.0 - clampf((practice_d - PracticeGreen.FLAT) / 6.0, 0.0, 1.0))
+		h = lerpf(h, DECK, 1.0 - clampf((practice_d - PracticeGreen.FLAT) / 6.0, 0.0, 1.0))
 	var green_d := point.distance_to(data.cup)
 	var green_flat := data.green_radius + HoleGenerator.FRINGE_WIDTH
 	if green_d < green_flat:
-		h = cup_h
+		h = DECK
 	else:
-		h = lerpf(h, cup_h, 1.0 - clampf((green_d - green_flat) / 6.0, 0.0, 1.0))
+		h = lerpf(h, DECK, 1.0 - clampf((green_d - green_flat) / 6.0, 0.0, 1.0))
 	return h
 
 

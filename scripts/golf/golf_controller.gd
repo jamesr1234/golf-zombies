@@ -7,6 +7,7 @@ extends Node3D
 
 signal stroke_taken()
 signal golfer_changed(golfer: Node)
+signal sweet_struck()
 
 const CLAIM_RANGE := 3.6
 const MOUSE_AIM_DEG := 0.12
@@ -21,6 +22,9 @@ const CAMERA_SIDE := 0.8
 ## The golfer turns with the club, which is what sells a swing on a body with no
 ## arms to animate.
 const BODY_TURN_RATIO := 0.22
+const SHAKE_AMP := 0.55
+const SHAKE_DECAY := 2.8
+const SHAKE_ROLL := 0.05
 
 var ball: GolfBall
 var golfer: Node = null
@@ -43,6 +47,7 @@ var _lie := Vector3.ZERO
 ## Locked at contact. Online clients never mark their own ball in play, so this
 ## is what keeps the stance from tracking the synced flight.
 var _lie_locked := false
+var _shake := 0.0
 
 
 func _ready() -> void:
@@ -157,7 +162,7 @@ func aim_height_by(degrees: float) -> void:
 func get_camera_transform() -> Transform3D:
 	var pivot := ball.global_position if ball != null else global_position
 	if _is_watching_shot():
-		return _look_from(_shot_eye, pivot)
+		return _with_shake(_look_from(_shot_eye, pivot))
 	var forward := Shot.aim_direction(aim_yaw, 0.0)
 	var look_along := _preview_look_along()
 	var back := CAMERA_DISTANCE
@@ -170,10 +175,11 @@ func get_camera_transform() -> Transform3D:
 		+ Vector3.UP * (height + look_along * 0.035)
 		+ forward.cross(Vector3.UP) * CAMERA_SIDE
 	)
-	return _look_from(eye, pivot + forward * look_along + Vector3.UP * CAMERA_LOOK_HEIGHT)
+	return _with_shake(_look_from(eye, pivot + forward * look_along + Vector3.UP * CAMERA_LOOK_HEIGHT))
 
 
 func _process(delta: float) -> void:
+	_shake = move_toward(_shake, 0.0, SHAKE_DECAY * delta)
 	if golfer == null:
 		return
 	if meter.is_swinging():
@@ -202,7 +208,8 @@ func _pose_preview() -> void:
 		return
 	_preview.visible = true
 	_preview.draw(Shot.flight_points(
-		_lie, aim_yaw, 1.0, aim_loft, _is_putting(), club_kit, green_span
+		_lie, aim_yaw, 1.0, aim_loft, _is_putting(), _shot_kit(), green_span,
+		_preview_surface()
 	))
 
 
@@ -246,7 +253,10 @@ func _claim(player: Node) -> void:
 func _strike() -> void:
 	_lock_lie()
 	_apply_kit()
+	var sweet := meter.sweet
 	ball.strike(aim_yaw, meter.deviation_deg, meter.power, _shot_kit(), green_span, aim_loft)
+	if sweet:
+		_celebrate_sweet()
 	meter.reset()
 	_arrow.visible = false
 	if _preview != null:
@@ -254,6 +264,36 @@ func _strike() -> void:
 	_club.start_follow_through()
 	stroke_taken.emit()
 	Sfx.play("putt" if _is_putting() else "club_hit", self)
+
+
+func _celebrate_sweet() -> void:
+	_shake = 1.0
+	var root := _fx_root()
+	var at := _lie
+	if at == Vector3.ZERO and ball != null:
+		at = ball.global_position
+	if root != null and (ball != null or _lie != Vector3.ZERO):
+		HitFx.burst(root, at + Vector3.UP * GolfBall.RADIUS, Palette.LIME)
+	sweet_struck.emit()
+
+
+func _fx_root() -> Node:
+	if not is_inside_tree():
+		return null
+	var root := get_tree().get_first_node_in_group("fx_root")
+	return root if root != null else get_tree().current_scene
+
+
+func _with_shake(xform: Transform3D) -> Transform3D:
+	if _shake <= 0.0:
+		return xform
+	var t := Time.get_ticks_msec() * 0.001
+	var amp := _shake * SHAKE_AMP
+	xform.origin += xform.basis.x * sin(t * 58.0) * amp
+	xform.origin += xform.basis.y * cos(t * 67.0) * amp
+	xform.basis = xform.basis.rotated(xform.basis.z, sin(t * 53.0) * _shake * SHAKE_ROLL)
+	xform.basis = xform.basis.rotated(xform.basis.x, cos(t * 71.0) * _shake * SHAKE_ROLL)
+	return xform
 
 
 func _shot_kit() -> ClubKit:
@@ -294,6 +334,12 @@ func _is_watching_shot() -> bool:
 
 func _is_putting() -> bool:
 	return ball != null and ball.is_putting()
+
+
+func _preview_surface() -> Surface.Type:
+	if ball == null:
+		return Surface.Type.FAIRWAY
+	return ball.current_surface()
 
 
 func _yaw_towards(target: Vector3) -> float:

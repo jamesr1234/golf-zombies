@@ -85,6 +85,32 @@ func test_the_aim_arrow_follows_world_yaw_when_the_parent_has_spun() -> void:
 	assert_almost_eq(golf._arrow.global_position.distance_to(golf._lie), 0.0, 0.01)
 
 
+func test_a_sweet_strike_shakes_the_golf_camera() -> void:
+	var golf := GolfController.new()
+	add_child_autofree(golf)
+	watch_signals(golf)
+	golf._celebrate_sweet()
+	assert_gt(golf._shake, 0.0)
+	assert_signal_emitted(golf, "sweet_struck")
+	var shaken := golf._with_shake(Transform3D.IDENTITY)
+	assert_gt(shaken.origin.length(), 0.001, "the camera has to kick off its rest pose")
+
+
+func test_a_sweet_strike_spawns_sparks_in_the_world() -> void:
+	var fx := Node3D.new()
+	fx.add_to_group("fx_root")
+	add_child_autofree(fx)
+	var golf := GolfController.new()
+	add_child_autofree(golf)
+	var ball := GolfBall.new()
+	add_child_autofree(ball)
+	golf.ball = ball
+	golf._lie = Vector3(2.0, 0.15, -4.0)
+	var before := fx.get_child_count()
+	golf._celebrate_sweet()
+	assert_gt(fx.get_child_count(), before, "sparks have to live under fx_root, not the window")
+
+
 func test_the_stick_raises_shot_height_until_the_swing_starts() -> void:
 	var golf := GolfController.new()
 	add_child_autofree(golf)
@@ -131,6 +157,36 @@ func test_the_white_line_follows_a_perfect_hit() -> void:
 	assert_gt(
 		golf._preview.landing.distance_to(golf._lie), 40.0,
 		"the landing mark has to sit out at the carry, not on the ball"
+	)
+
+
+func test_the_white_line_shortens_in_the_rough() -> void:
+	var ball := GolfBall.new()
+	add_child_autofree(ball)
+	ball.enter_surface(Surface.Type.ROUGH)
+	var golf := GolfController.new()
+	add_child_autofree(golf)
+	await get_tree().process_frame
+	golf.ball = ball
+	golf.golfer = Node.new()
+	add_child_autofree(golf.golfer)
+	golf._lie = Vector3.ZERO
+	golf.aim_yaw = 0.0
+	golf.aim_loft = 0.0
+	golf._pose_preview()
+	var expected := Shot.flight_points(
+		golf._lie, 0.0, 1.0, 0.0, false, ClubKit.starter(), 0.0, Surface.Type.ROUGH
+	)
+	var drawn := _preview_points(golf._preview)
+	assert_eq(drawn.size(), expected.size())
+	assert_almost_eq(
+		golf._preview.landing.distance_to(expected[expected.size() - 1]), 0.0, 0.2
+	)
+	var fairway := Shot.flight_points(golf._lie, 0.0, 1.0)
+	assert_lt(
+		golf._preview.landing.distance_to(golf._lie),
+		fairway[fairway.size() - 1].distance_to(golf._lie) - 10.0,
+		"the landing ring has to sit on the rough carry, not the fairway drive"
 	)
 
 

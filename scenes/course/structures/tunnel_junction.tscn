@@ -1,0 +1,28 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="PackedScene" uid="uid://dsgfa1lne4ck6" path="res://assets/obstacles/tunnel_large.glb" id="1_tunnel_large"]
+[ext_resource type="PackedScene" uid="uid://cbbs48ffxgq1a" path="res://assets/obstacles/cube_small.glb" id="2_cube_small"]
+[ext_resource type="PackedScene" uid="uid://my7dkqia2h6j" path="res://assets/obstacles/pillar_small.glb" id="3_pillar_small"]
+
+[node name="TunnelJunction" type="Node3D"]
+
+[node name="tunnel_large" parent="." instance=ExtResource("1_tunnel_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.7, 0, 0)
+
+[node name="tunnel_large2" parent="." instance=ExtResource("1_tunnel_large")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 9.45, 0, -1.35)
+
+[node name="cube_small" parent="." instance=ExtResource("2_cube_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="cube_small2" parent="." instance=ExtResource("2_cube_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.8, 0, 0)
+
+[node name="cube_small3" parent="." instance=ExtResource("2_cube_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -10.8)
+
+[node name="cube_small4" parent="." instance=ExtResource("2_cube_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.8, 0, -10.8)
+
+[node name="pillar_small" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.4, 9.45, -5.4)

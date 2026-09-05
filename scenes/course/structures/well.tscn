@@ -1,0 +1,36 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="PackedScene" uid="uid://cbbs48ffxgq1a" path="res://assets/obstacles/cube_small.glb" id="1_cube_small"]
+[ext_resource type="PackedScene" uid="uid://cbq1a3mrwoitm" path="res://assets/obstacles/platform_medium.glb" id="2_platform_medium"]
+[ext_resource type="PackedScene" uid="uid://pfp86xbuqujd" path="res://assets/obstacles/ladder_medium.glb" id="3_ladder_medium"]
+[ext_resource type="PackedScene" uid="uid://bvywikjp6p81e" path="res://assets/obstacles/pillar_extra_small.glb" id="4_pillar_extra_small"]
+[ext_resource type="PackedScene" uid="uid://cow1vnvymyyu7" path="res://assets/obstacles/wall_extra_small.glb" id="5_wall_extra_small"]
+
+[node name="Well" type="Node3D"]
+
+[node name="cube_small" parent="." instance=ExtResource("1_cube_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="cube_small2" parent="." instance=ExtResource("1_cube_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 0, 0)
+
+[node name="cube_small3" parent="." instance=ExtResource("1_cube_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -4.05)
+
+[node name="cube_small4" parent="." instance=ExtResource("1_cube_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 0, -4.05)
+
+[node name="platform_medium" parent="." instance=ExtResource("2_platform_medium")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.35, 2.7, -1.35)
+
+[node name="ladder_medium" parent="." instance=ExtResource("3_ladder_medium")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.7, 0, -2.7)
+
+[node name="pillar_extra_small" parent="." instance=ExtResource("4_pillar_extra_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.35, 4.05, -1.35)
+
+[node name="pillar_extra_small2" parent="." instance=ExtResource("4_pillar_extra_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 4.05, -4.05)
+
+[node name="wall_extra_small" parent="." instance=ExtResource("5_wall_extra_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.35, 4.05, -1.35)

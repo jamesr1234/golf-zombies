@@ -39,7 +39,10 @@ func tick(delta: float) -> void:
 		return
 	if _player.health != null and not _player.health.is_alive():
 		return
-	if _player.shopping or _player.talking:
+	if _player.shopping:
+		_ghost.tap("swap_gear")
+		return
+	if _player.talking:
 		_ghost.tap("interact")
 		return
 	match _phase():
@@ -56,6 +59,8 @@ func _hole(delta: float) -> void:
 		_walk_toward(_player.partner.global_position)
 		if _player.partner_needs_revive():
 			_ghost.hold("revive")
+		return
+	if _arena_fight(delta):
 		return
 	if _can("can_retrieve_ball"):
 		_ghost.tap("interact")
@@ -154,7 +159,7 @@ func _ride_to(dest: Vector3) -> bool:
 		_walk_toward(dest)
 		_ghost.hold("sprint")
 		return true
-	if cart.can_board(_player):
+	if cart.can_right(_player) or cart.can_board(_player):
 		_ghost.tap("interact")
 		return true
 	_walk_toward(cart.global_position)
@@ -319,7 +324,7 @@ func _transit() -> void:
 		_ghost.tap("interact")
 		return
 	var cart := _cart()
-	if cart != null and cart.can_board(_player):
+	if cart != null and (cart.can_right(_player) or cart.can_board(_player)):
 		_ghost.tap("interact")
 		return
 	if cart != null:
@@ -356,7 +361,8 @@ func _shop() -> void:
 
 
 func _fight() -> void:
-	if _player.weapon != null and _player.weapon.mag() <= 0:
+	var armed := _player.weapon != null and _player.weapon.has_weapon()
+	if armed and _player.weapon.mag() <= 0:
 		_ghost.tap("reload")
 	var zombie := _nearest_zombie()
 	if zombie == null:
@@ -367,10 +373,32 @@ func _fight() -> void:
 	_ghost.look = CpuBuddy.look_stick(yaw_err, pitch_err)
 	var range := _player.global_position.distance_to(zombie.global_position)
 	var on_target := absf(yaw_err) < AIM_OK_DEG and absf(pitch_err) < AIM_OK_DEG
-	if on_target and range <= SHOOT_RANGE:
+	if armed and on_target and range <= _hunt_range():
 		_ghost.hold("shoot")
 	if on_target and range <= MELEE_RANGE:
 		_ghost.tap("melee")
+
+
+func _arena_fight(_delta: float) -> bool:
+	if _player.flow == null or not ArenaHole.applies(_player.flow.hole):
+		return false
+	var phase := _phase()
+	if phase != VsMatchFlow.Phase.PREP and phase != VsMatchFlow.Phase.PLAYING:
+		return false
+	if ArenaHole.needs_gun(_player):
+		var gun := ArenaHole.nearest_gun(_player)
+		if gun != null:
+			_walk_toward(gun.global_position)
+			_ghost.hold("sprint", true)
+		return true
+	_fight()
+	return true
+
+
+func _hunt_range() -> float:
+	if _player.flow != null and ArenaHole.applies(_player.flow.hole):
+		return ArenaHole.HUNT_RANGE
+	return SHOOT_RANGE
 
 
 func _walk_toward(world_point: Vector3) -> void:
@@ -466,7 +494,7 @@ func _nearest_zombie() -> Zombie:
 	if not _player.is_inside_tree():
 		return null
 	var best: Zombie
-	var best_dist := SHOOT_RANGE
+	var best_dist := _hunt_range()
 	for node in _player.get_tree().get_nodes_in_group("zombies"):
 		var zombie := node as Zombie
 		if zombie == null or not is_instance_valid(zombie):

@@ -3,7 +3,7 @@ extends CharacterBody3D
 ## One script for both players. Movement, swim, shop, beer, combat, and camera
 ## live in composable helpers so each stays under the line-count rule.
 
-enum State { NORMAL, GOLFING, RIDING, SWIMMING, SHIELDING, PLACING, CLIMBING, MECH, GRAPPLING }
+enum State { NORMAL, GOLFING, RIDING, SWIMMING, SHIELDING, PLACING, CLIMBING, MECH, GRAPPLING, ZIPLINING }
 
 ## Re-exported for callers and tests that still read Player.CONST.
 const SPRINT_SPEED := PlayerMotion.SPRINT_SPEED
@@ -12,9 +12,12 @@ const BODY_RADIUS := PlayerHitFx.BODY_RADIUS
 const BASE_FOV := PlayerLook.BASE_FOV
 const DRIVER_FOV := PlayerLook.DRIVER_FOV
 const REVIVE_RANGE := 2.8
+## How hard the ragdoll spills when a thrown gun floors you.
+const FLOOR_FLOP_STRENGTH := 1.7
 const STAND_HEAD_HEIGHT := PlayerHitFx.STAND_HEAD_HEIGHT
 const DOWNED_HEAD_HEIGHT := PlayerAnim.DOWNED_HEAD_HEIGHT
 const SIT_HEAD_HEIGHT := PlayerAnim.SIT_HEAD_HEIGHT
+const SLIDE_HEAD_HEIGHT := PlayerAnim.SLIDE_HEAD_HEIGHT
 const HIT_FLASH_TIME := PlayerHitFx.HIT_FLASH_TIME
 const HIT_KNOCK := PlayerMotion.HIT_KNOCK
 const WADE_DEPTH := PlayerSwim.WADE_DEPTH
@@ -40,6 +43,9 @@ const _WorldFx := preload("res://scripts/net/world_fx.gd")
 @export var sync_pitch := 0.0
 @export var sync_stick := Vector2.ZERO
 @export var sync_sprint := false
+@export var sync_slide := false
+@export var sync_glide := false
+@export var sync_glide_worn := false
 @export var sync_jumps := 0
 @export var sync_xform := Transform3D.IDENTITY:
 	set(value):
@@ -67,6 +73,9 @@ var mech: MechSuit
 var flow
 var partner: Player
 var state: State = State.NORMAL
+## Seconds left flat on your back after a thrown gun landed on you. Short and
+## self-righting, unlike being downed, which waits on a partner.
+var floored_for := 0.0
 @export var aiming := false
 var brain: CpuBuddy
 var shopping := false
@@ -78,18 +87,23 @@ var talk_line := ""
 var _talk_npc: ClubhouseNpc
 var buzz := Buzz.new()
 @export var holding_beer := false
+@export var holding_mines := false
 ## CPU partner plants a shield after a tower sniper connects, or while you snipe.
 var wants_cover := false
 var climber := Climber.new()
 var grappler := Grappler.new()
+var zipliner := Zipliner.new()
 var _grapple_line: GrappleLine
 ## World point of a latched claw, so a watcher can draw the rope.
 @export var sync_grapple_at := Vector3.INF
 var mill_desk
 
 var swim := PlayerSwim.new()
+var slide := PlayerSlide.new()
+var glide := PlayerGlide.new()
 var place := PlayerPlace.new()
 var beer := PlayerBeerKit.new()
+var mine_kit := PlayerMines.new()
 var shop := PlayerShop.new()
 var look := PlayerLook.new()
 var motion := PlayerMotion.new()
@@ -99,6 +113,7 @@ var interact := PlayerInteract.new()
 var hit_fx := PlayerHitFx.new()
 var vehicle := PlayerVehicle.new()
 var anim := PlayerAnim.new()
+var poker := PlayerPoker.new()
 
 var _shield:
 	get:
@@ -196,6 +211,7 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	floored_for = maxf(0.0, floored_for - delta)
 	if (
 		state == State.RIDING
 		and (cart == null or not cart.is_riding(self))
@@ -219,7 +235,9 @@ func _physics_process(delta: float) -> void:
 	elif brain != null:
 		brain.tick(delta)
 	if is_driving() and NetSession.is_active() and not multiplayer.is_server() and cart != null:
-		cart.report_drive.rpc_id(1, input.move_vector(), input.pressed("shoot"))
+		cart.report_drive.rpc_id(
+			1, input.move_vector(), input.pressed("shoot"), input.pressed("aim")
+		)
 	look.tick(self, delta)
 	if is_in_mech() and NetSession.is_active() and not multiplayer.is_server() and mech != null:
 		mech.report_pilot.rpc_id(
@@ -239,13 +257,16 @@ func _physics_process(delta: float) -> void:
 	_tick_grapple()
 	if health.is_downed():
 		head.position.y = DOWNED_HEAD_HEIGHT
-	elif is_riding():
+	elif is_riding() or is_poker_seated():
 		head.position.y = SIT_HEAD_HEIGHT
+	elif is_sliding():
+		head.position.y = SLIDE_HEAD_HEIGHT
 	else:
 		head.position.y = STAND_HEAD_HEIGHT
 	motion.tick(self, delta)
 	combat.tick(self, delta)
 	interact.tick(self, delta)
+	poker.tick(self, delta)
 	buzz.tick(delta)
 	weapon.power_mult = buzz.weapon_mult()
 	hit_fx.tick_flash(self, delta)
@@ -260,6 +281,9 @@ func _physics_process(delta: float) -> void:
 	sync_pitch = look.pitch
 	sync_stick = input.move_vector()
 	sync_sprint = input.pressed("sprint")
+	sync_slide = slide.active
+	sync_glide = glide.active
+	sync_glide_worn = glide.equipped
 	sync_grapple_at = grappler.attach_world() if grappler.is_latched() else Vector3.INF
 	sync_xform = global_transform
 	anim.tick(self, delta)
@@ -320,6 +344,14 @@ func is_swimming() -> bool:
 	return state == State.SWIMMING
 
 
+func is_sliding() -> bool:
+	return slide.active
+
+
+func is_gliding() -> bool:
+	return glide.active
+
+
 func is_underwater() -> bool:
 	return state == State.SWIMMING and swim.underwater
 
@@ -344,8 +376,16 @@ func is_grappling() -> bool:
 	return state == State.GRAPPLING
 
 
+func is_ziplining() -> bool:
+	return state == State.ZIPLINING and zipliner.is_active()
+
+
 func is_milling() -> bool:
 	return mill_desk != null and is_instance_valid(mill_desk) and mill_desk.operator == self
+
+
+func is_poker_seated() -> bool:
+	return poker.seated()
 
 
 func is_celebrating() -> bool:
@@ -407,7 +447,52 @@ func wallet():
 
 
 func fling(direction: Vector3, speed: float, lift := 14.0, lock := 1.0) -> void:
-	motion.fling(self, direction, speed, lift, lock)
+	motion.apply_fling(self, direction, speed, lift, lock)
+
+
+func is_floored() -> bool:
+	return floored_for > 0.0
+
+
+## Flat on your back for a moment: no walking, no shooting, and a ragdoll flop
+## that rights itself, so nobody has to come and pick you up.
+func knock_to_floor(seconds: float, from: Vector3, speed := 7.0) -> void:
+	if seconds <= 0.0:
+		return
+	if speed > 0.0:
+		apply_knockback(from, speed)
+	_go_flat(seconds, from)
+	if NetSession.is_active() and multiplayer.is_server():
+		_replicate_floor.rpc(seconds, from)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _replicate_floor(seconds: float, from: Vector3) -> void:
+	_go_flat(seconds, from)
+
+
+func _go_flat(seconds: float, from: Vector3) -> void:
+	floored_for = maxf(floored_for, seconds)
+	if body == null or is_riding():
+		return
+	var away := global_position - from
+	away.y = 0.0
+	if away.length_squared() < 0.0001:
+		away = -global_transform.basis.z
+	body.flop(Ragdoll.Region.TORSO, away.normalized(), FLOOR_FLOP_STRENGTH, false)
+
+
+func request_host_throw(origin: Vector3, direction: Vector3) -> void:
+	_request_throw.rpc_id(1, origin, direction)
+
+
+@rpc("any_peer", "reliable")
+func _request_throw(origin: Vector3, direction: Vector3) -> void:
+	if not multiplayer.is_server():
+		return
+	if multiplayer.get_remote_sender_id() != peer_id:
+		return
+	WeaponGate.host_throw(self, origin, direction)
 
 
 func apply_knockback(from: Vector3, speed := 10.0) -> void:
@@ -422,6 +507,12 @@ func _do_knockback(from: Vector3, speed: float) -> void:
 func _receive_knockback(from: Vector3, speed: float) -> void:
 	if is_multiplayer_authority():
 		_do_knockback(from, speed)
+
+
+@rpc("any_peer", "reliable")
+func _receive_fling(direction: Vector3, speed: float, lift: float, lock: float) -> void:
+	if is_multiplayer_authority():
+		motion.fling(self, direction, speed, lift, lock)
 
 
 func get_view_transform() -> Transform3D:
@@ -567,6 +658,14 @@ func exit_boost() -> void:
 	motion.exit_boost()
 
 
+func enter_escalator(lift) -> void:
+	motion.enter_escalator(lift)
+
+
+func exit_escalator(lift) -> void:
+	motion.exit_escalator(lift)
+
+
 func sit_as_driver(sit_at: Vector3, facing_yaw: float) -> void:
 	vehicle.sit_as_driver(self, sit_at, facing_yaw)
 
@@ -580,7 +679,7 @@ func get_prompt() -> String:
 
 
 func wants_map() -> bool:
-	if is_cpu() or not health.is_alive() or shopping or talking:
+	if is_cpu() or not health.is_alive() or shopping or talking or is_poker_seated():
 		return false
 	if partner_needs_revive():
 		return false
@@ -720,6 +819,26 @@ func _request_place(at: Vector3, yaw_deg: float) -> void:
 	if multiplayer.get_remote_sender_id() != peer_id:
 		return
 	place.host_place(self, at, yaw_deg)
+
+
+@rpc("any_peer", "reliable")
+func _request_place_ladder(at: Vector3, yaw_deg: float, span: float) -> void:
+	if not multiplayer.is_server():
+		return
+	if multiplayer.get_remote_sender_id() != peer_id:
+		return
+	place.host_place_ladder(self, at, yaw_deg, span)
+
+
+@rpc("any_peer", "reliable")
+func _request_throw_ladder() -> void:
+	if not multiplayer.is_server():
+		return
+	if multiplayer.get_remote_sender_id() != peer_id:
+		return
+	var ladder := LeanLadder.nearest_throw(self)
+	if ladder != null:
+		ladder.host_throw(self)
 
 
 func orders_cpu_shots() -> bool:
@@ -880,6 +999,10 @@ func mill_control():
 	return interact.mill_control(self)
 
 
+func escalator_button():
+	return interact.escalator_button(self)
+
+
 func _in_clubhouse() -> bool:
 	return flow != null and flow.in_clubhouse()
 
@@ -899,6 +1022,14 @@ func _request_beer_cart() -> void:
 
 func is_holding_beer() -> bool:
 	return beer.is_holding(self)
+
+
+func is_holding_mines() -> bool:
+	return mine_kit.is_holding(self)
+
+
+func drop_mine() -> bool:
+	return mine_kit.deploy(self)
 
 
 func throw_beer() -> bool:
@@ -933,6 +1064,29 @@ func wants_drunk_fx() -> bool:
 	return beer.wants_drunk_fx(self)
 
 
+func begin_zipline(line: Node3D) -> bool:
+	if health == null or not health.is_alive():
+		return false
+	if is_riding() or is_golfing() or is_in_mech() or shopping or talking:
+		return false
+	_drop_climb()
+	_drop_grapple()
+	if not zipliner.latch(self, line as Zipline):
+		return false
+	_cancel_place()
+	if _shield != null:
+		_shield.set_raised(false)
+	state = State.ZIPLINING
+	Sfx.play("zipline_grab", self)
+	return true
+
+
+func _drop_zipline() -> void:
+	zipliner.drop()
+	if state == State.ZIPLINING:
+		state = State.NORMAL
+
+
 func begin_grapple(ride: Node3D, at: Vector3) -> bool:
 	if not _can_keep_grapple():
 		grappler.drop()
@@ -951,6 +1105,7 @@ func _drop_grapple() -> void:
 	var was := is_grappling()
 	grappler.drop()
 	_set_grapple_mask(false)
+	floor_snap_length = PlayerMotion.FLOOR_SNAP
 	if was:
 		state = State.NORMAL
 		Sfx.play("grapple_release", self)
@@ -981,7 +1136,7 @@ func _can_keep_grapple() -> bool:
 		return false
 	return not (
 		is_riding() or is_golfing() or is_in_mech() or is_climbing()
-		or is_milling() or shopping or talking
+		or is_ziplining() or is_milling() or shopping or talking
 	)
 
 
@@ -1013,7 +1168,10 @@ func _set_grapple_mask(on: bool) -> void:
 	if collision_layer != Layers.PLAYER:
 		return
 	if on:
-		collision_mask = Layers.PLAYER_MASK & ~(Layers.VEHICLE | Layers.MECH)
+		var skip := Layers.VEHICLE | Layers.MECH
+		if grappler.is_point():
+			skip |= Layers.PROP
+		collision_mask = Layers.PLAYER_MASK & ~skip
 	else:
 		collision_mask = Layers.PLAYER_MASK
 

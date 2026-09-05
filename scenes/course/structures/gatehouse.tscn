@@ -1,0 +1,33 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="PackedScene" uid="uid://bifjp6glqcw13" path="res://assets/obstacles/arch_extra_large.glb" id="1_arch_extra_large"]
+[ext_resource type="PackedScene" uid="uid://cqqh1e4pr81n3" path="res://assets/obstacles/wall_large.glb" id="2_wall_large"]
+[ext_resource type="PackedScene" uid="uid://bcjd3mt2o6imu" path="res://assets/obstacles/platform_large.glb" id="3_platform_large"]
+[ext_resource type="PackedScene" uid="uid://cbbs48ffxgq1a" path="res://assets/obstacles/cube_small.glb" id="4_cube_small"]
+[ext_resource type="PackedScene" uid="uid://bmnsybxxauqal" path="res://assets/obstacles/pillar_medium.glb" id="5_pillar_medium"]
+
+[node name="Gatehouse" type="Node3D"]
+
+[node name="arch_extra_large" parent="." instance=ExtResource("1_arch_extra_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="wall_large" parent="." instance=ExtResource("2_wall_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.75, 0, 0)
+
+[node name="wall_large2" parent="." instance=ExtResource("2_wall_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.15, 0, 0)
+
+[node name="platform_large" parent="." instance=ExtResource("3_platform_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.7, 10.8, 0)
+
+[node name="cube_small" parent="." instance=ExtResource("4_cube_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.7, 12.15, 0)
+
+[node name="cube_small2" parent="." instance=ExtResource("4_cube_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.75, 12.15, 0)
+
+[node name="pillar_medium" parent="." instance=ExtResource("5_pillar_medium")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.35, 0, -1.35)
+
+[node name="pillar_medium2" parent="." instance=ExtResource("5_pillar_medium")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.15, 0, -1.35)

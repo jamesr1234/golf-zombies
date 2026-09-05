@@ -38,6 +38,9 @@ func test_the_suit_is_built_of_neon_parts() -> void:
 	assert_not_null(visuals.get_node_or_null("Stairs"))
 	assert_not_null(visuals.find_child("LeftArm", true, false))
 	assert_not_null(visuals.find_child("RightArm", true, false))
+	assert_not_null(visuals.find_child("Chassis", true, false), "blender plates ride the godot rig")
+	assert_not_null(visuals.find_child("LeftPod", true, false))
+	assert_not_null(visuals.find_child("RightPod", true, false))
 	assert_gte(visuals.get_node("Stairs").get_child_count(), 16, "a run of steps plus the balcony")
 	var meshes := suit.find_children("*", "MeshInstance3D", true, false)
 	assert_gte(meshes.size(), 40, "plates, arms, vents and a walkable stair")
@@ -48,6 +51,10 @@ func test_the_suit_is_built_of_neon_parts() -> void:
 	assert_gt(hatch.rotation.x, deg_to_rad(-20.0), "sealing folds the hatch")
 	assert_false(visuals.get_node("Stairs").visible, "the stair drops away once you are in")
 	assert_true((suit.get_node("StairRamp") as CollisionShape3D).disabled)
+	var hull := visuals.find_child("Chassis", true, false) as MeshInstance3D
+	var mat := hull.get_active_material(0) as StandardMaterial3D
+	assert_not_null(mat)
+	assert_lte(mat.emission_energy_multiplier, Palette.GLOW_SOFT)
 
 
 func test_the_pilot_looks_out_past_the_visor() -> void:

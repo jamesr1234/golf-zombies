@@ -45,6 +45,7 @@ var _net: Node3D
 var _flare: Node3D
 var _nailer: Node3D
 var _door: Node3D
+var _remote: Node3D
 var _phase := 0.0
 var _amount := 0.0
 var _steady_left := 0.0
@@ -66,7 +67,7 @@ func build(color: Color) -> void:
 	_build_shotgun(_shotgun, color)
 	_rocket = Node3D.new()
 	add_child(_rocket)
-	_build_rocket(_rocket, color)
+	build_rocket(_rocket, color)
 	_sniper = Node3D.new()
 	add_child(_sniper)
 	_build_sniper(_sniper, color)
@@ -82,6 +83,9 @@ func build(color: Color) -> void:
 	_door = Node3D.new()
 	add_child(_door)
 	_build_door(_door, color)
+	_remote = Node3D.new()
+	add_child(_remote)
+	_build_remote(_remote, color)
 	_paint_view(self)
 	show_gun("rifle")
 
@@ -107,6 +111,8 @@ func show_gun(kind: String) -> void:
 		_nailer.visible = kind == "nailer"
 	if _door != null:
 		_door.visible = kind == "door"
+	if _remote != null:
+		_remote.visible = kind == "remote"
 
 
 func is_shotgun() -> bool:
@@ -137,6 +143,10 @@ func is_door() -> bool:
 	return _door != null and _door.visible
 
 
+func is_remote() -> bool:
+	return _remote != null and _remote.visible
+
+
 ## Farthest the visible gun reaches down the barrel, used to tell the two meshes apart.
 func forward_extent() -> float:
 	var root := _rifle
@@ -152,6 +162,8 @@ func forward_extent() -> float:
 		root = _nailer
 	elif is_door():
 		root = _door
+	elif is_remote():
+		root = _remote
 	elif is_shotgun():
 		root = _shotgun
 	if root == null:
@@ -337,7 +349,7 @@ func _build_shotgun(parent: Node3D, color: Color) -> void:
 	parent.add_child(butt)
 
 
-func _build_rocket(parent: Node3D, color: Color) -> void:
+static func build_rocket(parent: Node3D, color: Color) -> void:
 	var metal := color.darkened(0.38)
 	var tube := MeshFactory.cylinder(0.04, 0.3, metal)
 	tube.rotation.x = deg_to_rad(90.0)
@@ -486,6 +498,27 @@ func _build_door(parent: Node3D, color: Color) -> void:
 	var grip := MeshFactory.box(Vector3(0.045, 0.11, 0.05), metal)
 	grip.position = Vector3(0.0, -0.085, 0.07)
 	grip.rotation.x = deg_to_rad(-16.0)
+	parent.add_child(grip)
+
+
+func _build_remote(parent: Node3D, color: Color) -> void:
+	var shell := color.darkened(0.45)
+	var body := MeshFactory.box(Vector3(0.09, 0.035, 0.16), shell)
+	body.position = Vector3(0.0, 0.0, 0.02)
+	parent.add_child(body)
+	var button := MeshFactory.cylinder(0.032, 0.028, Palette.LED_RED, Palette.GLOW_STRONG)
+	button.position = Vector3(0.0, 0.028, 0.0)
+	parent.add_child(button)
+	var stem := MeshFactory.cylinder(0.006, 0.07, shell)
+	stem.position = Vector3(0.0, 0.01, -0.12)
+	stem.rotation.x = deg_to_rad(90.0)
+	parent.add_child(stem)
+	var tip := MeshFactory.sphere(0.012, Palette.LED_RED, Palette.GLOW_MEDIUM)
+	tip.position = Vector3(0.0, 0.01, -0.26)
+	parent.add_child(tip)
+	var grip := MeshFactory.box(Vector3(0.045, 0.1, 0.05), shell)
+	grip.position = Vector3(0.0, -0.07, 0.06)
+	grip.rotation.x = deg_to_rad(-18.0)
 	parent.add_child(grip)
 
 

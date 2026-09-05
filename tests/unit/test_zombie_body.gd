@@ -50,9 +50,17 @@ func test_the_three_types_read_apart_at_a_glance() -> void:
 
 
 func test_a_built_zombie_is_made_of_many_pieces() -> void:
+	var runner := _built(RUNNER)
+	assert_gt(runner.meshes.size(), 12, "a golfer should not be three primitives")
+	assert_gt(_built(BRUTE).meshes.size(), runner.meshes.size(), "the bag adds bulk")
+
+
+func test_a_walker_is_a_ripped_open_golf_robot() -> void:
 	var body := _built(WALKER)
-	assert_gt(body.meshes.size(), 12, "a golfer should not be three primitives")
-	assert_gt(_built(BRUTE).meshes.size(), body.meshes.size(), "the bag adds bulk")
+	assert_not_null(body.find_child("Reactor", true, false), "the chest cavity still holds a core")
+	assert_not_null(body.find_child("EyeDead", true, false), "one eye is out")
+	assert_not_null(body.find_child("Rib0", true, false), "ribs show through the torn polo")
+	assert_gt(body.meshes.size(), 40, "the blender shell is more than a few boxes")
 
 
 func test_a_hit_flash_covers_every_piece() -> void:

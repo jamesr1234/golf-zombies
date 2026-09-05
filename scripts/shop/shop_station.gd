@@ -24,6 +24,8 @@ static func create(p_dept: int, p_title: String, at: Vector3, yaw := 0.0) -> Sho
 func can_use(who: Node3D) -> bool:
 	if who == null or not is_inside_tree():
 		return false
+	if not ClubhouseBuild.same_story(who.global_position, global_position):
+		return false
 	var offset := who.global_position - global_position
 	offset.y = 0.0
 	return offset.length() <= USE_RANGE

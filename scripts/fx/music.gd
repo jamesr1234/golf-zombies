@@ -66,6 +66,15 @@ static func play(track: int, fade_sec: float = 0.0) -> AudioStreamPlayer:
 	if stream == null:
 		return null
 	var node := player()
+	# #region agent log
+	_dbg("music.gd:play", "play before make", "C", {
+		"track": track,
+		"current": current,
+		"had_player": node != null,
+		"existing_in_tree": node != null and node.is_inside_tree(),
+		"existing_parent": str(node.get_parent()) if node != null else "",
+	})
+	# #endregion
 	if node == null:
 		node = _make_player(PLAYER_NAME)
 		if node == null:
@@ -74,6 +83,14 @@ static func play(track: int, fade_sec: float = 0.0) -> AudioStreamPlayer:
 		_crossfade_to(node, stream, track, fade_sec)
 	else:
 		_cut_to(node, stream, track)
+	# #region agent log
+	_dbg("music.gd:play", "play after cut", "D", {
+		"in_tree": node.is_inside_tree(),
+		"playing": node.playing,
+		"parent": str(node.get_parent()),
+		"current": current,
+	})
+	# #endregion
 	return node
 
 
@@ -133,6 +150,14 @@ static func _cut_to(node: AudioStreamPlayer, stream: AudioStream, track: int) ->
 	node.stream = stream
 	node.volume_db = float(VOLUME_DB[track])
 	current = track
+	# #region agent log
+	_dbg("music.gd:_cut_to", "before play", "A", {
+		"in_tree": node.is_inside_tree(),
+		"parent": str(node.get_parent()),
+		"has_parent": node.get_parent() != null,
+		"track": track,
+	})
+	# #endregion
 	node.play()
 
 
@@ -195,8 +220,44 @@ static func _make_player(player_name: String) -> AudioStreamPlayer:
 	var node := AudioStreamPlayer.new()
 	node.name = player_name
 	node.process_mode = Node.PROCESS_MODE_ALWAYS
+	# #region agent log
+	_dbg("music.gd:_make_player", "before add_child", "A", {
+		"player_name": player_name,
+		"root_ready": tree.root.is_node_ready(),
+		"root_in_tree": tree.root.is_inside_tree(),
+		"root_children": tree.root.get_child_count(),
+		"current_scene": str(tree.current_scene),
+	})
+	# #endregion
 	tree.root.add_child(node)
+	# #region agent log
+	_dbg("music.gd:_make_player", "after add_child", "A", {
+		"in_tree": node.is_inside_tree(),
+		"parent": str(node.get_parent()),
+		"root_has_name": tree.root.get_node_or_null(player_name) != null,
+	})
+	# #endregion
 	return node
+
+
+static func _dbg(loc: String, msg: String, hid: String, data: Dictionary) -> void:
+	var path := "/Users/jamesritchie/golf-zombies/.cursor/debug-8a4d5e.log"
+	var f := FileAccess.open(path, FileAccess.READ_WRITE)
+	if f == null:
+		f = FileAccess.open(path, FileAccess.WRITE)
+	else:
+		f.seek_end()
+	if f == null:
+		return
+	f.store_line(JSON.stringify({
+		"sessionId": "8a4d5e",
+		"timestamp": Time.get_ticks_msec(),
+		"location": loc,
+		"message": msg,
+		"hypothesisId": hid,
+		"data": data,
+	}))
+	f.close()
 
 
 static func _enable_loop(stream: AudioStream) -> void:

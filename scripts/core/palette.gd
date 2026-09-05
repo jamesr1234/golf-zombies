@@ -39,7 +39,7 @@ const CUP_MOUTH := Color(0.02, 0.01, 0.03)
 const CART := Color(0.2, 1.0, 0.85)
 const CART_FRAME := Color(0.09, 0.26, 0.28)
 const HEADLIGHT := Color(1.0, 0.85, 0.4)
-const TIRE_MARK: Color = Color(0.04, 0.02, 0.05)
+const TIRE_MARK: Color = Color(1.0, 1.0, 1.0)
 const BEER := Color(1.0, 0.78, 0.18)
 const BEER_CAN := Color(0.58, 0.6, 0.64)
 const BEER_INK := Color(0.18, 0.5, 1.0)
@@ -78,6 +78,8 @@ const MECH := Color(0.95, 0.55, 0.12)
 const MECH_FRAME := Color(0.16, 0.1, 0.05)
 const WALL := Color(0.12, 0.06, 0.14)
 const WALL_TRIM := MAGENTA
+const CONCRETE := Color(0.2, 0.22, 0.26)
+const CONCRETE_TRIM := CYAN
 
 ## Emission strengths. Anything above the environment glow threshold blooms.
 const GLOW_FAINT := 0.45

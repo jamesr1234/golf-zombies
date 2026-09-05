@@ -153,7 +153,7 @@ func test_a_second_shot_replaces_the_old_door() -> void:
 func test_firing_the_warp_door_spends_a_round_and_spawns_a_shot() -> void:
 	var gun := Weapon.new()
 	add_child_autofree(gun)
-	gun.index = gun.loadout.find(DOOR)
+	assert_true(gun.add_gun(DOOR))
 	assert_eq(gun.stats(), DOOR)
 	var before := get_tree().get_nodes_in_group("door_shots").size()
 	gun.tick(0.0, Transform3D.IDENTITY, false, true, false)

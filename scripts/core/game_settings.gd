@@ -10,6 +10,12 @@ const LABELS: PackedStringArray = ["Easy", "Medium", "Hard", "Impossible"]
 
 static var mode := Mode.SOLO
 static var difficulty := Kind.MEDIUM
+## Set when a player-made hole is on. The match plays this one hole instead of
+## the twelve-hole course, and the creator hands its work-in-progress over the
+## same way when a hole is taken out for a playtest.
+static var custom_hole: CustomHole
+## The hole the creator should open with. Empty means start something new.
+static var creator_hole: CustomHole
 
 
 static func is_solo() -> bool:
@@ -63,6 +69,32 @@ static func gunner_unlock(base_unlock: int) -> int:
 static func reset() -> void:
 	mode = Mode.SOLO
 	difficulty = Kind.MEDIUM
+	custom_hole = null
+	creator_hole = null
+
+
+static func is_custom() -> bool:
+	return custom_hole != null
+
+
+## A hole goes out to be played on its own copy, so a shot taken on it can never
+## write back into what is still open in the creator.
+static func play_custom(hole: CustomHole) -> void:
+	mode = Mode.SOLO
+	custom_hole = hole.copy()
+	creator_hole = hole
+
+
+static func edit_custom(hole: CustomHole) -> void:
+	creator_hole = hole
+	custom_hole = null
+
+
+static func take_creator_hole() -> CustomHole:
+	var hole := creator_hole if creator_hole != null else CustomHole.create()
+	creator_hole = null
+	custom_hole = null
+	return hole
 
 
 static func label_for(kind: Kind) -> String:

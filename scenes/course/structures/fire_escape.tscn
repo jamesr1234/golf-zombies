@@ -1,0 +1,32 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="PackedScene" uid="uid://d1e3ipu2gfvvi" path="res://assets/obstacles/wall_extra_large.glb" id="1_wall_extra_large"]
+[ext_resource type="PackedScene" uid="uid://bgsqyo14mnujo" path="res://assets/obstacles/platform_small.glb" id="2_platform_small"]
+[ext_resource type="PackedScene" uid="uid://dall0ak3y2har" path="res://assets/obstacles/ladder_small.glb" id="3_ladder_small"]
+[ext_resource type="PackedScene" uid="uid://doccqy0gay68w" path="res://assets/obstacles/cube_extra_small.glb" id="4_cube_extra_small"]
+
+[node name="FireEscape" type="Node3D"]
+
+[node name="wall_extra_large" parent="." instance=ExtResource("1_wall_extra_large")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 0, 0, 0)
+
+[node name="platform_small" parent="." instance=ExtResource("2_platform_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.35, 2.7, 0)
+
+[node name="ladder_small" parent="." instance=ExtResource("3_ladder_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.35, 0, 0)
+
+[node name="platform_small2" parent="." instance=ExtResource("2_platform_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.35, 5.4, -2.7)
+
+[node name="ladder_small2" parent="." instance=ExtResource("3_ladder_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.7, 2.7, -2.7)
+
+[node name="platform_small3" parent="." instance=ExtResource("2_platform_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.35, 8.1, 0)
+
+[node name="ladder_small3" parent="." instance=ExtResource("3_ladder_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.35, 5.4, 0)
+
+[node name="cube_extra_small" parent="." instance=ExtResource("4_cube_extra_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.35, 9.45, -1.35)

@@ -25,6 +25,23 @@ var _callbacks_hooked := false
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	# #region agent log
+	_agent_dbg("A", "steam_lobby.gd:_ready", "autoload boot", {
+		"arch": Engine.get_architecture_name() if Engine.has_method("get_architecture_name") else "?",
+		"os": OS.get_name(),
+		"os_version": OS.get_version(),
+		"model": OS.get_model_name() if OS.has_method("get_model_name") else "?",
+		"cpu": OS.get_processor_name(),
+		"is_debug": OS.is_debug_build(),
+		"exec": OS.get_executable_path(),
+		"steam_class": ClassDB.class_exists("SteamMultiplayerPeer"),
+		"steam_singleton": Engine.has_singleton("Steam"),
+		"renderer": RenderingServer.get_current_rendering_method() if RenderingServer.has_method("get_current_rendering_method") else "?",
+		"adapter": RenderingServer.get_video_adapter_name(),
+		"adapter_vendor": RenderingServer.get_video_adapter_vendor(),
+		"cmdline": OS.get_cmdline_args(),
+	})
+	# #endregion
 	if not is_available():
 		return
 	## Do not init Steam on boot. App 480 makes the Mac Steam client exit as
@@ -313,3 +330,31 @@ func create_client_peer() -> MultiplayerPeer:
 		return null
 	peer.server_relay = true
 	return peer
+
+
+# #region agent log
+func _agent_dbg(hyp: String, loc: String, msg: String, data: Dictionary) -> void:
+	var payload := {
+		"sessionId": "ef8322",
+		"timestamp": int(Time.get_unix_time_from_system() * 1000.0),
+		"location": loc,
+		"message": msg,
+		"hypothesisId": hyp,
+		"data": data,
+	}
+	var line := JSON.stringify(payload)
+	print("[debug-ef8322] ", line)
+	for path in [
+		"/Users/jamesritchie/golf-zombies/.cursor/debug-ef8322.log",
+		OS.get_user_data_dir().path_join("debug-ef8322.log"),
+		OS.get_executable_path().get_base_dir().path_join("debug-ef8322.log"),
+	]:
+		var f := FileAccess.open(path, FileAccess.READ_WRITE)
+		if f == null:
+			f = FileAccess.open(path, FileAccess.WRITE)
+		else:
+			f.seek_end()
+		if f != null:
+			f.store_line(line)
+			f.close()
+# #endregion

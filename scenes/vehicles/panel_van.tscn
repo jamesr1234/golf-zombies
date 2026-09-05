@@ -1,0 +1,41 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/vehicles/golf_cart.gd" id="1_cart"]
+[ext_resource type="PackedScene" path="res://assets/vehicles/panel_van.glb" id="2_vis"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_body"]
+size = Vector3(2.1, 1.6, 4.4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_crush"]
+size = Vector3(2.3, 1.8, 4.8)
+
+[node name="PanelVan" type="CharacterBody3D"]
+script = ExtResource("1_cart")
+visual_scene = ExtResource("2_vis")
+top_speed = 26.0
+boost_speed = 32.0
+acceleration = 8.0
+turn_deg = 70.0
+wheel_z = 1.4
+wheel_x = 0.88
+crush_push = 18.0
+crush_damage_per_speed = 30.0
+impact_decay = 16.0
+crate_impulse = 20.0
+exit_side = 2.6
+
+[node name="Shape" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.85, 0)
+shape = SubResource("BoxShape3D_body")
+
+[node name="Crush" type="Area3D" parent="."]
+
+[node name="Shape" type="CollisionShape3D" parent="Crush"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.95, 0)
+shape = SubResource("BoxShape3D_crush")
+
+[node name="DriverSeat" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.42, 1.08, -0.7)
+
+[node name="PassengerSeat" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.42, 1.08, -0.7)

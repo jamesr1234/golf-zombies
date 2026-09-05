@@ -121,8 +121,144 @@ func test_trees_are_the_path_boundary() -> void:
 	var inner := PhysicsRayQueryParameters3D.create(
 		from, from + right * (CartPath.PATH_WIDTH * 0.5 + 2.0)
 	)
-	inner.collision_mask = Layers.BARRIER
-	assert_true(space.intersect_ray(inner).is_empty(), "no chute wall hugging the path")
+	inner.collision_mask = Layers.FORCEFIELD
+	var field := space.intersect_ray(inner)
+	assert_false(field.is_empty(), "a forcefield has to catch a run off the tarmac")
+	var hit_at: Vector3 = field.position
+	assert_lt(
+		_lane_offset(path, hit_at), CartPath.PATH_WIDTH * 0.5 + 1.0,
+		"the field sits on the lip, not out in the trees"
+	)
+
+
+func test_a_cart_cannot_drive_off_the_tarmac() -> void:
+	var path := _path()
+	await wait_physics_frames(2)
+	var mid: Vector3 = path.centerline[path.centerline.size() / 2]
+	var along: Vector3 = path.centerline[path.centerline.size() / 2 + 1] - mid
+	along.y = 0.0
+	var right := along.normalized().cross(Vector3.UP).normalized()
+	var cart: GolfCart = preload("res://scenes/vehicles/golf_cart.tscn").instantiate()
+	path.add_child(cart)
+	cart.set_physics_process(false)
+	cart.place_at(mid + Vector3.UP * 0.4, rad_to_deg(atan2(-right.x, -right.z)))
+	cart.drive_speed = _Boost.SPEED
+	cart.velocity = right * _Boost.SPEED
+	for _i in 90:
+		cart._drive(1.0 / 60.0)
+	assert_lt(
+		_lane_offset(path, cart.global_position), CartPath.PATH_WIDTH * 0.5 + 1.2,
+		"the forcefield has to hold a boosted cart on the tarmac"
+	)
+	assert_lt(cart.global_position.y, mid.y + 2.0, "hitting the field must not launch you into the trees")
+
+
+func test_a_bend_has_no_hole_in_the_outer_rail() -> void:
+	var path := _path()
+	await wait_physics_frames(2)
+	var space := path.get_world_3d().direct_space_state
+	var misses := 0
+	var samples := 0
+	for i in range(2, path.centerline.size() - 2):
+		var prev: Vector3 = path.centerline[i - 1]
+		var here: Vector3 = path.centerline[i]
+		var nxt: Vector3 = path.centerline[i + 1]
+		var incoming := Vector3(here.x - prev.x, 0.0, here.z - prev.z)
+		var outgoing := Vector3(nxt.x - here.x, 0.0, nxt.z - here.z)
+		if incoming.length_squared() < 0.01 or outgoing.length_squared() < 0.01:
+			continue
+		incoming = incoming.normalized()
+		outgoing = outgoing.normalized()
+		if incoming.dot(outgoing) > 0.995:
+			continue
+		var right := (incoming + outgoing).cross(Vector3.UP)
+		if right.length_squared() < 0.0001:
+			continue
+		right = right.normalized()
+		var from := here + Vector3.UP * 1.2
+		var ray := PhysicsRayQueryParameters3D.create(
+			from, from + right * (CartPath.PATH_WIDTH * 0.5 + 3.0)
+		)
+		ray.collision_mask = Layers.FORCEFIELD
+		samples += 1
+		if space.intersect_ray(ray).is_empty():
+			misses += 1
+	assert_gt(samples, 8, "the circuit has to actually bend")
+	assert_eq(misses, 0, "the long side of a bend cannot leave a hole")
+
+
+func test_a_bend_does_not_grow_teeth() -> void:
+	var path := _path()
+	await wait_physics_frames(2)
+	var space := path.get_world_3d().direct_space_state
+	var worst := 0.0
+	for i in range(2, path.centerline.size() - 2):
+		var prev: Vector3 = path.centerline[i - 1]
+		var here: Vector3 = path.centerline[i]
+		var nxt: Vector3 = path.centerline[i + 1]
+		var incoming := Vector3(here.x - prev.x, 0.0, here.z - prev.z)
+		var outgoing := Vector3(nxt.x - here.x, 0.0, nxt.z - here.z)
+		if incoming.length_squared() < 0.01 or outgoing.length_squared() < 0.01:
+			continue
+		incoming = incoming.normalized()
+		outgoing = outgoing.normalized()
+		if incoming.dot(outgoing) > 0.995:
+			continue
+		var right := (incoming + outgoing).cross(Vector3.UP)
+		if right.length_squared() < 0.0001:
+			continue
+		right = right.normalized()
+		var from := here + Vector3.UP * 1.2
+		for side in [-1.0, 1.0]:
+			var ray := PhysicsRayQueryParameters3D.create(
+				from, from + right * side * (CartPath.PATH_WIDTH * 0.5 + 6.0)
+			)
+			ray.collision_mask = Layers.FORCEFIELD
+			var hit := space.intersect_ray(ray)
+			if hit.is_empty():
+				continue
+			var lip := CartPath.PATH_WIDTH * 0.5
+			worst = maxf(worst, absf(_lane_offset(path, hit.position) - lip))
+	assert_gt(worst, 0.0, "the circuit has to actually bend")
+	assert_lt(worst, 1.1, "a turn field has to follow the lip, not poke into the lane")
+
+
+func test_strokes_end_where_the_centerline_does() -> void:
+	var origin := Vector3(4.0, 0.0, -2.0)
+	var heading := Vector3(0.0, 0.0, -1.0)
+	var line := CartPathTrack.centerline(origin, heading, 1.5)
+	var runs := CartPathTrack.strokes(origin, heading, 1.5)
+	assert_gt(runs.size(), 10)
+	var last: Dictionary = runs[runs.size() - 1]
+	var end: Vector3 = last["b"] if last["kind"] == "line" else last["to"]
+	assert_almost_eq(end.x, line[line.size() - 1].x, 0.05)
+	assert_almost_eq(end.z, line[line.size() - 1].z, 0.05)
+	assert_eq(int(last["kind"] == "arc"), 0, "the last stretch is the straight onto the tee")
+
+
+func test_a_turn_wall_sits_on_the_circle() -> void:
+	var path := _path()
+	await wait_physics_frames(2)
+	var start: Vector3 = path.centerline[0]
+	var heading := path.centerline[1] - start
+	heading.y = 0.0
+	heading = heading.normalized()
+	var origin := start + heading * float(CartPathTrack.LEGS[0][0])
+	var radius := float(CartPathTrack.LEGS[0][2])
+	var inward := -heading.cross(Vector3.UP).normalized()
+	var center := origin + inward * radius
+	var on := center + (origin - center).rotated(Vector3.UP, deg_to_rad(36.0))
+	var out := Vector3(on.x - center.x, 0.0, on.z - center.z).normalized()
+	var from := on + Vector3.UP * 1.2
+	var ray := PhysicsRayQueryParameters3D.create(from, from + out * 20.0)
+	ray.collision_mask = Layers.FORCEFIELD
+	var hit := path.get_world_3d().direct_space_state.intersect_ray(ray)
+	assert_false(hit.is_empty(), "the first bend has to have an outer field")
+	var reach := Vector2(hit.position.x - center.x, hit.position.z - center.z).length()
+	assert_almost_eq(
+		reach, radius + CartPath.PATH_WIDTH * 0.5, 0.35,
+		"the field has to sit on the circular lip, not a chord"
+	)
 
 
 func test_the_green_is_not_a_crash() -> void:
@@ -138,15 +274,40 @@ func test_the_green_is_not_a_crash() -> void:
 	assert_true(path.off_path(mid + right * (CartPath.LANE_LIMIT + 2.0)), "into the trees is a crash")
 
 
-func test_a_crash_puts_you_ten_metres_back_on_the_path() -> void:
+func test_a_crash_puts_you_back_beside_where_you_left() -> void:
 	var path := _path()
 	var mid: Vector3 = path.centerline[path.centerline.size() / 2]
-	var along := CartPathTrack.along(path.centerline, mid)
-	var pose := path.reset_from(mid)
+	var along: Vector3 = path.centerline[path.centerline.size() / 2 + 1] - mid
+	along.y = 0.0
+	var right := along.normalized().cross(Vector3.UP).normalized()
+	var crash := mid + right * (CartPath.PATH_WIDTH * 0.5 + 8.0)
+	var crash_along := CartPathTrack.along(path.centerline, crash)
+	var pose := path.reset_from(crash)
 	var at: Vector3 = pose["position"]
 	assert_lt(_lane_offset(path, at), 1.0, "back on the path, not in the trees")
 	assert_almost_eq(
-		CartPathTrack.along(path.centerline, at), along - CartPath.CRASH_BACK, 2.0
+		CartPathTrack.along(path.centerline, at), crash_along, 2.0,
+		"on the line next to the crash, not ten metres back"
+	)
+
+
+func test_a_walker_in_the_trees_is_put_back_on_the_line() -> void:
+	var path := _path()
+	var mid: Vector3 = path.centerline[path.centerline.size() / 2]
+	var along: Vector3 = path.centerline[path.centerline.size() / 2 + 1] - mid
+	along.y = 0.0
+	var right := along.normalized().cross(Vector3.UP).normalized()
+	var player: Player = preload("res://scenes/players/player.tscn").instantiate()
+	add_child_autofree(player)
+	player.global_position = mid + right * (CartPath.PATH_WIDTH * 0.5 + 8.0) + Vector3.UP * 0.9
+	var crash_along := CartPathTrack.along(path.centerline, player.global_position)
+	assert_true(path.off_path(player.global_position), "standing in the trees is off the path")
+	path.tick_crash(player, 0.05)
+	assert_lt(_lane_offset(path, player.global_position), 1.5, "you cannot stay in the rough")
+	assert_almost_eq(
+		CartPathTrack.along(path.centerline, player.global_position),
+		crash_along,
+		3.0
 	)
 
 
@@ -214,8 +375,8 @@ func test_the_circuit_is_a_long_drift_track() -> void:
 	var path := _path()
 	assert_gte(CartPathTrack.turn_count(), 6, "corners are what make drifting the fast line")
 	assert_gte(
-		path.track_length, 25.0 * GolfCart.MAX_SPEED * 0.72,
-		"even a hot lap should take about 25 seconds"
+		path.track_length, 12.5 * GolfCart.MAX_SPEED * 0.72,
+		"even a hot lap should take about 12 seconds"
 	)
 	assert_gte(path.centerline.size(), 20)
 	var yaw := 0.0
@@ -350,6 +511,19 @@ func test_large_windmills_stand_in_the_middle_of_the_circuit() -> void:
 			_lane_offset(path, mill.position), 1.2,
 			"the mast sits on the racing line"
 		)
+
+
+func test_every_windmill_mesh_sits_on_a_physics_body() -> void:
+	var mill := _Windmill.create(Vector3.ZERO, Vector3.FORWARD)
+	add_child_autofree(mill)
+	var meshes := mill.find_children("*", "MeshInstance3D", true, false)
+	assert_gt(meshes.size(), 6, "mast, nacelle, cap, hub, and four sails")
+	for mesh in meshes:
+		var body := _physics_owner(mesh)
+		assert_not_null(body, "%s has to be a collision object" % mill.get_path_to(mesh))
+		assert_gt(body.collision_layer & Layers.PROP, 0, "balls and carts have to hit it")
+	var rotor := mill.get_node("Rotor") as AnimatableBody3D
+	assert_not_null(rotor, "spinning sails need a moving body")
 
 
 func test_a_windmill_pillar_throws_you_off_then_explodes_a_second_later() -> void:
@@ -503,6 +677,15 @@ func _path() -> CartPath:
 	path.set_meta("hole_data", data)
 	hole.add_child(path)
 	return path
+
+
+func _physics_owner(node: Node) -> PhysicsBody3D:
+	var walk := node.get_parent()
+	while walk != null:
+		if walk is PhysicsBody3D:
+			return walk
+		walk = walk.get_parent()
+	return null
 
 
 ## Hole one also authors a mill on the overlay, so the group is wider than the circuit.

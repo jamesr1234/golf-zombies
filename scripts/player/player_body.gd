@@ -29,6 +29,8 @@ const SIT_RECLINE_DEG := 28.0
 const SIT_LEG_DEG := 72.0
 const SIT_ARM_DEG := 78.0
 const SIT_ARM_SPREAD_DEG := 8.0
+const CARD_ARM_DEG := 42.0
+const CARD_ARM_TUCK_DEG := 10.0
 const SWIM_LEAN_DEG := 52.0
 const SURFACE_LEAN_DEG := 16.0
 const SWIM_KICK_DEG := 28.0
@@ -47,6 +49,9 @@ const GUN_ARM := 1
 const WORLD_LAYER := 1
 const CABIN_P1 := 1 << 2
 const CABIN_P2 := 1 << 3
+const WINGS_OFF := 0
+const WINGS_PACKED := 1
+const WINGS_OPEN := 2
 
 var hips: Node3D
 var torso: Node3D
@@ -67,6 +72,7 @@ var _headbands: Array[MeshInstance3D] = []
 var _bottoms: Array[MeshInstance3D] = []
 var _preview_id := ""
 var _preview_slot := ""
+var _wings: Node3D
 
 
 func build(color: Color) -> void:
@@ -192,6 +198,47 @@ func cheer(delta: float, left: float) -> void:
 	_show_arm_hands(true)
 
 
+## Prone, arms out. The wing meshes hang off the torso separately.
+func glide() -> void:
+	hips.position.y = HIP_HEIGHT
+	torso.rotation.x = deg_to_rad(52.0)
+	torso.rotation.y = 0.0
+	if head != null:
+		head.rotation.x = deg_to_rad(-18.0)
+		head.rotation.y = 0.0
+	legs[0].rotation.x = deg_to_rad(12.0)
+	legs[1].rotation.x = deg_to_rad(-8.0)
+	arms[FREE_ARM].rotation.x = deg_to_rad(8.0)
+	arms[FREE_ARM].rotation.z = deg_to_rad(-78.0)
+	arms[GUN_ARM].rotation.x = deg_to_rad(8.0)
+	arms[GUN_ARM].rotation.z = deg_to_rad(78.0)
+	_show_arm_hands(true)
+
+
+## Low and stretched: hips down, chest reclined, lead leg out.
+func slide() -> void:
+	hips.position.y = 0.28
+	torso.rotation.x = deg_to_rad(42.0)
+	torso.rotation.y = 0.0
+	if head != null:
+		head.rotation = Vector3.ZERO
+	legs[0].rotation.x = deg_to_rad(78.0)
+	legs[1].rotation.x = deg_to_rad(18.0)
+	arms[FREE_ARM].rotation.x = deg_to_rad(28.0)
+	arms[FREE_ARM].rotation.z = deg_to_rad(-12.0)
+	arms[GUN_ARM].rotation.x = deg_to_rad(GUN_ARM_REST_DEG)
+	arms[GUN_ARM].rotation.z = deg_to_rad(GUN_ARM_TUCK_DEG)
+	_show_arm_hands(true)
+
+
+## The 78-degree lead leg, so slide sparks can sit in front of the camera.
+func slide_toe() -> Vector3:
+	if legs.is_empty():
+		return Vector3.INF
+	var foot := legs[0].get_child(legs[0].get_child_count() - 1) as Node3D
+	return foot.global_position if foot != null else legs[0].global_position
+
+
 ## Planted behind the shield: feet still, both arms up on the panel.
 func guard() -> void:
 	pose(0.0)
@@ -219,6 +266,26 @@ func swim(delta: float, pace: float, underwater: bool) -> void:
 	_show_arm_hands(true)
 
 
+## Pull up over a lip: knees hook, chest crests, then you stand.
+func mantle(progress: float) -> void:
+	var t := clampf(progress, 0.0, 1.0)
+	var stand := smoothstep(0.62, 1.0, t)
+	var tuck := 1.0 - stand
+	hips.position.y = lerpf(0.52, HIP_HEIGHT, stand)
+	torso.rotation.x = deg_to_rad(lerpf(-38.0, 0.0, stand))
+	torso.rotation.y = 0.0
+	if head != null:
+		head.rotation.x = deg_to_rad(lerpf(-18.0, 0.0, stand))
+		head.rotation.y = 0.0
+	legs[0].rotation.x = deg_to_rad(lerpf(72.0, 0.0, stand))
+	legs[1].rotation.x = deg_to_rad(22.0 * tuck)
+	arms[FREE_ARM].rotation.x = deg_to_rad(lerpf(128.0, 8.0, stand))
+	arms[FREE_ARM].rotation.z = deg_to_rad(-16.0 * tuck)
+	arms[GUN_ARM].rotation.x = deg_to_rad(lerpf(128.0, GUN_ARM_REST_DEG, stand))
+	arms[GUN_ARM].rotation.z = deg_to_rad(16.0 * tuck)
+	_show_arm_hands(true)
+
+
 ## Reach for holds. A free hand points at the aimed spot until L1 or R1 plants it.
 func climb(left_to: Vector3, right_to: Vector3, _aim: Vector3, _left_on: bool, _right_on: bool) -> void:
 	hips.position.y = HIP_HEIGHT
@@ -226,6 +293,18 @@ func climb(left_to: Vector3, right_to: Vector3, _aim: Vector3, _left_on: bool, _
 	torso.rotation.y = 0.0
 	legs[0].rotation.x = deg_to_rad(18.0)
 	legs[1].rotation.x = deg_to_rad(-8.0)
+	_climb_arm(arms[FREE_ARM], left_to)
+	_climb_arm(arms[GUN_ARM], right_to)
+	_show_arm_hands(true)
+
+
+## Both hands overhead on a zipline trolley, legs dangling.
+func zip(left_to: Vector3, right_to: Vector3) -> void:
+	hips.position.y = HIP_HEIGHT
+	torso.rotation.x = deg_to_rad(-6.0)
+	torso.rotation.y = 0.0
+	legs[0].rotation.x = deg_to_rad(22.0)
+	legs[1].rotation.x = deg_to_rad(-12.0)
 	_climb_arm(arms[FREE_ARM], left_to)
 	_climb_arm(arms[GUN_ARM], right_to)
 	_show_arm_hands(true)
@@ -273,6 +352,16 @@ func sit(driving: bool, wheel_deg := 0.0, grips: Array[Vector3] = []) -> void:
 		arms[GUN_ARM].rotation.z = deg_to_rad(GUN_ARM_TUCK_DEG)
 	# Mittens on the rim are the fists, so the robot's own hands would double up.
 	_show_arm_hands(not driving)
+
+
+## Both hands in front of the chest, hole cards facing you.
+func hold_cards() -> void:
+	sit(false)
+	arms[FREE_ARM].rotation.x = deg_to_rad(CARD_ARM_DEG)
+	arms[FREE_ARM].rotation.z = deg_to_rad(CARD_ARM_TUCK_DEG)
+	arms[GUN_ARM].rotation.x = deg_to_rad(CARD_ARM_DEG)
+	arms[GUN_ARM].rotation.z = deg_to_rad(-CARD_ARM_TUCK_DEG)
+	_show_arm_hands(true)
 
 
 func _climb_arm(arm: Node3D, to: Vector3) -> void:
@@ -437,6 +526,53 @@ func _add_cabin(mesh: MeshInstance3D, parent: Node3D = null) -> void:
 
 ## Shirt sleeves stay on the arms so the driver still sees them. Everything else
 ## rides the cabin layer and disappears from that player's own camera.
+func show_wings(mode: int) -> void:
+	if mode > WINGS_OFF and _wings == null:
+		_wings = _build_wings()
+		torso.add_child(_wings)
+	if _wings == null:
+		return
+	_wings.visible = mode > WINGS_OFF
+	var packed := _wings.get_node_or_null("Packed") as Node3D
+	var open := _wings.get_node_or_null("Open") as Node3D
+	if packed != null:
+		packed.visible = mode == WINGS_PACKED
+	if open != null:
+		open.visible = mode == WINGS_OPEN
+
+
+func _build_wings() -> Node3D:
+	var mount := Node3D.new()
+	mount.name = "Wings"
+	mount.position = Vector3(0.0, 0.28, 0.1)
+	var packed := Node3D.new()
+	packed.name = "Packed"
+	var pack := MeshFactory.box(Vector3(0.36, 0.42, 0.18), Palette.ICE.darkened(0.4), Palette.GLOW_SOFT)
+	pack.position = Vector3(0.0, 0.02, 0.14)
+	packed.add_child(pack)
+	for side: float in [-1.0, 1.0]:
+		var blade := MeshFactory.box(Vector3(0.55, 0.05, 0.22), Palette.CYAN, Palette.GLOW_STRONG)
+		blade.position = Vector3(side * 0.42, 0.08, 0.02)
+		blade.rotation.z = deg_to_rad(side * 55.0)
+		blade.rotation.y = deg_to_rad(side * 18.0)
+		packed.add_child(blade)
+	mount.add_child(packed)
+	var open := Node3D.new()
+	open.name = "Open"
+	open.visible = false
+	var harness := MeshFactory.box(Vector3(0.3, 0.24, 0.14), Palette.ICE.darkened(0.4), Palette.GLOW_SOFT)
+	harness.position = Vector3(0.0, 0.0, 0.12)
+	open.add_child(harness)
+	for side: float in [-1.0, 1.0]:
+		var wing := MeshFactory.box(Vector3(1.45, 0.04, 0.7), Palette.CYAN, Palette.GLOW_STRONG)
+		wing.position = Vector3(side * 0.82, 0.04, 0.04)
+		wing.rotation.z = deg_to_rad(side * 10.0)
+		wing.rotation.y = deg_to_rad(side * -8.0)
+		open.add_child(wing)
+	mount.add_child(open)
+	return mount
+
+
 func attach_wear(mesh: MeshInstance3D, parent: Node3D = null, hide_in_cabin := true) -> void:
 	if hide_in_cabin:
 		_add_cabin(mesh, parent)

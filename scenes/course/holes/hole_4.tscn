@@ -1,7 +1,7 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3 uid="uid://buvxb1gpjwwk4"]
 
-[ext_resource type="Script" path="res://scripts/course/hole_overlay_root.gd" id="1_root"]
+[ext_resource type="Script" uid="uid://bjyb7l8ptj88k" path="res://scripts/course/hole_overlay_root.gd" id="1_root"]
 
-[node name="Hole4" type="Node3D"]
+[node name="Hole4" type="Node3D" unique_id=1811406282]
 script = ExtResource("1_root")
 hole_index = 3

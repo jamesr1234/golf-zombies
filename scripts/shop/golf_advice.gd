@@ -4,17 +4,16 @@ extends Object
 ## advice that does not apply here and is only funny because of that.
 
 const USEFUL: PackedStringArray = [
-	"Three clicks. Second click is power, third is contact. Miss the bottom and it slices.",
+	"Amber band is max power, lime band is the contact click. Flush it for a nice shot.",
 	"No yardage on the meter. The tee sign has the number. The flag beam is the pin.",
 	"A fast tap-tap is a chip. That is how you play short with one club.",
 	"The bright green grid is a putt. The HUD says PUTTER. A full stroke still just rolls.",
 	"Rough and bunkers steal distance. Get it back to the short grass first.",
 	"Double bogey costs cash and you play on. Par or better pays you.",
 	"Water is a swim, not a penalty. Dive, grab the ball, throw it to your partner.",
-	"Hold interact if you want the CPU partner to take the shot for you.",
 	"Buy better clubs in here. They forgive a fat swing and make putting easier.",
 	"The cart is a weapon on the path. Run them down, then shop.",
-	"Grapple a cart or mech and ride it down the hole. Jump lets go near the ball.",
+	"Grapple a cart, mech, or posted target and ride the rope. Jump lets go near the ball.",
 	"Hex barriers are cover you drop with gear. Charges stack across holes.",
 	"The Warp Door shoots a doorway. Walk through it and you are back at your ball.",
 	"Par or better: leftover seconds pay five dollars each. Speed is money.",

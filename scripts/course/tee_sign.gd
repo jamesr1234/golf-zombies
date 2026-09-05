@@ -95,7 +95,7 @@ func _copy(data: HoleData) -> void:
 	hole.width = box
 	hole.position = Vector3(-edge, top, FACE_Z)
 	add_child(hole)
-	var yard := _label("YardCopy", "%d m" % data.yardage(), Palette.AMBER, 32, COPY_PIXEL)
+	var yard := _label("YardCopy", data.yardage_label(), Palette.AMBER, 32, COPY_PIXEL)
 	yard.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	yard.width = box
 	yard.position = Vector3(edge, top, FACE_Z)

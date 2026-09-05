@@ -34,6 +34,7 @@ Impossible.
 | Move | WASD | Left stick |
 | Aim | Mouse | Right stick |
 | Sprint | Shift | Click left stick |
+| Slide | Shift + Z | Sprint + R3 |
 | Jump | Space | Cross |
 | Shoot / cart boost | Left click | R2 |
 | Aim down sights | Right click | L2 |
@@ -54,8 +55,9 @@ Impossible.
 - The golfer is rooted in place and still takes damage. Getting hit mid-swing
   cancels the swing at no cost. The claim is released once the shot resolves, so
   you always have to walk to the ball.
-- The swing is three clicks: start the backswing, click at the top to set power,
-  click at the bottom for contact. A fast tap-tap is a short chip off the green,
+- The swing is three clicks: start the backswing, click to set power (the meter
+  goes back and forth until you do), then click at the bottom for contact. Miss
+  that last click and you mishit badly. A fast tap-tap is a short chip off the green,
   or a putt on the green and its collar. There is one club and no yardage readout
   anywhere, so judge the distance off the flag. A pink beam goes from the pin
   straight up into the sky so you can always see where the hole is.

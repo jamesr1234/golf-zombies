@@ -113,13 +113,13 @@ func test_buying_the_preview_keeps_it_when_you_walk_off() -> void:
 	assert_eq(_chest_color(body), Palette.VIOLET)
 
 
-func test_the_try_on_camera_stands_in_front_of_the_robot() -> void:
-	var origin := Vector3(5.0, 0.0, 10.0)
-	var view := InspectScript.view_transform(origin, 0.0)
-	assert_lt(view.origin.z, origin.z, "facing -Z, the camera sits on the chest side")
-	assert_lt(view.origin.x, origin.x, "slid left so the robot sits on the right")
-	assert_gt(view.origin.y, origin.y + 1.2, "pulled up so the whole robot is in frame")
-	assert_gt((-view.basis.z).dot(Vector3.BACK), 0.7, "looking at the chest")
+func test_the_inspect_camera_looks_at_the_stock() -> void:
+	var target := Vector3(5.0, 1.12, 10.0)
+	var view := InspectScript.view_transform(target, 0.0)
+	assert_lt(view.origin.z, target.z, "facing -Z, the camera sits in front of the item")
+	assert_lt(view.origin.x, target.x, "slid left so the item sits on the right")
+	assert_gt(view.origin.y, target.y, "a little above so you look slightly down")
+	assert_gt((-view.basis.z).dot((target - view.origin).normalized()), 0.99, "looking at the item")
 
 
 func test_the_apparel_wall_hangs_garments_not_boxes() -> void:
@@ -149,7 +149,7 @@ func test_the_armory_wall_hangs_guns_not_boxes() -> void:
 	assert_gte(counts["cylinders"], 8, "barrels and coils, not slabs")
 	assert_gte(counts["spheres"], 3, "muzzles and a warhead")
 	assert_eq(counts["tori"], 1, "the net hangs as a hoop")
-	assert_eq(_bobs(host), 8, "every gun turns on its hook")
+	assert_eq(_bobs(host), 9, "every gun turns on its hook")
 
 
 func test_the_items_wall_shows_kits_not_boxes() -> void:
@@ -157,10 +157,8 @@ func test_the_items_wall_shows_kits_not_boxes() -> void:
 	add_child_autofree(host)
 	ShopFront.wall_display(host, Shop.Dept.ITEMS, Vector3.ZERO, 0.0)
 	var counts := _mesh_counts(host)
-	assert_gte(counts["tilted"], 8, "a lid, a strap, clock hands and hex bars lean")
-	assert_gte(counts["cylinders"], 3, "clock faces and a revive mast")
-	assert_gte(counts["spheres"], 1, "the revive beacon")
-	assert_eq(_bobs(host), 7, "every kit turns on its hook")
+	assert_gte(counts["tilted"], 6, "a lid and hex bars lean")
+	assert_eq(_bobs(host), 4, "every kit turns on its hook")
 
 
 func test_the_cart_wall_shows_a_cart_not_boxes() -> void:

@@ -13,10 +13,15 @@ const EXIT_HALF := 16.0
 
 
 static func plant(
-	data: HoleData, rng: RandomNumberGenerator, width: float, blocked: Callable
+	data: HoleData,
+	rng: RandomNumberGenerator,
+	width: float,
+	blocked: Callable,
+	along_only := false
 ) -> void:
 	_along_fairway(data, rng, width, blocked)
-	_around_bounds(data, rng, blocked)
+	if not along_only:
+		_around_bounds(data, rng, blocked)
 
 
 static func _along_fairway(

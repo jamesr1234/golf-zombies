@@ -1,0 +1,32 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="PackedScene" uid="uid://bmnsybxxauqal" path="res://assets/obstacles/pillar_medium.glb" id="1_pillar_medium"]
+[ext_resource type="PackedScene" uid="uid://6iiejv77q5hf" path="res://assets/obstacles/arch_small.glb" id="2_arch_small"]
+[ext_resource type="PackedScene" uid="uid://bcjd3mt2o6imu" path="res://assets/obstacles/platform_large.glb" id="3_platform_large"]
+[ext_resource type="PackedScene" uid="uid://doccqy0gay68w" path="res://assets/obstacles/cube_extra_small.glb" id="4_cube_extra_small"]
+
+[node name="Pergola" type="Node3D"]
+
+[node name="pillar_medium" parent="." instance=ExtResource("1_pillar_medium")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="pillar_medium2" parent="." instance=ExtResource("1_pillar_medium")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.4, 0, 0)
+
+[node name="pillar_medium3" parent="." instance=ExtResource("1_pillar_medium")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -5.4)
+
+[node name="pillar_medium4" parent="." instance=ExtResource("1_pillar_medium")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.4, 0, -5.4)
+
+[node name="arch_small" parent="." instance=ExtResource("2_arch_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.35, 0, 0)
+
+[node name="arch_small2" parent="." instance=ExtResource("2_arch_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.35, 0, -5.4)
+
+[node name="platform_large" parent="." instance=ExtResource("3_platform_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4.05, 0)
+
+[node name="cube_extra_small" parent="." instance=ExtResource("4_cube_extra_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.7, 5.4, -2.7)

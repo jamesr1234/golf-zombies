@@ -10,6 +10,12 @@
 [ext_resource type="PackedScene" path="res://scenes/golf/ball.tscn" id="12_ball"]
 [ext_resource type="PackedScene" path="res://scenes/zombies/zombie.tscn" id="13_zombie"]
 [ext_resource type="PackedScene" path="res://scenes/vehicles/golf_cart.tscn" id="14_cart"]
+[ext_resource type="Script" path="res://scripts/vehicles/vehicle_lot.gd" id="16_lot"]
+[ext_resource type="PackedScene" path="res://scenes/vehicles/race_car.tscn" id="17_race"]
+[ext_resource type="PackedScene" path="res://scenes/vehicles/station_wagon.tscn" id="18_wagon"]
+[ext_resource type="PackedScene" path="res://scenes/vehicles/pickup_truck.tscn" id="19_truck"]
+[ext_resource type="PackedScene" path="res://scenes/vehicles/panel_van.tscn" id="20_van"]
+[ext_resource type="PackedScene" path="res://scenes/vehicles/suv.tscn" id="21_suv"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_sky"]
 shader = ExtResource("6_sky")
@@ -86,6 +92,19 @@ directional_shadow_max_distance = 120.0
 [node name="Cart6" parent="Carts" instance=ExtResource("14_cart")]
 
 [node name="Cart7" parent="Carts" instance=ExtResource("14_cart")]
+
+[node name="VehicleLot" type="Node3D" parent="."]
+script = ExtResource("16_lot")
+
+[node name="RaceCar" parent="VehicleLot" instance=ExtResource("17_race")]
+
+[node name="StationWagon" parent="VehicleLot" instance=ExtResource("18_wagon")]
+
+[node name="PickupTruck" parent="VehicleLot" instance=ExtResource("19_truck")]
+
+[node name="PanelVan" parent="VehicleLot" instance=ExtResource("20_van")]
+
+[node name="SUV" parent="VehicleLot" instance=ExtResource("21_suv")]
 
 [node name="Zombies" type="Node3D" parent="."]
 

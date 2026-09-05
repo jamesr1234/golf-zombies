@@ -58,12 +58,22 @@ func test_a_blast_also_chips_a_mech() -> void:
 func test_firing_the_rocket_spends_the_shell_and_spawns_one() -> void:
 	var gun := Weapon.new()
 	add_child_autofree(gun)
+	assert_true(gun.add_gun(ROCKET))
 	assert_true(gun.has_gun(ROCKET))
-	gun.index = gun.loadout.find(ROCKET)
 	var before := get_tree().get_nodes_in_group("rockets").size()
 	gun.tick(0.0, Transform3D.IDENTITY, false, true, false)
 	assert_eq(gun.mag(), 0)
 	assert_eq(get_tree().get_nodes_in_group("rockets").size(), before + 1)
+
+
+func test_the_flying_rocket_has_a_yellow_nose() -> void:
+	var rocket := Rocket.spawn_flight(self, Vector3.ZERO, Vector3.FORWARD, 110.0, 6.5, 90.0)
+	var nose := rocket.get_child(1) as MeshInstance3D
+	assert_not_null(nose)
+	assert_eq(nose.mesh.get_class(), "SphereMesh")
+	assert_almost_eq(nose.material_override.albedo_color.r, Palette.AMBER.r, 0.01)
+	assert_almost_eq(nose.material_override.albedo_color.g, Palette.AMBER.g, 0.01)
+	rocket.free()
 
 
 func _zombie(root: Node, at: Vector3) -> Zombie:

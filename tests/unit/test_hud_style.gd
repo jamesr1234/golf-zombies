@@ -51,7 +51,7 @@ func test_the_shop_menu_sits_on_the_left() -> void:
 	var panel := hud.shop_panel.get_node("Panel") as Control
 	assert_not_null(panel)
 	assert_lt(panel.anchor_right, 0.2, "pinned to the left edge")
-	assert_lt(panel.offset_right, 420.0, "narrow enough that the robot stays in view")
+	assert_lt(panel.offset_right, 420.0, "narrow enough that the item stays in view")
 	assert_eq(hud.shop_title.horizontal_alignment, HORIZONTAL_ALIGNMENT_LEFT)
 	assert_eq(hud.shop_body.horizontal_alignment, HORIZONTAL_ALIGNMENT_LEFT)
 
@@ -60,6 +60,14 @@ func test_a_hit_flash_is_a_red_slap_not_the_low_health_haze() -> void:
 	assert_gt(Hud.HIT_FLASH.r, 0.8)
 	assert_lt(Hud.HIT_FLASH.g, 0.2)
 	assert_gt(Hud.HIT_FLASH.a, Hud.HURT_TINT.a)
+
+
+func test_a_sweet_callout_uses_scoreboard_chrome() -> void:
+	var hud: Hud = HUD_SCENE.instantiate()
+	add_child_autofree(hud)
+	hud.flash_callout(Hud.SWEET_CALLOUT)
+	assert_eq(hud.message_title.text, "NICE SHOT!")
+	assert_true(hud.message.visible)
 
 
 func test_the_ammo_readout_says_putter_on_the_green() -> void:

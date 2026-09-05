@@ -1,11 +1,11 @@
 class_name ZombieBody
 extends Node3D
-## Undead golfers built from primitives, same recipe as the player robots. Each
-## archetype keeps the hunched silhouette but dresses differently so a walker, a
-## runner and a brute read apart at night.
+## Undead golfers. Walkers wear a Blender chassis (ripped polo, hanging jaw);
+## the others stay primitive so a runner, brute and gunner still read apart.
 
 enum Kind { WALKER, RUNNER, BRUTE, GUNNER, SNIPER }
 
+const WALKER_MODEL := "res://assets/zombies/walker.glb"
 const STRIDE_RATE := 6.2
 const RUNNER_STRIDE_RATE := 10.4
 const BRUTE_STRIDE_RATE := 4.1
@@ -58,16 +58,17 @@ func build(stats: ZombieStats) -> void:
 	_apply_kind()
 	var trim := stats.body_color
 	var shell := trim.darkened(0.62)
-	hips = Node3D.new()
-	hips.position.y = _hip_height()
-	add_child(hips)
-	torso = Node3D.new()
-	hips.add_child(torso)
-	_build_torso(shell, trim)
-	_build_head(shell, trim)
-	for side: float in [-1.0, 1.0]:
-		legs.append(_build_leg(side, shell, trim))
-		arms.append(_build_arm(side, shell, trim))
+	if kind != Kind.WALKER or not _skin_walker(shell, trim):
+		hips = Node3D.new()
+		hips.position.y = _hip_height()
+		add_child(hips)
+		torso = Node3D.new()
+		hips.add_child(torso)
+		_build_torso(shell, trim)
+		_build_head(shell, trim)
+		for side: float in [-1.0, 1.0]:
+			legs.append(_build_leg(side, shell, trim))
+			arms.append(_build_arm(side, shell, trim))
 	_build_kit(shell, trim)
 	pose(0.0)
 
@@ -486,7 +487,7 @@ func _build_kit(shell: Color, trim: Color) -> void:
 	if kind == Kind.SNIPER:
 		club = _build_long_rifle(arms[1], trim)
 		return
-	if kind != Kind.RUNNER:
+	if kind != Kind.RUNNER and club == null:
 		club = _build_club(arms[0], trim)
 	if kind == Kind.BRUTE:
 		bag = _build_bag(shell, trim)
@@ -568,6 +569,114 @@ func _build_bag(shell: Color, trim: Color) -> Node3D:
 	strap.position = Vector3(-_radius * 0.55, _chest_size().y * 0.45, 0.0)
 	_add(strap, torso)
 	return root
+
+
+func _skin_walker(shell: Color, trim: Color) -> bool:
+	var packed := load(WALKER_MODEL) as PackedScene
+	if packed == null:
+		return false
+	var model: Node = packed.instantiate()
+	add_child(model)
+	var root := model.find_child("WalkerRoot", true, false) as Node3D
+	if root == null and model.name == "WalkerRoot":
+		root = model as Node3D
+	if root == null:
+		model.free()
+		return false
+	_build_pivots()
+	root.position = Vector3.ZERO
+	root.rotation.y = PI
+	_steal(_part(root, "Hips"), hips, ["Torso", "LLeg", "RLeg"])
+	_steal(_part(root, "Torso"), torso, ["Head", "LArm", "RArm"])
+	_steal(_part(root, "Head"), head, ["Jaw"])
+	_steal(_part(root, "Jaw"), jaw)
+	_steal(_part(root, "RLeg"), legs[0])
+	_steal(_part(root, "LLeg"), legs[1])
+	_steal(_part(root, "RArm"), arms[0], ["Club"])
+	_steal(_part(root, "LArm"), arms[1])
+	club = Node3D.new()
+	club.position.y = -0.64 * _scale()
+	club.rotation.x = deg_to_rad(22.0)
+	_club_rest_x = club.rotation.x
+	arms[0].add_child(club)
+	_steal(_part(root, "Club"), club)
+	model.free()
+	_paint_walker(shell, trim)
+	for node in find_children("*", "MeshInstance3D", true, false):
+		meshes.append(node)
+	return true
+
+
+func _build_pivots() -> void:
+	var s := _scale()
+	hips = Node3D.new()
+	hips.position.y = _hip_height()
+	add_child(hips)
+	torso = Node3D.new()
+	hips.add_child(torso)
+	head = Node3D.new()
+	head.position.y = _chest_size().y + 0.08 * s
+	torso.add_child(head)
+	jaw = Node3D.new()
+	jaw.position.y = 0.02 * s
+	head.add_child(jaw)
+	for side: float in [-1.0, 1.0]:
+		var leg := Node3D.new()
+		leg.position = Vector3(side * _radius * 0.55, 0.0, 0.0)
+		hips.add_child(leg)
+		legs.append(leg)
+		var arm := Node3D.new()
+		arm.position = Vector3(side * _shoulder_spread(), _chest_size().y * 0.82, 0.04 * s)
+		torso.add_child(arm)
+		arms.append(arm)
+
+
+func _part(from: Node, node_name: String) -> Node3D:
+	return from.find_child(node_name, true, false) as Node3D
+
+
+func _steal(from: Node, to: Node3D, skip: Array[String] = []) -> void:
+	if from == null or to == null:
+		return
+	var kids: Array[Node] = []
+	kids.assign(from.get_children())
+	for child in kids:
+		if skip.has(child.name):
+			continue
+		var node := child as Node3D
+		if node == null:
+			continue
+		var xf := node.global_transform
+		var parent := node.get_parent()
+		if parent != null:
+			parent.remove_child(node)
+		node.owner = null
+		to.add_child(node)
+		node.global_transform = xf
+
+
+func _paint_walker(shell: Color, trim: Color) -> void:
+	var looks := {
+		"WalkerShell": MeshFactory.material(shell),
+		"WalkerTrim": MeshFactory.material(trim, false, Palette.GLOW_MEDIUM),
+		"WalkerGlow": MeshFactory.material(trim, false, Palette.GLOW_STRONG),
+		"WalkerFrame": MeshFactory.material(Palette.NIGHT.lightened(0.14)),
+		"WalkerBone": MeshFactory.material(Color(0.58, 0.64, 0.48)),
+		"WalkerRust": MeshFactory.material(Color(0.28, 0.14, 0.06)),
+		"WalkerEye": MeshFactory.material(trim, false, Palette.GLOW_STRONG),
+		"WalkerDead": MeshFactory.material(Palette.LED_RED, false, Palette.GLOW_SOFT),
+	}
+	for node in find_children("*", "MeshInstance3D", true, false):
+		var mesh := node as MeshInstance3D
+		var src := mesh.get_active_material(0)
+		if src == null:
+			continue
+		var key := src.resource_name
+		if key.is_empty():
+			key = src.get_name()
+		var painted: Material = looks.get(key)
+		if painted != null:
+			mesh.material_override = painted
 
 
 func _add(mesh: MeshInstance3D, parent: Node3D) -> void:

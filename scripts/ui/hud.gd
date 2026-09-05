@@ -11,6 +11,8 @@ const UNDERWATER_TINT := Color(0.02, 0.18, 0.42, 0.4)
 const REVIVE_TINT := Palette.LIME
 const BLEED_TINT := Palette.MAGENTA
 const DRUNK_SHADER := preload("res://assets/shaders/drunk_vision.gdshader")
+const CALLOUT_TIME := 1.35
+const SWEET_CALLOUT := "Nice shot!"
 
 @onready var score_label: Label = $Root/Score
 @onready var timer_label: Label = $Root/Timer
@@ -29,6 +31,9 @@ const DRUNK_SHADER := preload("res://assets/shaders/drunk_vision.gdshader")
 @onready var shop_title: Label = $Root/Shop/Panel/Lines/Title
 @onready var shop_body: Label = $Root/Shop/Panel/Lines/Body
 @onready var hole_map: HoleMap = $Root/HoleMap
+@onready var board_hud: PokerBoardHud = $Root/PokerBoard
+@onready var poker_result: PokerResultHud = $Root/PokerResult
+@onready var poker_act: PokerActHud = $Root/PokerAct
 
 var player: Player
 var flow
@@ -36,6 +41,8 @@ var _fade: ColorRect
 var _drunk: ColorRect
 var _drunk_mat: ShaderMaterial
 var _shop_info_shown := false
+var _callout_left := 0.0
+var _sweet_golf: GolfController
 
 
 func _ready() -> void:
@@ -85,7 +92,13 @@ func show_message(title: String, body: String, shown: bool) -> void:
 	message_body.text = body
 
 
-func _process(_delta: float) -> void:
+func flash_callout(title: String) -> void:
+	show_message(title, "", true)
+	_callout_left = CALLOUT_TIME
+
+
+func _process(delta: float) -> void:
+	_tick_callout(delta)
 	if player == null or flow == null:
 		return
 	score_label.text = HudStyle.chrome(flow.scorecard_text())
@@ -99,6 +112,8 @@ func _process(_delta: float) -> void:
 	_update_weapon()
 	_update_golf()
 	_update_shop()
+	_update_board()
+	_update_act()
 	_update_map()
 	_update_drunk()
 	prompt_label.text = HudStyle.chrome(player.get_prompt())
@@ -149,29 +164,50 @@ func _update_weapon() -> void:
 	if player.is_placing():
 		var held := 0
 		var card = player.wallet() if player.has_method("wallet") else flow.score
+		var gear := "Barrier"
 		if card != null:
-			held = card.barrier_charges
+			if player.place.kind == "ladder":
+				gear = "Ladder"
+				held = card.ladder_charges
+			else:
+				held = card.barrier_charges
 		var weapon := player.weapon
-		ammo_label.text = HudStyle.chrome("%s   %d / %d   Barrier x%d" % [
-			weapon.stats().display_name, weapon.mag(), weapon.reserve(), held
-		])
+		var current := weapon.stats()
+		if current == null:
+			ammo_label.text = HudStyle.chrome("%s x%d" % [gear, held])
+		else:
+			ammo_label.text = HudStyle.chrome("%s   %d / %d   %s x%d" % [
+				current.display_name, weapon.mag(), weapon.reserve(), gear, held
+			])
 		return
 	var extra := ""
 	if player.buzz.held > 0 and not player.is_holding_beer():
 		extra += "   Beer x%d" % player.buzz.held
+	if (
+		player.cart != null and player.cart.passenger == player and player.cart.mines > 0
+		and not player.is_holding_mines()
+	):
+		extra += "   Mines x%d" % player.cart.mines
 	if player.buzz.active() > 0:
 		extra += "   Buzz x%d" % player.buzz.active()
+	if player.is_holding_mines() and player.cart != null:
+		ammo_label.text = HudStyle.chrome("Mines x%d%s" % [player.cart.mines, extra])
+		return
 	if player.is_holding_beer():
 		ammo_label.text = HudStyle.chrome("Beer   x%d%s" % [player.buzz.held, extra])
 		return
 	var weapon := player.weapon
+	var current := weapon.stats()
+	if current == null:
+		ammo_label.text = HudStyle.chrome(extra.strip_edges())
+		return
 	if weapon.is_scoped():
 		extra = "   %dx%s" % [roundi(weapon.zoom_mult()), extra]
 	if weapon.is_reloading():
-		ammo_label.text = HudStyle.chrome("%s   reloading%s" % [weapon.stats().display_name, extra])
+		ammo_label.text = HudStyle.chrome("%s   reloading%s" % [current.display_name, extra])
 	else:
 		ammo_label.text = HudStyle.chrome("%s %d/%d   %d / %d%s" % [
-			weapon.stats().display_name,
+			current.display_name,
 			weapon.index + 1,
 			weapon.loadout.size(),
 			weapon.mag(),
@@ -186,8 +222,11 @@ func _update_golf() -> void:
 		not golfing and player.health.is_alive()
 		and not player.shopping and not player.talking and not player.wants_map()
 		and not player.is_swimming() and not player.is_placing()
+		and not player.is_poker_seated()
 	)
 	swing_meter.visible = golfing
+	if player.golf != null:
+		_listen_sweet(player.golf)
 	if golfing:
 		swing_meter.meter = player.golf.meter
 		swing_meter.putting = (
@@ -198,6 +237,29 @@ func _update_golf() -> void:
 			ammo_label.text = HudStyle.chrome(golf_club_text(true))
 
 
+func _tick_callout(delta: float) -> void:
+	if _callout_left <= 0.0:
+		return
+	_callout_left = maxf(0.0, _callout_left - delta)
+	if _callout_left <= 0.0 and message_title.text == HudStyle.chrome(SWEET_CALLOUT):
+		show_message("", "", false)
+
+
+func _listen_sweet(golf: GolfController) -> void:
+	if _sweet_golf == golf:
+		return
+	if _sweet_golf != null and is_instance_valid(_sweet_golf):
+		if _sweet_golf.sweet_struck.is_connected(_on_sweet_struck):
+			_sweet_golf.sweet_struck.disconnect(_on_sweet_struck)
+	_sweet_golf = golf
+	if not golf.sweet_struck.is_connected(_on_sweet_struck):
+		golf.sweet_struck.connect(_on_sweet_struck)
+
+
+func _on_sweet_struck() -> void:
+	flash_callout(SWEET_CALLOUT)
+
+
 static func golf_club_text(putting: bool) -> String:
 	return "Putter" if putting else ""
 
@@ -205,6 +267,18 @@ static func golf_club_text(putting: bool) -> String:
 ## Parked on the full clock during warm-up, so you can see what you are about to
 ## start before you step on the tee.
 func _update_timer() -> void:
+	var poker_t := player.poker.timer_left(player) if player.has_method("is_poker_seated") else -1.0
+	if poker_t >= 0.0:
+		timer_label.visible = true
+		timer_label.text = HudStyle.chrome(GameState.format_clock(poker_t))
+		var color := Palette.ICE
+		if poker_t <= 10.0:
+			color = Palette.MAGENTA
+		elif poker_t <= 30.0:
+			color = Palette.AMBER
+		timer_label.label_settings.font_color = color
+		timer_label.label_settings.shadow_color = Color(color, HudStyle.GLOW_ALPHA)
+		return
 	var show: bool = true
 	if flow.has_method("shows_timer"):
 		show = bool(flow.shows_timer())
@@ -225,18 +299,37 @@ func _update_timer() -> void:
 
 
 func _update_money() -> void:
+	if player.poker != null:
+		money_label.text = HudStyle.chrome(GameState.format_money(player.poker.shown_cash(player)))
+		return
 	var card = player.wallet() if player.has_method("wallet") else flow.score
 	if card != null:
 		money_label.text = HudStyle.chrome(GameState.format_money(card.money))
 
 
 func _update_shop() -> void:
+	if poker_result != null:
+		poker_result.refresh(player)
 	if player.talking:
 		_shop_info_shown = false
 		shop_panel.visible = true
 		message.visible = false
+		if poker_result != null:
+			poker_result.visible = false
 		shop_title.text = HudStyle.chrome(player.talk_name)
 		shop_body.text = HudStyle.chrome(player.talk_line)
+		return
+	if player.poker.showing_result():
+		_shop_info_shown = false
+		shop_panel.visible = false
+		message.visible = false
+		return
+	if player.poker.shows_panel(player):
+		_shop_info_shown = false
+		shop_panel.visible = true
+		message.visible = false
+		shop_title.text = HudStyle.chrome("Hold'em")
+		shop_body.text = HudStyle.chrome(player.poker.panel_text(player))
 		return
 	var open: bool = player.shopping and flow.has_shop()
 	shop_panel.visible = open
@@ -253,6 +346,24 @@ func _update_shop() -> void:
 		player.shop_choice, player.shop_dept, player
 	) if inspect else flow.shop_listing(player.shop_choice, player.shop_dept, player)
 	shop_body.text = HudStyle.chrome(body)
+
+
+func _update_board() -> void:
+	if board_hud == null:
+		return
+	if player.poker.showing_result():
+		board_hud.visible = false
+		return
+	board_hud.refresh(player)
+
+
+func _update_act() -> void:
+	if poker_act == null:
+		return
+	if player.talking or player.poker.showing_result():
+		poker_act.visible = false
+		return
+	poker_act.refresh(player)
 
 
 func _update_map() -> void:

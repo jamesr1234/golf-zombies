@@ -1,7 +1,7 @@
 class_name CartPathTrack
 extends Object
-## Waypoints for the drive to the clubhouse. Windy turns on a level deck; trees
-## are the boundary.
+## Waypoints for the drive to the clubhouse. Windy turns on a level deck; the
+## forcefield holds the cart on the tarmac.
 
 ## [straight metres, turn degrees (left +), corner radius]
 const LEGS: Array = [
@@ -161,6 +161,47 @@ static func aim_at(points: Array[Vector3], from: Vector3, ahead := AIM_AHEAD) ->
 	var on := closest(points, from)
 	var pull := Vector3(on.x - from.x, 0.0, on.z - from.z)
 	return target + pull * AIM_PULL
+
+
+## Exact straights and circular sweeps the centerline was sampled from.
+static func strokes(origin: Vector3, heading: Vector3, start_h: float) -> Array[Dictionary]:
+	var pos := origin
+	var dir := heading
+	dir.y = 0.0
+	dir = dir.normalized()
+	var runs: Array[Dictionary] = []
+	for leg in LEGS:
+		var dist := float(leg[0])
+		var turn := float(leg[1])
+		var radius := float(leg[2])
+		var dest := pos + dir * dist
+		runs.append({
+			"kind": "line",
+			"a": _lift(pos, start_h),
+			"b": _lift(dest, start_h),
+		})
+		pos = dest
+		if absf(turn) < 0.5 or radius < 1.0:
+			continue
+		var right := dir.cross(Vector3.UP).normalized()
+		var inward := -right if turn > 0.0 else right
+		var center := pos + inward * radius
+		var from := pos
+		var sweep := deg_to_rad(turn)
+		var start_dir := dir
+		pos = center + (from - center).rotated(Vector3.UP, sweep)
+		dir = dir.rotated(Vector3.UP, sweep).normalized()
+		runs.append({
+			"kind": "arc",
+			"center": _lift(center, start_h),
+			"radius": radius,
+			"from": _lift(from, start_h),
+			"to": _lift(pos, start_h),
+			"sweep": sweep,
+			"heading": start_dir,
+			"height": start_h,
+		})
+	return runs
 
 
 static func _arc(

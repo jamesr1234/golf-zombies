@@ -1,0 +1,43 @@
+[gd_scene load_steps=10 format=3]
+
+[ext_resource type="PackedScene" uid="uid://c372486rn6jcn" path="res://assets/obstacles/cube_medium.glb" id="1_cube_medium"]
+[ext_resource type="PackedScene" uid="uid://6iiejv77q5hf" path="res://assets/obstacles/arch_small.glb" id="2_arch_small"]
+[ext_resource type="PackedScene" uid="uid://my7dkqia2h6j" path="res://assets/obstacles/pillar_small.glb" id="3_pillar_small"]
+[ext_resource type="PackedScene" uid="uid://bgsqyo14mnujo" path="res://assets/obstacles/platform_small.glb" id="4_platform_small"]
+[ext_resource type="PackedScene" uid="uid://curknt1wmtk4h" path="res://assets/obstacles/ramp_extra_small.glb" id="5_ramp_extra_small"]
+[ext_resource type="PackedScene" uid="uid://b3ptlwxh4shx4" path="res://assets/obstacles/steps_extra_small.glb" id="6_steps_extra_small"]
+[ext_resource type="PackedScene" uid="uid://cow1vnvymyyu7" path="res://assets/obstacles/wall_extra_small.glb" id="7_wall_extra_small"]
+[ext_resource type="PackedScene" uid="uid://bc8mvkcfwf7xl" path="res://assets/obstacles/tunnel_extra_small.glb" id="8_tunnel_extra_small"]
+[ext_resource type="PackedScene" uid="uid://ct4snfxxh2xon" path="res://assets/obstacles/ladder_extra_small.glb" id="9_ladder_extra_small"]
+
+[node name="Plaza" type="Node3D"]
+
+[node name="cube_medium" parent="." instance=ExtResource("1_cube_medium")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.4, 0, -5.4)
+
+[node name="arch_small" parent="." instance=ExtResource("2_arch_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 0, 0)
+
+[node name="pillar_small" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="pillar_small2" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.8, 0, 0)
+
+[node name="platform_small" parent="." instance=ExtResource("4_platform_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.4, 4.05, -5.4)
+
+[node name="ramp_extra_small" parent="." instance=ExtResource("5_ramp_extra_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 0, -5.4)
+
+[node name="steps_extra_small" parent="." instance=ExtResource("6_steps_extra_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -5.4)
+
+[node name="wall_extra_small" parent="." instance=ExtResource("7_wall_extra_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.8, 0, -5.4)
+
+[node name="tunnel_extra_small" parent="." instance=ExtResource("8_tunnel_extra_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.4, 0, -10.8)
+
+[node name="ladder_extra_small" parent="." instance=ExtResource("9_ladder_extra_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.8, 0, -4.05)

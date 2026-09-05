@@ -15,18 +15,26 @@ var melee_pending := false
 func steer(zombie: Zombie) -> Vector3:
 	if zombie.stats.stationary:
 		return Vector3.ZERO
+	if zombie.has_roam() and not zombie.roam_contains(zombie.global_position):
+		return _aisle(zombie, zombie.patrol_a if zombie.has_patrol() else zombie.roam_home())
+	if target == null:
+		if zombie.has_patrol():
+			return _patrol(zombie)
+		return _clamp_roam(zombie, _wander(zombie)) if zombie.has_roam() else Vector3.ZERO
+	if zombie.has_patrol():
+		return _aisle(zombie, target.global_position)
 	var direct := target.global_position - zombie.global_position
 	direct.y = 0.0
 	var span := direct.length()
 	if zombie.allied:
 		if span <= Melee.RANGE * 0.75:
 			return Vector3.ZERO
-		return path_dir(zombie, direct)
+		return _clamp_roam(zombie, path_dir(zombie, direct))
 	if zombie.stats.ranged:
-		return range_steer_for(zombie, direct, span)
+		return _clamp_roam(zombie, range_steer_for(zombie, direct, span))
 	if span <= zombie.stats.attack_range:
 		return Vector3.ZERO
-	return path_dir(zombie, direct)
+	return _clamp_roam(zombie, path_dir(zombie, direct))
 
 
 func range_steer_for(zombie: Zombie, direct: Vector3, span: float) -> Vector3:
@@ -210,7 +218,14 @@ func pick_target(zombie: Zombie) -> Node3D:
 			var player := node as Player
 			if player == null or not player.health.is_alive():
 				continue
+			if zombie.has_roam() and not zombie.roam_contains(player.global_position):
+				continue
+			var maze := zombie.home_maze()
+			if maze != null and not maze.contains_world(player.global_position):
+				continue
 			var dist := zombie.global_position.distance_to(player.global_position)
+			if zombie.aggro_range > 0.0 and dist > zombie.aggro_range:
+				continue
 			if dist < best_d:
 				best = player
 				best_d = dist
@@ -220,8 +235,71 @@ func pick_target(zombie: Zombie) -> Node3D:
 			continue
 		if not Zombie.hunts(zombie.allied, false, other.is_allied()):
 			continue
+		if zombie.has_roam() and not zombie.roam_contains(other.global_position):
+			continue
 		var dist := zombie.global_position.distance_to(other.global_position)
+		if zombie.aggro_range > 0.0 and dist > zombie.aggro_range:
+			continue
 		if dist < best_d:
 			best = other
 			best_d = dist
 	return best
+
+
+func _home(zombie: Zombie) -> Vector3:
+	var home := zombie.roam_home() - zombie.global_position
+	home.y = 0.0
+	if home.length_squared() < 0.0001:
+		return Vector3.ZERO
+	return home.normalized()
+
+
+func _patrol(zombie: Zombie) -> Vector3:
+	var goal := zombie.patrol_b if zombie.patrol_goal_b else zombie.patrol_a
+	var offset := goal - zombie.global_position
+	offset.y = 0.0
+	if offset.length() < Maze.CELL * 0.45:
+		zombie.patrol_goal_b = not zombie.patrol_goal_b
+		goal = zombie.patrol_b if zombie.patrol_goal_b else zombie.patrol_a
+		offset = goal - zombie.global_position
+		offset.y = 0.0
+	if offset.length_squared() < 0.0001:
+		return Vector3.ZERO
+	return offset.normalized()
+
+
+func _aisle(zombie: Zombie, toward: Vector3) -> Vector3:
+	var maze := zombie.home_maze()
+	if maze == null:
+		var fallback := toward - zombie.global_position
+		fallback.y = 0.0
+		return fallback.normalized() if fallback.length_squared() > 0.0001 else Vector3.ZERO
+	var next := maze.next_toward(zombie.global_position, toward)
+	if not next.is_finite():
+		return _patrol(zombie) if zombie.has_patrol() else Vector3.ZERO
+	var offset := next - zombie.global_position
+	offset.y = 0.0
+	if offset.length() < 0.2:
+		var last := toward - zombie.global_position
+		last.y = 0.0
+		if last.length() <= zombie.stats.attack_range:
+			return Vector3.ZERO
+		return last.normalized() if last.length_squared() > 0.0001 else Vector3.ZERO
+	return offset.normalized()
+
+
+func _wander(zombie: Zombie) -> Vector3:
+	if zombie.wander_at == Vector3.ZERO or zombie.global_position.distance_to(zombie.wander_at) < 1.8:
+		zombie.wander_at = zombie.roam_sample()
+	var direct := zombie.wander_at - zombie.global_position
+	direct.y = 0.0
+	return path_dir(zombie, direct)
+
+
+func _clamp_roam(zombie: Zombie, direction: Vector3) -> Vector3:
+	if not zombie.has_roam() or direction.length_squared() < 0.0001:
+		return direction
+	var next := zombie.global_position + direction.normalized() * 1.2
+	if zombie.roam_contains(next):
+		return direction
+	return _home(zombie)

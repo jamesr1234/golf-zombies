@@ -5,7 +5,7 @@ extends CharacterBody3D
 
 enum Visit { WAITING, APPROACHING, SERVING, LEAVING, GONE }
 
-const CRUISE_SPEED := 9.0
+const CRUISE_SPEED := 18.0
 const ACCELERATION := 10.0
 const COAST_DECAY := 6.0
 const TURN_DEG_PER_SEC := 95.0

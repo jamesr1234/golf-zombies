@@ -1,0 +1,70 @@
+[gd_scene format=3 uid="uid://b6l11jor4611x"]
+
+[ext_resource type="Script" uid="uid://bjyb7l8ptj88k" path="res://scripts/course/hole_overlay_root.gd" id="1_root"]
+[ext_resource type="PackedScene" path="res://scenes/course/structures/starter_hut.tscn" id="2_hut"]
+[ext_resource type="PackedScene" path="res://scenes/course/structures/signal_mast.tscn" id="4_mast"]
+[ext_resource type="PackedScene" path="res://scenes/course/structures/scoreboard.tscn" id="5_board"]
+[ext_resource type="PackedScene" path="res://scenes/course/structures/grandstand.tscn" id="6_stand"]
+[ext_resource type="PackedScene" path="res://scenes/course/structures/bleachers.tscn" id="7_bleachers"]
+[ext_resource type="PackedScene" path="res://scenes/course/structures/range_fence.tscn" id="8_fence"]
+[ext_resource type="PackedScene" path="res://scenes/course/structures/colonnade.tscn" id="9_col"]
+[ext_resource type="PackedScene" path="res://scenes/vehicles/race_car.tscn" id="10_car"]
+[ext_resource type="PackedScene" path="res://scenes/vehicles/pickup_truck.tscn" id="11_truck"]
+[ext_resource type="PackedScene" path="res://scenes/vehicles/suv.tscn" id="12_suv"]
+[ext_resource type="PackedScene" uid="uid://biacitegxcv8c" path="res://assets/vehicles/race_car.glb" id="13_rjrhw"]
+[ext_resource type="PackedScene" path="res://scenes/vehicles/panel_van.tscn" id="13_van"]
+
+[node name="Hole11" type="Node3D" unique_id=1757129109]
+script = ExtResource("1_root")
+hole_index = 10
+
+[node name="StarterHut" parent="." unique_id=643837498 instance=ExtResource("2_hut")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -32.0, 0, 2.7)
+
+[node name="SignalMast" parent="." unique_id=175572255 instance=ExtResource("4_mast")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32.0, 0, 5.4)
+
+[node name="Scoreboard" parent="." unique_id=1227967581 instance=ExtResource("5_board")]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 44.0, 0, 8.1)
+
+[node name="Grandstand" parent="." unique_id=1707072151 instance=ExtResource("6_stand")]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 44.0, 0, -8.1)
+
+[node name="Grandstand2" parent="." unique_id=1831167500 instance=ExtResource("6_stand")]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 44.0, 0, -35.1)
+
+[node name="Bleachers" parent="." unique_id=200413647 instance=ExtResource("7_bleachers")]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 44.0, 0, -62.1)
+
+[node name="RangeFence" parent="." unique_id=1890377347 instance=ExtResource("8_fence")]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 32.0, 0, -8.1)
+
+[node name="RangeFence2" parent="." unique_id=27342253 instance=ExtResource("8_fence")]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 32.0, 0, -27)
+
+[node name="RangeFence3" parent="." unique_id=307430198 instance=ExtResource("8_fence")]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 32.0, 0, -45.9)
+
+[node name="Colonnade" parent="." unique_id=1794504857 instance=ExtResource("9_col")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -34.0, 0, -8.1)
+
+[node name="RaceCar" parent="." unique_id=1594561505 instance=ExtResource("10_car")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 36.0, 0, -16.2)
+
+[node name="RaceCar2" parent="." unique_id=2087380134 instance=ExtResource("10_car")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 36.0, 0, -24.3)
+
+[node name="RaceCar3" parent="." unique_id=2090173834 instance=ExtResource("10_car")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 36.0, 0, -32.4)
+
+[node name="PickupTruck" parent="." unique_id=232762507 instance=ExtResource("11_truck")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 40.0, 0, -10.8)
+
+[node name="SUV" parent="." unique_id=2116449727 instance=ExtResource("12_suv")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 40.0, 0, -40.5)
+
+[node name="PanelVan" parent="." unique_id=1361725799 instance=ExtResource("13_van")]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -40.0, 0, -21.6)
+
+[node name="MechSuit" parent="." unique_id=1012678495 instance=ExtResource("13_rjrhw")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11.215282, 22.09436, 28.340015)

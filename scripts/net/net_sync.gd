@@ -54,9 +54,9 @@ static func attach(
 ## watchers walk the pawn from it and use the pose only to correct.
 static func attach_pawn(node: Node, authority := 1) -> MultiplayerSynchronizer:
 	return attach(node, PackedStringArray([
-		":sync_xform", ":sync_stick", ":sync_sprint", ":sync_jumps",
+		":sync_xform", ":sync_stick", ":sync_sprint", ":sync_slide", ":sync_glide", ":sync_glide_worn", ":sync_jumps",
 		":sync_pace", ":aiming",
-		":sync_gun", ":holding_beer",
+		":sync_gun", ":holding_beer", ":holding_mines",
 		":sync_state", ":sync_dive", ":sync_firing", ":sync_reload", ":sync_scoped",
 		":sync_pitch", ":sync_grapple_at",
 	]), PAWN_HZ, authority)
@@ -85,8 +85,9 @@ static func attach_zombie(node: Node) -> MultiplayerSynchronizer:
 ## replaying the pose, and the pose is what corrects them when they are wrong.
 static func attach_cart(node: Node) -> MultiplayerSynchronizer:
 	return attach(node, PackedStringArray([
-		":sync_xform", ":sync_stick", ":sync_boost",
-		":turbo", ":ram_plate", ":armored",
+		":sync_xform", ":sync_stick", ":sync_boost", ":sync_brake", ":sync_brake_pitch",
+		":sync_tipped", ":sync_tip_sign", ":sync_right",
+		":turbo", ":ram_plate", ":armored", ":mines",
 	]), CART_HZ)
 
 

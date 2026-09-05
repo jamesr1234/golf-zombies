@@ -24,15 +24,18 @@ func test_the_hook_only_bites_rides() -> void:
 	var cart := GolfCart.new()
 	var mech := MechSuit.new()
 	var girl := CartGirl.new()
+	var point = load("res://scripts/course/grapple_point.gd").new()
 	assert_eq(Grappler.hitchable(cart), cart)
 	assert_eq(Grappler.hitchable(mech), mech)
 	assert_eq(Grappler.hitchable(girl), girl)
+	assert_eq(Grappler.hitchable(point), point)
 	var dummy := Node3D.new()
 	assert_null(Grappler.hitchable(dummy))
 	assert_null(Grappler.hitchable(null))
 	cart.free()
 	mech.free()
 	girl.free()
+	point.free()
 	dummy.free()
 
 
@@ -195,6 +198,22 @@ func test_the_line_draws_while_you_are_on_the_rope() -> void:
 	assert_true(player._grapple_line.visible)
 
 
+func test_a_cart_rope_stays_long_until_you_sprint() -> void:
+	var player: Player = PLAYER.instantiate()
+	add_child_autofree(player)
+	var cart: GolfCart = CART.instantiate()
+	add_child_autofree(cart)
+	await wait_physics_frames(1)
+	player.global_position = Vector3(0.0, 1.0, 8.0)
+	cart.global_position = Vector3(0.0, 0.4, 0.0)
+	player.begin_grapple(cart, cart.global_position + Vector3(0.0, 0.6, 0.0))
+	var before := player.grappler.slack
+	assert_false(player.grappler.is_point())
+	for _frame in 20:
+		player._physics_process(STEP)
+	assert_almost_eq(player.grappler.slack, before, 0.01)
+
+
 func test_sprint_reels_the_rope_in() -> void:
 	var grappler := Grappler.new()
 	grappler.slack = 12.0
@@ -213,6 +232,7 @@ func test_you_can_shoot_while_on_the_rope() -> void:
 	add_child_autofree(player)
 	var cart: GolfCart = CART.instantiate()
 	add_child_autofree(cart)
+	assert_true(player.weapon.add_gun(preload("res://resources/weapons/rifle.tres")))
 	await wait_physics_frames(1)
 	player.input = CpuInput.new("p1", true)
 	player.global_position = Vector3(0.0, 1.0, 8.0)

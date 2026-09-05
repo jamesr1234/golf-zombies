@@ -108,15 +108,27 @@ func start_hole(index: int) -> void:
 	## Each pawn is owned by its peer, so the host's spawn_at is overwritten by
 	## the joiner's default origin unless that joiner plants itself too.
 	course.place_players(_players)
-	course.place_cart_girl()
-	course.aim_practice(_sessions())
+	if not ArenaHole.applies(hole):
+		course.place_cart_girl()
+		course.aim_practice(_sessions())
 	_reset_clock()
 	spawner_ai.clear_zombies()
+	spawner_ai.plant_mazes(course.hole_node)
 	scorecard_changed.emit()
 	_broadcast_scores()
 	_flash_message(
-		"Hole %d   Par %d" % [index + 1, hole.par],
-		"Warm up. Step onto the tee and interact when you are ready."
+		hole.banner_title(),
+		"First ball in the soccer goal wins."
+		if hole.has_soccer_goal()
+		else (
+			RaceHole.WARMUP_SHORT
+			if RaceHole.applies(hole)
+			else (
+				ArenaHole.WARMUP_SHORT
+				if ArenaHole.applies(hole)
+				else "Warm up. Step onto the tee and interact when you are ready."
+			)
+		)
 	)
 	Sfx.play("hole_start", self)
 	_Music.play_lounge()
@@ -131,6 +143,8 @@ func start_play() -> void:
 
 func can_start_play(who: Node3D) -> bool:
 	if phase != Phase.PREP or finished or who == null or hole == null:
+		return false
+	if ArenaHole.applies(hole):
 		return false
 	var offset := who.global_position - hole.tee
 	offset.y = 0.0
@@ -430,15 +444,17 @@ func scorecard_text() -> String:
 	if score == null:
 		return ""
 	if phase == Phase.PREP:
-		return "Hole %d   Par %d   Warm up" % [score.hole_index + 1, score.par()]
+		if ArenaHole.applies(hole):
+			return "%s   Pick two guns" % _hole_tag(score)
+		return "%s   Warm up" % _hole_tag(score)
 	if phase == Phase.SHOP:
 		return "Clubhouse   next hole %d   %s" % [
 			score.hole_index + 1, GameState.format_money(score.money)
 		]
 	if phase == Phase.TRANSIT:
 		return "Drive to hole %d" % [score.hole_index + 1]
-	return "Hole %d   Par %d   Strokes %d/%d   %s" % [
-		score.hole_index + 1, score.par(), score.strokes, score.max_strokes(),
+	return "%s   Strokes %d/%d   %s" % [
+		_hole_tag(score), score.strokes, score.max_strokes(),
 		GameState.format_relative(score.relative_to_par()),
 	]
 
@@ -448,7 +464,9 @@ func _coop_scorecard() -> String:
 	if card == null:
 		return ""
 	if phase == Phase.PREP:
-		return "Hole %d   Par %d   Warm up" % [card.hole_index + 1, card.par()]
+		if ArenaHole.applies(hole):
+			return "%s   Pick two guns" % _hole_tag(card)
+		return "%s   Warm up" % _hole_tag(card)
 	if phase == Phase.RETRIEVE:
 		return "Pick up your ball   then drive to hole %d" % [card.hole_index + 1]
 	if phase == Phase.SHOP:
@@ -458,10 +476,20 @@ func _coop_scorecard() -> String:
 		]
 	if phase == Phase.TRANSIT:
 		return "Drive to hole %d" % [card.hole_index + 1]
-	return "Hole %d   Par %d   Strokes %d/%d   %s" % [
-		card.hole_index + 1, card.par(), card.strokes, card.max_strokes(),
+	return "%s   Strokes %d/%d   %s" % [
+		_hole_tag(card), card.strokes, card.max_strokes(),
 		GameState.format_relative(card.relative_to_par()),
 	]
+
+
+func _hole_tag(card: GameState) -> String:
+	if hole != null and hole.has_soccer_goal():
+		return "Hole %d   Soccer Goal" % [card.hole_index + 1]
+	if hole != null and RaceHole.applies(hole):
+		return hole.banner_title()
+	if hole != null and ArenaHole.applies(hole):
+		return hole.banner_title()
+	return "Hole %d   Par %d" % [card.hole_index + 1, card.par()]
 
 
 func scoreboard_text() -> String:
@@ -496,7 +524,10 @@ func _process(delta: float) -> void:
 		_clock_broadcast = 0.0
 		_broadcast_scores()
 	if hole_time_left <= 0.0:
-		_timeout_hole()
+		if ArenaHole.applies(hole):
+			_timeout_arena()
+		else:
+			_timeout_hole()
 
 
 func owns_clock() -> bool:
@@ -506,12 +537,17 @@ func owns_clock() -> bool:
 func _physics_process(delta: float) -> void:
 	if phase != Phase.TRANSIT or course.cart_path == null:
 		return
+	var bodies: Array[Node3D] = []
 	for cart in _carts:
-		course.cart_path.tick_crash(cart, delta)
+		bodies.append(cart)
+	for player in _players:
+		if player != null and not player.is_riding():
+			bodies.append(player)
+	course.cart_path.tick_bodies(bodies, delta)
 
 
 func _wire_players() -> void:
-	var pars := HoleGenerator.pars()
+	var pars := HoleStore.course_pars()
 	for player in _players:
 		player.flow = self
 		player.score = _scores.get(player.peer_id) as PlayerScore
@@ -525,10 +561,18 @@ func _wire_players() -> void:
 		player.cart = cart_for(player)
 		if player.golf != null:
 			player.golf.club_kit = player.score.club_kit()
+		player.weapon.fill_stash()
+		if NetSession.is_active() and multiplayer.is_server():
+			_broadcast_loadout(player)
 		if GameSettings.is_coop_vs():
 			_team_card(CoopVs.team_of(player.seat_index()))
 		if not GameSettings.is_coop_vs():
 			_connect_player_golf(player)
+		if player.health != null:
+			if not player.health.downed.is_connected(_check_arena_standings):
+				player.health.downed.connect(_check_arena_standings)
+			if not player.health.died.is_connected(_check_arena_standings):
+				player.health.died.connect(_check_arena_standings)
 	if GameSettings.is_coop_vs():
 		CoopVs.bind_partners(_players)
 		_wire_team_golf()
@@ -619,20 +663,28 @@ func _do_start_play() -> void:
 		return
 	phase = Phase.PLAYING
 	course.close_shop(_players)
-	course.aim_play(_sessions())
-	spawner_ai.begin_hole(score.hole_index if score else 0, hole.spawn_points)
+	if not ArenaHole.applies(hole):
+		course.aim_play(_sessions())
+	spawner_ai.begin_hole(
+		score.hole_index if score else 0, hole.spawn_points, ArenaHole.applies(hole)
+	)
 	spawner_ai.place_snipers(hole.sniper_perches())
 	scorecard_changed.emit()
 	Sfx.play("start_play", self)
 	_Music.play_level()
-	_flash_message(
-		"Hole %d   Par %d" % [hole.index + 1, hole.par],
-		"Lowest team total wins. Alternate shot. Melee delays. Guns are for zombies."
-		if GameSettings.is_coop_vs()
-		else "Lowest strokes wins. Melee delays. Guns are for zombies."
-	)
+	_flash_message(hole.banner_title(), _play_copy())
 	_replicate_event.rpc("play")
 	_broadcast_scores()
+
+
+func _play_copy() -> String:
+	if hole != null and hole.has_soccer_goal():
+		return "First ball in the soccer goal wins. Less accuracy, more speed."
+	if ArenaHole.applies(hole):
+		return ArenaHole.PLAY_BANNER
+	if GameSettings.is_coop_vs():
+		return "Lowest team total wins. Alternate shot. Melee delays. Guns are for zombies."
+	return "Lowest strokes wins. Melee delays. Guns are for zombies."
 
 
 func _on_stroke_taken(player: Player) -> void:
@@ -723,10 +775,33 @@ func _on_hazard(kind: String, player: Player) -> void:
 func _on_holed(player: Player) -> void:
 	if finished or is_practice() or player == null:
 		return
+	if hole != null and hole.has_soccer_goal():
+		_finish_race(player)
+		return
 	if GameSettings.is_coop_vs():
 		_finish_team(player, true)
 		return
 	_finish_player(player, true)
+
+
+func _finish_race(player: Player) -> void:
+	_flash_message("GOAL!", "First ball in the net wins.")
+	if GameSettings.is_coop_vs():
+		_finish_team(player, true)
+		var scored := CoopVs.team_of(player.seat_index())
+		for other in _players:
+			if CoopVs.team_of(other.seat_index()) == scored:
+				continue
+			var card := team_score_for(other)
+			if card != null and not card.done_this_hole:
+				_finish_team(other, false)
+		return
+	_finish_player(player, true)
+	for other in _players:
+		if other == player:
+			continue
+		if not score_for(other).done_this_hole:
+			_pickup(other)
 
 
 func _pickup(player: Player) -> void:
@@ -796,6 +871,98 @@ func _all_done() -> bool:
 	return true
 
 
+func _timeout_arena() -> void:
+	if not ArenaHole.applies(hole) or phase != Phase.PLAYING:
+		return
+	_flush_arena_wipes()
+	var remaining: Array = _arena_live_cards()
+	remaining.sort_custom(func(a, b): return _arena_card_hp(a) > _arena_card_hp(b))
+	for i in remaining.size():
+		_finish_arena_card(remaining[i], i)
+	_complete_hole()
+
+
+func _check_arena_standings() -> void:
+	if not ArenaHole.applies(hole) or phase != Phase.PLAYING or finished:
+		return
+	if NetSession.is_active() and not multiplayer.is_server():
+		return
+	_flush_arena_wipes()
+	var live := _arena_live_cards()
+	if live.size() > 1:
+		return
+	if live.size() == 1:
+		_finish_arena_card(live[0], 0)
+	if live.is_empty() or _all_done():
+		_complete_hole()
+
+
+func _flush_arena_wipes() -> void:
+	var live := _arena_live_cards()
+	var wiped: Array = []
+	for card in _arena_cards():
+		if card == null or bool(card.done_this_hole):
+			continue
+		if not _arena_card_alive(card):
+			wiped.append(card)
+	var place := live.size() + wiped.size() - 1
+	for card in wiped:
+		_finish_arena_card(card, place)
+		place -= 1
+
+
+func _arena_cards() -> Array:
+	if GameSettings.is_coop_vs():
+		_ensure_team_cards()
+		return _team_scores.values()
+	return _scores.values()
+
+
+func _arena_live_cards() -> Array:
+	var live: Array = []
+	for card in _arena_cards():
+		if card == null or bool(card.done_this_hole):
+			continue
+		if _arena_card_alive(card):
+			live.append(card)
+	return live
+
+
+func _arena_card_alive(card) -> bool:
+	if card is TeamScore:
+		for player in _players:
+			if CoopVs.team_of(player.seat_index()) != (card as TeamScore).team:
+				continue
+			if player.health != null and player.health.is_alive():
+				return true
+		return false
+	var player := _player_for((card as PlayerScore).peer_id)
+	return player != null and player.health != null and player.health.is_alive()
+
+
+func _arena_card_hp(card) -> float:
+	var total := 0.0
+	if card is TeamScore:
+		for player in _players:
+			if CoopVs.team_of(player.seat_index()) != (card as TeamScore).team:
+				continue
+			if player.health != null and player.health.is_alive():
+				total += player.health.hp
+		return total
+	var player := _player_for((card as PlayerScore).peer_id)
+	if player != null and player.health != null and player.health.is_alive():
+		return player.health.hp
+	return 0.0
+
+
+func _finish_arena_card(card, place: int) -> void:
+	if card == null or bool(card.done_this_hole):
+		return
+	card.strokes = ArenaHole.strokes_for_place(card.par(), place)
+	card.strokes_changed.emit(card.strokes)
+	card.finish_hole()
+
+
 func _timeout_hole() -> void:
 	if GameSettings.is_coop_vs():
 		_ensure_team_cards()
@@ -817,7 +984,16 @@ func _timeout_hole() -> void:
 func _complete_hole() -> void:
 	if phase != Phase.PLAYING:
 		return
-	if GameSettings.is_coop_vs():
+	if ArenaHole.applies(hole):
+		ArenaBuild.open_exit(course.hole_node)
+		for owned in _balls:
+			if owned != null:
+				owned.stow()
+		if GameSettings.is_coop_vs():
+			_enter_retrieve()
+			_begin_coop_transit()
+			return
+	elif GameSettings.is_coop_vs():
 		_enter_retrieve()
 		return
 	spawner_ai.stop()
@@ -911,7 +1087,7 @@ func _teams_course_complete() -> bool:
 func _team_card(team: int) -> TeamScore:
 	var card := _team_scores.get(team) as TeamScore
 	if card == null:
-		card = TeamScore.new(HoleGenerator.pars())
+		card = TeamScore.new(HoleStore.course_pars())
 		card.team = team
 		_team_scores[team] = card
 	return card
@@ -957,6 +1133,7 @@ func _do_arrive() -> void:
 	hole = course.hole
 	shop = course.shop
 	_reset_clock()
+	spawner_ai.plant_mazes(course.hole_node)
 	get_tree().call_group("hud", "reveal")
 	scorecard_changed.emit()
 	_replicate_event.rpc("shop")
@@ -1121,6 +1298,20 @@ func note_beer_sale(player: Player) -> void:
 		_apply_beers.rpc(player.peer_id, player.buzz.held)
 
 
+func note_loadout(player: Player) -> void:
+	_broadcast_loadout(player)
+	_try_start_arena()
+
+
+func _try_start_arena() -> void:
+	if not ArenaHole.applies(hole) or phase != Phase.PREP or finished:
+		return
+	if NetSession.is_active() and not multiplayer.is_server():
+		return
+	if ArenaHole.all_armed(_players):
+		_do_start_play()
+
+
 func _broadcast_look(buyer: Player) -> void:
 	if not multiplayer.is_server() or buyer == null or buyer.body == null:
 		return
@@ -1131,10 +1322,14 @@ func _broadcast_loadout(buyer: Player) -> void:
 	if not multiplayer.is_server() or buyer == null or buyer.weapon == null:
 		return
 	var paths: PackedStringArray = []
-	for stats in buyer.weapon.loadout:
-		if stats != null and stats.resource_path != "":
-			paths.append(stats.resource_path)
-	_apply_loadout.rpc(buyer.peer_id, buyer.weapon.index, paths)
+	var gates := PackedFloat32Array()
+	for i in buyer.weapon.loadout.size():
+		var stats: WeaponStats = buyer.weapon.loadout[i]
+		if stats == null or stats.resource_path == "":
+			continue
+		paths.append(stats.resource_path)
+		gates.append(buyer.weapon.gates[i] if i < buyer.weapon.gates.size() else CustomHole.NO_GATE)
+	_apply_loadout.rpc(buyer.peer_id, buyer.weapon.index, paths, gates)
 
 
 @rpc("authority", "call_remote", "reliable")
@@ -1156,11 +1351,13 @@ func _apply_apparel(peer_id: int, worn: Dictionary) -> void:
 
 
 @rpc("authority", "call_remote", "reliable")
-func _apply_loadout(peer_id: int, gun_index: int, paths: PackedStringArray) -> void:
+func _apply_loadout(
+	peer_id: int, gun_index: int, paths: PackedStringArray, gates := PackedFloat32Array()
+) -> void:
 	var player := _player_for(peer_id)
 	if player == null or player.weapon == null:
 		return
-	player.weapon.apply_replicated_loadout(gun_index, paths)
+	player.weapon.apply_replicated_loadout(gun_index, paths, gates)
 
 
 @rpc("authority", "call_remote", "reliable")
@@ -1170,7 +1367,7 @@ func _apply_scores(payload: Dictionary, clock: float, phase_value: int, teams: D
 	for peer_id in payload.keys():
 		var card := _scores.get(int(peer_id)) as PlayerScore
 		if card == null:
-			card = PlayerScore.new(HoleGenerator.pars())
+			card = PlayerScore.new(HoleStore.course_pars())
 			card.peer_id = int(peer_id)
 			_scores[int(peer_id)] = card
 		var row: Dictionary = payload[peer_id]
@@ -1181,7 +1378,9 @@ func _apply_scores(payload: Dictionary, clock: float, phase_value: int, teams: D
 		card.seat = int(row.get("seat", card.seat))
 		card.club_id = String(row.get("club_id", ClubKit.STARTER_ID))
 		card.barrier_charges = int(row.get("barrier", card.barrier_charges))
+		card.ladder_charges = int(row.get("ladder", card.ladder_charges))
 		card.mech_bought = bool(row.get("mech", card.mech_bought))
+		card.glide_bought = bool(row.get("glide", card.glide_bought))
 		var packed: PackedInt32Array = row.get("results", PackedInt32Array())
 		if packed.size() == card.results.size():
 			card.results = packed
@@ -1214,7 +1413,9 @@ func _broadcast_scores() -> void:
 			"results": card.results,
 			"seat": card.seat,
 			"barrier": card.barrier_charges,
+			"ladder": card.ladder_charges,
 			"mech": card.mech_bought,
+			"glide": card.glide_bought,
 		}
 	var teams := {}
 	for team in _team_scores.keys():

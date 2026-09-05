@@ -1,0 +1,45 @@
+[gd_scene format=3 uid="uid://dt64ua5atq6mo"]
+
+[ext_resource type="Script" uid="uid://bjyb7l8ptj88k" path="res://scripts/course/hole_overlay_root.gd" id="1_root"]
+[ext_resource type="PackedScene" path="res://scenes/course/props/folding_steps.tscn" id="3_klatr"]
+[ext_resource type="PackedScene" path="res://scenes/vehicles/pickup_truck.tscn" id="11_ngtmk"]
+[ext_resource type="PackedScene" path="res://scenes/vehicles/station_wagon.tscn" id="12_421vf"]
+[ext_resource type="PackedScene" path="res://scenes/course/structures/maze.tscn" id="13_4brur"]
+[ext_resource type="PackedScene" path="res://scenes/vehicles/race_car.tscn" id="13_wow2r"]
+[ext_resource type="PackedScene" path="res://scenes/vehicles/suv.tscn" id="14_vlv5r"]
+[ext_resource type="PackedScene" uid="uid://dv5k5mdbki4t5" path="res://assets/obstacles/ramp_extra_large.glb" id="17_vlv5r"]
+[ext_resource type="PackedScene" path="res://scenes/course/props/gun_pickup.tscn" id="18_rocket"]
+
+[node name="Hole10" type="Node3D" unique_id=866724385]
+script = ExtResource("1_root")
+hole_index = 9
+
+[node name="FoldingSteps" parent="." unique_id=1835748604 instance=ExtResource("3_klatr")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12.606485, -9.536743e-07, 5.822262)
+collision_mask = 0
+run_cells = 3
+rise_cells = 3
+
+[node name="PickupTruck" parent="." unique_id=2126200887 instance=ExtResource("11_ngtmk")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -18.9, 0, 24.300001)
+
+[node name="StationWagon" parent="." unique_id=1042239171 instance=ExtResource("12_421vf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.2, 0, 21.6)
+
+[node name="RaceCar" parent="." unique_id=1989516147 instance=ExtResource("13_wow2r")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8.1, 0, 37.8)
+
+[node name="SUV" parent="." unique_id=47706701 instance=ExtResource("14_vlv5r")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.4, 0, 35.100002)
+
+[node name="ramp_extra_large" parent="." unique_id=1513594511 instance=ExtResource("17_vlv5r")]
+transform = Transform3D(-0.35028788, 0, 7.966554, 0, 1.5999999, 0, -2.740115, 0, -1.0184196, 36.45, 0, -112.05)
+
+[node name="Maze" parent="." unique_id=2079545310 instance=ExtResource("13_4brur")]
+transform = Transform3D(0.8537495, 0, 0, 0, 1, 0, 0, 0, 1, -22.95, 0, -18.9)
+
+[node name="GunPickup" parent="." unique_id=1847293847 instance=ExtResource("18_rocket")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8.1, 1.2, -13.5)
+
+[node name="RaceCar2" parent="." unique_id=1308726271 instance=ExtResource("13_wow2r")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -20.207973, 0, -85.297516)

@@ -5,7 +5,7 @@ extends RefCounted
 
 const BUTTONS: PackedStringArray = [
 	"sprint", "jump", "shoot", "reload", "melee", "interact", "revive", "swing",
-	"shield", "aim", "zoom", "grab", "ascend",
+	"shield", "aim", "zoom", "slide", "grab", "ascend",
 ]
 const FORBIDDEN: PackedStringArray = ["pause", "map"]
 

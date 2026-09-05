@@ -10,7 +10,7 @@ const TRIGGER_DEADZONE := 0.4
 const ACTIONS: PackedStringArray = [
 	"move_left", "move_right", "move_forward", "move_back",
 	"look_left", "look_right", "look_up", "look_down",
-	"sprint", "jump", "shoot", "aim", "zoom", "reload", "melee", "swap_weapon",
+	"sprint", "jump", "shoot", "aim", "zoom", "slide", "reload", "melee", "swap_weapon",
 	"swap_weapon_prev", "swap_gear", "swap_gear_prev",
 	"interact", "revive", "swing", "pause", "map", "ascend", "grab", "shield",
 	"grapple",
@@ -70,6 +70,7 @@ static func _register_keyboard(prefix: String) -> void:
 	_key(prefix + "_shield", KEY_C)
 	_key(prefix + "_grapple", KEY_V)
 	_key(prefix + "_zoom", KEY_Z)
+	_key(prefix + "_slide", KEY_Z)
 	_mouse(prefix + "_shoot", MOUSE_BUTTON_LEFT)
 	_mouse(prefix + "_swing", MOUSE_BUTTON_LEFT)
 	_mouse(prefix + "_aim", MOUSE_BUTTON_RIGHT)
@@ -99,6 +100,7 @@ static func _register_gamepad_for(prefix: String, device: int) -> void:
 	_axis(prefix + "_aim", JOY_AXIS_TRIGGER_LEFT, 1.0, TRIGGER_DEADZONE, device)
 	_button(prefix + "_sprint", JOY_BUTTON_LEFT_STICK, device)
 	_button(prefix + "_zoom", JOY_BUTTON_RIGHT_STICK, device)
+	_button(prefix + "_slide", JOY_BUTTON_RIGHT_STICK, device)
 	_button(prefix + "_jump", JOY_BUTTON_A, device)
 	_button(prefix + "_reload", JOY_BUTTON_X, device)
 	_button(prefix + "_melee", JOY_BUTTON_LEFT_SHOULDER, device)

@@ -15,7 +15,7 @@ func test_every_hole_has_towers_off_the_fairway() -> void:
 	assert_eq(_towers(hole0).size(), 2, "the first tee has to already have both perches")
 	for index in 9:
 		var hole := HoleGenerator.generate(index, SEED)
-		if hole.is_setpiece():
+		if hole.is_setpiece() or ArenaHole.applies(hole):
 			assert_eq(_towers(hole).size(), 0, "a set-piece strip has no side perches")
 			continue
 		var towers := _towers(hole)
@@ -100,8 +100,8 @@ func test_the_held_sniper_clicks_through_its_zooms() -> void:
 	var player: Player = PLAYER_SCENE.instantiate()
 	add_child_autofree(player)
 	await wait_physics_frames(1)
-	assert_eq(player.weapon.stats().display_name, "Flare Driver")
-	player.weapon.index = player.weapon.loadout.find(GUN)
+	assert_false(player.weapon.has_weapon())
+	assert_true(player.weapon.add_gun(GUN))
 	assert_eq(player.weapon.stats(), GUN)
 	assert_false(player.weapon.is_scoped())
 	player.weapon.cycle_zoom()
@@ -152,9 +152,11 @@ func test_drawing_the_sniper_asks_the_cpu_to_cover() -> void:
 	player.set_physics_process(false)
 	assert_false(player.is_holding_sniper())
 	assert_false(player.needs_cover())
-	player.weapon.index = player.weapon.loadout.find(GUN)
+	assert_true(player.weapon.add_gun(GUN))
 	assert_true(player.is_holding_sniper())
 	assert_true(player.needs_cover())
+	assert_true(player.weapon.add_gun(preload("res://resources/weapons/rifle.tres")))
+	player.weapon.index = player.weapon.loadout.find(GUN)
 	player.weapon.swap(1)
 	assert_false(player.is_holding_sniper())
 	assert_false(player.needs_cover())

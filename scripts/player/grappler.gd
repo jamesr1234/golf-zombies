@@ -1,16 +1,19 @@
 class_name Grappler
 extends RefCounted
-## Fires a claw at a cart or mech. Once it bites, the rope tows you along until
-## you jump off, fire again, or grab the ball.
+## Fires a claw at a cart, mech, or posted target. Once it bites, the rope tows
+## you along until you jump off, fire again, or grab the ball.
 
 const RANGE := 36.0
 const MIN_SLACK := 2.4
 const STIFF := 16.0
 const REEL := 9.0
+const POINT_REEL := 42.0
+const POINT_ARRIVE := 0.4
 const SWING := 7.5
 const YANK := 6.0
 const FOV := 98.0
 const HOOK_MASK := Layers.HOOK_MASK
+const _Point := preload("res://scripts/course/grapple_point.gd")
 
 
 var target: Node3D
@@ -29,6 +32,10 @@ func is_flying() -> bool:
 
 func is_active() -> bool:
 	return is_latched() or is_flying()
+
+
+func is_point() -> bool:
+	return is_latched() and target.get_script() == _Point
 
 
 func attach_world() -> Vector3:
@@ -91,6 +98,8 @@ func tick(player: Player, delta: float) -> bool:
 		return false
 	if player.input.just_pressed("jump") or player.input.just_pressed("grapple"):
 		return false
+	if is_point():
+		return _reel_to_point(player, delta)
 	if player.motion.sprinting(player):
 		slack = move_toward(slack, MIN_SLACK, REEL * delta)
 	var hook := attach_world()
@@ -122,6 +131,8 @@ static func hitchable(node: Object) -> Node3D:
 	var walk := node as Node
 	while walk != null:
 		if walk is GolfCart or walk is CartGirl or walk is MechSuit:
+			return walk as Node3D
+		if walk.get_script() == _Point:
 			return walk as Node3D
 		walk = walk.get_parent()
 	return null
@@ -171,6 +182,31 @@ static func muzzle_of(player: Player) -> Vector3:
 	if player.head != null:
 		return player.head.global_position
 	return player.global_position + Vector3.UP * 1.4
+
+
+func _reel_to_point(player: Player, delta: float) -> bool:
+	player.floor_snap_length = 0.0
+	var hook := attach_world()
+	var land := _pad()
+	var to_land := land - player.global_position
+	var dist := to_land.length()
+	var step := POINT_REEL * delta
+	if dist <= POINT_ARRIVE or dist <= step:
+		player.global_position = land
+		player.velocity = Vector3.ZERO
+		slack = hook.distance_to(land)
+		return false
+	var dir := to_land / dist
+	player.velocity = dir * POINT_REEL
+	player.global_position += dir * step
+	slack = player.global_position.distance_to(hook)
+	return true
+
+
+func _pad() -> Vector3:
+	if is_point() and target.has_method("land_at"):
+		return target.land_at()
+	return attach_world()
 
 
 func _swing(player: Player) -> Vector3:

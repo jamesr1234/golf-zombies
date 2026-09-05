@@ -25,7 +25,6 @@ func test_a_bought_beer_is_not_in_hand_until_you_scroll_to_it() -> void:
 	assert_false(player.is_holding_beer())
 	assert_false(player.chug(), "Circle does nothing until the can is selected")
 	assert_eq(player.buzz.held, 1)
-	player.weapon.index = player.weapon.loadout.size() - 1
 	player._cycle_held(1)
 	assert_true(player.is_holding_beer())
 	player._animate(1.0 / 60.0)
@@ -37,16 +36,15 @@ func test_a_bought_beer_is_not_in_hand_until_you_scroll_to_it() -> void:
 	assert_true(player._beer.is_busy())
 
 
-func test_scrolling_off_beer_puts_the_rifle_back() -> void:
+func test_scrolling_off_beer_puts_you_back_unarmed() -> void:
 	var player: Player = PLAYER.instantiate()
 	add_child_autofree(player)
 	player.buzz.take()
-	player.weapon.index = player.weapon.loadout.size() - 1
 	player._cycle_held(1)
 	assert_true(player.is_holding_beer())
 	player._cycle_held(1)
 	assert_false(player.is_holding_beer())
-	assert_eq(player.weapon.index, 0)
+	assert_false(player.weapon.has_weapon())
 
 
 func test_a_throw_spends_a_can_without_starting_a_buzz() -> void:
@@ -56,7 +54,6 @@ func test_a_throw_spends_a_can_without_starting_a_buzz() -> void:
 	var player: Player = PLAYER.instantiate()
 	add_child_autofree(player)
 	player.buzz.take(2)
-	player.weapon.index = player.weapon.loadout.size() - 1
 	player._cycle_held(1)
 	assert_true(player.throw_beer())
 	assert_eq(player.buzz.held, 1)

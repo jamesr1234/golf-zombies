@@ -1,21 +1,102 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene format=3 uid="uid://ckv0punprhydn"]
 
-[ext_resource type="Script" path="res://scripts/course/hole_overlay_root.gd" id="1_root"]
-[ext_resource type="PackedScene" path="res://scenes/course/props/windmill.tscn" id="2_mill"]
-[ext_resource type="PackedScene" path="res://scenes/course/props/windmill_control.tscn" id="3_desk"]
+[ext_resource type="Script" uid="uid://bjyb7l8ptj88k" path="res://scripts/course/hole_overlay_root.gd" id="1_root"]
+[ext_resource type="PackedScene" uid="uid://d1e3ipu2gfvvi" path="res://assets/obstacles/wall_extra_large.glb" id="4_a7uon"]
+[ext_resource type="PackedScene" uid="uid://doccqy0gay68w" path="res://assets/obstacles/cube_extra_small.glb" id="4_vblm1"]
+[ext_resource type="PackedScene" uid="uid://b30crjp80ahjf" path="res://assets/obstacles/cube_extra_large.glb" id="5_b13t2"]
+[ext_resource type="PackedScene" uid="uid://c372486rn6jcn" path="res://assets/obstacles/cube_medium.glb" id="5_m33u1"]
+[ext_resource type="PackedScene" uid="uid://ca86kbsman8fu" path="res://assets/obstacles/cube_large.glb" id="6_qfol4"]
+[ext_resource type="PackedScene" uid="uid://c8t47bsoo4rob" path="res://assets/obstacles/steps_extra_large.glb" id="7_o10em"]
+[ext_resource type="PackedScene" uid="uid://pitdo3yy0w2j" path="res://assets/obstacles/pillar_large.glb" id="8_bkbyh"]
+[ext_resource type="PackedScene" uid="uid://bqv1kqkcvufhw" path="res://assets/obstacles/pillar_extra_large.glb" id="9_p38qk"]
+[ext_resource type="PackedScene" path="res://scenes/course/props/windmill.tscn" id="10_qfol4"]
+[ext_resource type="PackedScene" uid="uid://dv5k5mdbki4t5" path="res://assets/obstacles/ramp_extra_large.glb" id="11_o10em"]
+[ext_resource type="PackedScene" path="res://scenes/vehicles/golf_cart.tscn" id="12_o10em"]
+[ext_resource type="PackedScene" uid="uid://n0e37lj7av6y" path="res://assets/obstacles/escalator_large.glb" id="13_esc"]
 
-[node name="Hole1" type="Node3D"]
+[node name="Hole1" type="Node3D" unique_id=543902443]
 script = ExtResource("1_root")
 
-[node name="Windmill" parent="." instance=ExtResource("2_mill")]
-transform = Transform3D(-1, 0, 1.509958e-07, 0, 1, 0, -1.509958e-07, 0, -1, -0.96033573, 0.5813871, -35.99988)
-sync_rotor = 139.83112545845418
-
-[node name="WindmillControl" parent="." instance=ExtResource("3_desk")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -17.019766, 0.546164, -1.4227962)
-mill_path = NodePath("../Windmill")
-collision_layer = 32
-collision_mask = 0
-
-[node name="MechPad" type="Marker3D" parent="."]
+[node name="MechPad" type="Marker3D" parent="." unique_id=1447865065]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -19.293434, -0.4404421, 7.1928024)
+
+[node name="1st obstacle" type="Node3D" parent="." unique_id=45715542]
+
+[node name="wall_extra_large" parent="1st obstacle" unique_id=569380467 instance=ExtResource("4_a7uon")]
+transform = Transform3D(10, 0, 0, 0, 1, 0, 0, 0, 1, -106.65, 0, -21.6)
+
+[node name="wall_extra_large2" parent="1st obstacle" unique_id=309127956 instance=ExtResource("4_a7uon")]
+transform = Transform3D(10, 0, 0, 0, 1, 0, 0, 0, 1, 12.15, 1.35, -21.6)
+
+[node name="cube_extra_large2" parent="1st obstacle" unique_id=322600961 instance=ExtResource("5_b13t2")]
+transform = Transform3D(2.6, 0, 0, 0, 1, 0, 0, 0, 1, -12.15, 9.45, -22.95)
+
+[node name="cube_extra_large" parent="1st obstacle" unique_id=662050771 instance=ExtResource("5_b13t2")]
+transform = Transform3D(2.6, 0, 0, 0, 1, 0, 0, 0, 1, -12.15, 0, -22.95)
+
+[node name="cube_extra_small" parent="1st obstacle" unique_id=651634054 instance=ExtResource("4_vblm1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.45, 0, -21.6)
+
+[node name="cube_extra_small2" parent="1st obstacle" unique_id=1047736938 instance=ExtResource("4_vblm1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8.1, 1.35, -21.6)
+
+[node name="cube_extra_small3" parent="1st obstacle" unique_id=1375761961 instance=ExtResource("4_vblm1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.75, 2.7, -21.6)
+
+[node name="cube_medium" parent="1st obstacle" unique_id=1167454891 instance=ExtResource("5_m33u1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.4, 0, -18.9)
+
+[node name="cube_large" parent="1st obstacle" unique_id=1095864050 instance=ExtResource("6_qfol4")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 0.7, -1.35, 0, -18.225)
+
+[node name="cube_large2" parent="1st obstacle" unique_id=1928995083 instance=ExtResource("6_qfol4")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 0.7, 5.4, 0, -18.225)
+
+[node name="steps_extra_large" parent="1st obstacle" unique_id=195309285 instance=ExtResource("7_o10em")]
+transform = Transform3D(0.7, 0, 0, 0, 1, 0, 0, 0, 0.47249997, -1.35, 6.75, -18.48487)
+
+[node name="cube_extra_small4" parent="1st obstacle" unique_id=1238501253 instance=ExtResource("4_vblm1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.7, 4.05, -21.6)
+
+[node name="pillar_large" parent="1st obstacle" unique_id=1391540268 instance=ExtResource("8_bkbyh")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.4, 6.75, -21.6)
+
+[node name="pillar_extra_large" parent="1st obstacle" unique_id=127683141 instance=ExtResource("9_p38qk")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.45, 6.75, -21.6)
+
+[node name="cube_extra_small5" parent="1st obstacle" unique_id=1543829275 instance=ExtResource("4_vblm1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.1, 13.5, -21.6)
+
+[node name="cube_extra_small6" parent="1st obstacle" unique_id=799106313 instance=ExtResource("4_vblm1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.8, 16.2, -21.6)
+
+[node name="cube_extra_small7" parent="1st obstacle" unique_id=391698742 instance=ExtResource("4_vblm1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.420014, 16.2, -22.95)
+
+[node name="cube_extra_small8" parent="1st obstacle" unique_id=97599584 instance=ExtResource("4_vblm1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.15, 16.2, -21.6)
+
+[node name="cube_extra_small9" parent="1st obstacle" unique_id=1598831314 instance=ExtResource("4_vblm1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.420014, 17.55, -24.3)
+
+[node name="cube_extra_small10" parent="1st obstacle" unique_id=344492565 instance=ExtResource("4_vblm1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.420014, 18.9, -25.65)
+
+[node name="cube_extra_small11" parent="1st obstacle" unique_id=1813602065 instance=ExtResource("4_vblm1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.6999998, 5.4, -20.25)
+
+[node name="escalator_large" parent="1st obstacle" unique_id=2100000001 instance=ExtResource("13_esc")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.2, 0, -8.1)
+
+[node name="Windmill" parent="." unique_id=619784759 instance=ExtResource("10_qfol4")]
+transform = Transform3D(-0.96592575, 0, -0.2588191, 0, 1, 0, 0.2588191, 0, -0.96592575, -17.550001, 0, -117.45)
+sync_rotor = 2619.8834878051875
+
+[node name="ramp_extra_large" parent="." unique_id=1111634097 instance=ExtResource("11_o10em")]
+transform = Transform3D(-0.5, 0, 0.8660253, 0, 1, 0, -0.8660253, 0, -0.5, -7.508939, 0, -94.5)
+
+[node name="ramp_extra_large2" parent="." unique_id=1209746238 instance=ExtResource("11_o10em")]
+transform = Transform3D(-0.5, 0, 0.8660253, 0, 1, 0, -0.8660253, 0, -0.5, 6.75, 0, -99.9)
+
+[node name="GolfCart" parent="." unique_id=1265102787 instance=ExtResource("12_o10em")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.35, 18.9, -28.35)

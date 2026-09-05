@@ -115,22 +115,25 @@ static func shove_from(path: Node3D, body: Node3D, from: Vector3) -> Vector3:
 func _build() -> void:
 	add_child(_tower())
 	add_child(_mast_hit())
-	var nacelle := MeshFactory.box(
-		Vector3(2.2, 1.6, 3.4), Palette.WALL, Palette.GLOW_FAINT
+	var nacelle := MeshFactory.box_body(
+		Vector3(2.2, 1.6, 3.4), Palette.WALL, Layers.PROP, true, Palette.GLOW_FAINT
 	)
 	nacelle.position = Vector3(0.0, HUB_Y, 0.35)
 	add_child(nacelle)
-	var cap := MeshFactory.taper(1.1, 0.15, 1.8, Palette.WALL, Palette.GLOW_FAINT)
+	var cap := MeshFactory.taper_body(1.1, 0.15, 1.8, Palette.WALL, Layers.PROP, Palette.GLOW_FAINT)
 	cap.position = Vector3(0.0, TOWER_H + 0.9, 0.0)
 	add_child(cap)
-	var hub := MeshFactory.cylinder(0.85, 0.7, Palette.CYAN, Palette.GLOW_MEDIUM)
+	var hub := MeshFactory.cylinder_body(0.85, 0.7, Palette.CYAN, Layers.PROP, Palette.GLOW_MEDIUM)
 	hub.rotation.x = deg_to_rad(90.0)
 	hub.position = Vector3(0.0, HUB_Y, -0.85)
 	add_child(hub)
-	var rotor := Node3D.new()
+	var rotor := AnimatableBody3D.new()
 	rotor.name = "Rotor"
+	rotor.collision_layer = Layers.PROP
+	rotor.collision_mask = 0
 	rotor.position = Vector3(0.0, HUB_Y, -1.15)
 	for i in PILLAR_COUNT:
+		rotor.add_child(_sail_hull(i))
 		rotor.add_child(_pillar(i))
 	add_child(rotor)
 	var lamp := OmniLight3D.new()
@@ -149,8 +152,8 @@ func _physics_process(delta: float) -> void:
 		return
 	var rotor := get_node_or_null("Rotor") as Node3D
 	if rotor != null:
-		for child in rotor.get_children():
-			_scan(child as Area3D)
+		for zone in rotor.find_children("*", "Area3D", true, false):
+			_scan(zone as Area3D)
 	_scan(get_node_or_null("MastHit") as Area3D)
 
 
@@ -217,21 +220,19 @@ func _mast_hit() -> Area3D:
 	return zone
 
 
-func _pillar(index: int) -> Area3D:
-	var arm := Area3D.new()
-	arm.collision_layer = 0
-	arm.collision_mask = Layers.PLAYER | Layers.VEHICLE
-	arm.monitoring = true
-	arm.monitorable = false
+func _sail_hull(index: int) -> CollisionShape3D:
+	var angle := float(index) * TAU / float(PILLAR_COUNT)
+	var at := Vector3(0.0, PILLAR_LEN * 0.5, 0.0)
+	var node := _box_shape(Vector3(PILLAR_W, PILLAR_LEN, PILLAR_T), at.rotated(Vector3.FORWARD, angle))
+	node.rotation.z = angle
+	return node
+
+
+func _pillar(index: int) -> Node3D:
+	var arm := Node3D.new()
 	arm.rotation.z = float(index) * TAU / float(PILLAR_COUNT)
 	var size := Vector3(PILLAR_W, PILLAR_LEN, PILLAR_T)
 	var at := Vector3(0.0, PILLAR_LEN * 0.5, 0.0)
-	var shape := CollisionShape3D.new()
-	var box := BoxShape3D.new()
-	box.size = size
-	shape.shape = box
-	shape.position = at
-	arm.add_child(shape)
 	var beam := MeshFactory.box(size, Palette.WALL, Palette.GLOW_FAINT)
 	beam.position = at
 	arm.add_child(beam)
@@ -242,8 +243,25 @@ func _pillar(index: int) -> Area3D:
 	edge.position = at + Vector3(PILLAR_W * 0.38, 0.0, 0.0)
 	edge.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	arm.add_child(edge)
-	arm.body_entered.connect(_on_pillar_hit)
+	var zone := Area3D.new()
+	zone.name = "Hit"
+	zone.collision_layer = 0
+	zone.collision_mask = Layers.PLAYER | Layers.VEHICLE
+	zone.monitoring = true
+	zone.monitorable = false
+	zone.add_child(_box_shape(size, at))
+	zone.body_entered.connect(_on_pillar_hit)
+	arm.add_child(zone)
 	return arm
+
+
+func _box_shape(size: Vector3, at: Vector3) -> CollisionShape3D:
+	var node := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = size
+	node.shape = box
+	node.position = at
+	return node
 
 
 static func _cull_spawns(path: Node3D) -> void:

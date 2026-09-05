@@ -4,13 +4,17 @@ extends RefCounted
 
 const CPU_SHOT_HOLD := 0.45
 const _MillDesk := preload("res://scripts/course/windmill_control.gd")
+const _Elevator := preload("res://scripts/shop/clubhouse_elevator.gd")
+const _Escalator := preload("res://scripts/course/escalator.gd")
+const _FoldSteps := preload("res://scripts/course/folding_steps.gd")
+const _Zip := preload("res://scripts/course/zipline.gd")
 
 var cpu_shot_hold := 0.0
 var cpu_shot_latched := false
 
 
 func tick(player: Player, delta: float) -> void:
-	if player.is_climbing():
+	if player.is_climbing() or player.is_ziplining():
 		return
 	if player.is_grappling() and player.input.just_pressed("interact"):
 		player._drop_grapple()
@@ -18,7 +22,14 @@ func tick(player: Player, delta: float) -> void:
 		if player.input.just_pressed("interact"):
 			player.mill_desk.try_toggle(player)
 		return
-	if player.shopping and player.station() == null:
+	if player.is_poker_seated():
+		if player.input.just_pressed("interact"):
+			player.poker.use(player)
+			cpu_shot_latched = true
+		return
+	if player.shopping and (
+		player.input.just_pressed("swap_gear") or player.input.just_pressed("swap_gear_prev")
+	):
 		player.close_shop()
 	if player.talking and player.npc() == null:
 		player.stop_talk()
@@ -82,7 +93,7 @@ func tick_cpu_shot(player: Player, delta: float) -> void:
 ## Hold vs tap is only for "you take this shot or the CPU does". Cart, shop,
 ## retrieve, and hop-out stay on press so a release cannot undo them.
 func cpu_shot_hold_applies(player: Player) -> bool:
-	if player.state != Player.State.NORMAL or player.shopping or player.talking or player.is_milling():
+	if player.state != Player.State.NORMAL or player.shopping or player.talking or player.is_milling() or player.is_poker_seated():
 		return false
 	if (
 		player.can_open_doors() or player.can_open_exit() or player.station() != null
@@ -91,12 +102,26 @@ func cpu_shot_hold_applies(player: Player) -> bool:
 		return false
 	if player.can_start_play() or player.beer.cart_for(player) != null or mill_control(player) != null:
 		return false
+	if _Escalator.nearest(player) != null:
+		return false
+	if _FoldSteps.nearest(player) != null:
+		return false
+	if _Zip.nearest(player) != null:
+		return false
+	if _Elevator.nearest(player) != null:
+		return false
 	if (
-		player.active_cart() != null and player.active_cart().can_board(player)
+		player.active_cart() != null
+		and (
+			player.active_cart().can_right(player)
+			or player.active_cart().can_board(player)
+		)
 		and (player.golf == null or not player.golf.can_claim(player))
 	):
 		return false
 	if player.ready_mech() != null:
+		return false
+	if LeanLadder.nearest_throw(player) != null:
 		return false
 	return true
 
@@ -105,7 +130,7 @@ func cpu_shot_hold_applies(player: Player) -> bool:
 ## riding; shop if the pavilion is open; pick the ball out of the cup after a
 ## hole-out; else play the ball; else climb in.
 func use(player: Player) -> void:
-	if player.is_climbing():
+	if player.is_climbing() or player.is_ziplining():
 		return
 	if player.is_grappling():
 		player._drop_grapple()
@@ -120,6 +145,8 @@ func use(player: Player) -> void:
 			player.golf.try_toggle(player)
 	elif player.can_open_doors():
 		player.open_doors()
+	elif player.poker.use(player):
+		pass
 	elif player.station() != null:
 		player.open_station(player.station())
 	elif player.npc() != null:
@@ -134,10 +161,22 @@ func use(player: Player) -> void:
 		player.flow.retrieve_ball(player)
 	elif mill_control(player) != null:
 		mill_control(player).try_toggle(player)
+	elif escalator_button(player) != null:
+		escalator_button(player).try_reverse(player)
+	elif steps_lever(player) != null:
+		steps_lever(player).try_toggle(player)
+	elif _Zip.nearest(player) != null:
+		_Zip.nearest(player).try_board(player)
+	elif _Elevator.nearest(player) != null:
+		_Elevator.nearest(player).try_ride(player)
+	elif LeanLadder.nearest_throw(player) != null:
+		LeanLadder.nearest_throw(player).try_throw(player)
 	elif player.golf != null and (player.golf.golfer == player or player.golf.can_claim(player)):
 		player.golf.try_toggle(player)
 	elif player.ready_mech() != null:
 		player.ready_mech().try_close(player)
+	elif player.active_cart() != null and player.active_cart().can_right(player):
+		player.active_cart().try_right(player)
 	elif player.active_cart() != null and player.active_cart().can_board(player):
 		player.active_cart().board(player)
 	elif player.is_holding_beer():
@@ -146,3 +185,11 @@ func use(player: Player) -> void:
 
 func mill_control(player: Player):
 	return _MillDesk.nearest(player)
+
+
+func escalator_button(player: Player):
+	return _Escalator.nearest(player)
+
+
+func steps_lever(player: Player):
+	return _FoldSteps.nearest(player)

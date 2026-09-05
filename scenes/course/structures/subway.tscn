@@ -1,0 +1,31 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="PackedScene" uid="uid://dsgfa1lne4ck6" path="res://assets/obstacles/tunnel_large.glb" id="1_tunnel_large"]
+[ext_resource type="PackedScene" uid="uid://ftwwe5v604kq" path="res://assets/obstacles/tunnel_medium.glb" id="2_tunnel_medium"]
+[ext_resource type="PackedScene" uid="uid://ds2ko2se24nna" path="res://assets/obstacles/steps_medium.glb" id="3_steps_medium"]
+[ext_resource type="PackedScene" uid="uid://ba8fjnsbkn18s" path="res://assets/obstacles/wall_medium.glb" id="4_wall_medium"]
+[ext_resource type="PackedScene" uid="uid://cbbs48ffxgq1a" path="res://assets/obstacles/cube_small.glb" id="5_cube_small"]
+[ext_resource type="PackedScene" uid="uid://my7dkqia2h6j" path="res://assets/obstacles/pillar_small.glb" id="6_pillar_small"]
+
+[node name="Subway" type="Node3D"]
+
+[node name="tunnel_large" parent="." instance=ExtResource("1_tunnel_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="tunnel_large2" parent="." instance=ExtResource("1_tunnel_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.75, 0, 0)
+
+[node name="tunnel_medium" parent="." instance=ExtResource("2_tunnel_medium")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.5, 0, -1.35)
+
+[node name="steps_medium" parent="." instance=ExtResource("3_steps_medium")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.05, 0, -2.7)
+
+[node name="wall_medium" parent="." instance=ExtResource("4_wall_medium")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17.55, 0, 0)
+
+[node name="cube_small" parent="." instance=ExtResource("5_cube_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17.55, 0, -2.7)
+
+[node name="pillar_small" parent="." instance=ExtResource("6_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.7, 9.45, -4.05)

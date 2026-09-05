@@ -5,19 +5,28 @@ extends MeshInstance3D
 
 const MAX_POINTS := 72
 const STEP := 0.16
-const WIDTH := 0.16
+const WIDTH := 0.10
 const LIFE := 2.4
-const LIFT := 0.05
+## Sit above every painted lie. Fairway/green overlays float on DRAW_HEIGHT, so a
+## mark at the tire would be under the turf.
+const LIFT := 0.22
+
 
 var _tracks: Array[PackedVector3Array] = []
 var _ages: Array[PackedFloat32Array] = []
 
 
 func _ready() -> void:
+	# Points are world-space. The mesh stays top-level and jumps to the latest
+	# contact so its AABB rides with the cart instead of sitting at the origin
+	# where the camera never looks.
 	top_level = true
+	global_transform = Transform3D.IDENTITY
 	mesh = ImmediateMesh.new()
 	material_override = _mark_material()
 	cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	extra_cull_margin = 48.0
+	custom_aabb = AABB(Vector3(-64.0, -8.0, -64.0), Vector3(128.0, 16.0, 128.0))
 
 
 func clear() -> void:
@@ -74,6 +83,9 @@ func _rebuild() -> void:
 	if immediate == null:
 		return
 	immediate.clear_surfaces()
+	var origin := _anchor()
+	global_position = origin
+	global_rotation = Vector3.ZERO
 	for i in _tracks.size():
 		if _tracks[i].size() < 2:
 			continue
@@ -85,11 +97,19 @@ func _rebuild() -> void:
 				side = Vector3.RIGHT
 			side = side.normalized() * WIDTH
 			var color := Color(Palette.TIRE_MARK, 1.0 - _ages[i][p] / LIFE)
+			var at := _tracks[i][p] - origin
 			immediate.surface_set_color(color)
-			immediate.surface_add_vertex(_tracks[i][p] + side)
+			immediate.surface_add_vertex(at + side)
 			immediate.surface_set_color(color)
-			immediate.surface_add_vertex(_tracks[i][p] - side)
+			immediate.surface_add_vertex(at - side)
 		immediate.surface_end()
+
+
+func _anchor() -> Vector3:
+	for track in _tracks:
+		if not track.is_empty():
+			return track[track.size() - 1]
+	return Vector3.ZERO
 
 
 func _direction_at(track: int, index: int) -> Vector3:
@@ -103,8 +123,9 @@ func _direction_at(track: int, index: int) -> Vector3:
 
 
 func _mark_material() -> StandardMaterial3D:
-	var mat := MeshFactory.material(Palette.TIRE_MARK, true)
+	var mat := MeshFactory.material(Palette.TIRE_MARK, true, Palette.GLOW_SOFT)
 	mat.vertex_color_use_as_albedo = true
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
 	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	return mat

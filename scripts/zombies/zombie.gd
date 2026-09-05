@@ -54,6 +54,14 @@ var move_speed := 3.4
 var last_hit_by: Player
 var _net_interp := NetInterp.new()
 var ai = _ZombieAI.new()
+## XZ yard a maze resident must stay inside. Empty means chase anywhere.
+var roam := AABB()
+var wander_at := Vector3.ZERO
+var patrol_a := Vector3.ZERO
+var patrol_b := Vector3.ZERO
+var patrol_goal_b := true
+var aggro_range := 0.0
+var maze_ref: WeakRef
 
 @onready var agent: NavigationAgent3D = $Agent
 @onready var shape: CollisionShape3D = $Shape
@@ -185,6 +193,12 @@ func _physics_process(delta: float) -> void:
 		_target = _pick_target()
 		if _target != null:
 			agent.target_position = _target.global_position
+		elif has_patrol():
+			agent.target_position = patrol_b if patrol_goal_b else patrol_a
+		elif has_roam():
+			if wander_at == Vector3.ZERO or global_position.distance_to(wander_at) < 1.8:
+				wander_at = roam_sample()
+			agent.target_position = wander_at
 	elif stats.stationary and _repath_timer <= 0.0:
 		_repath_timer = REPATH_INTERVAL
 		_target = _pick_target()
@@ -192,14 +206,14 @@ func _physics_process(delta: float) -> void:
 	var horizontal := Vector3.ZERO
 	var pace := 0.0
 	var swinging := visual.is_meleeing()
-	if _target != null:
+	if _target != null or has_patrol() or has_roam():
 		if swinging:
 			horizontal = Vector3.ZERO
 		else:
 			horizontal = _steer() * move_speed * walk_scale(_stagger.length())
 			pace = clampf(horizontal.length() / maxf(0.1, move_speed), 0.0, 1.0)
 		var face_dir := horizontal
-		if allied or stats.ranged or swinging:
+		if _target != null and (allied or stats.ranged or swinging):
 			face_dir = _target.global_position - global_position
 			face_dir.y = 0.0
 		_face(face_dir, delta)
@@ -400,6 +414,45 @@ static func hunts(self_allied: bool, target_is_player: bool, target_allied: bool
 	if self_allied:
 		return not target_is_player and not target_allied
 	return target_is_player or target_allied
+
+
+func has_roam() -> bool:
+	return roam.size.x > 0.5
+
+
+func has_patrol() -> bool:
+	return patrol_a.distance_squared_to(patrol_b) > 0.5
+
+
+func home_maze() -> Maze:
+	if maze_ref == null:
+		return null
+	return maze_ref.get_ref() as Maze
+
+
+func roam_contains(at: Vector3) -> bool:
+	if not has_roam():
+		return true
+	return (
+		at.x >= roam.position.x
+		and at.x <= roam.position.x + roam.size.x
+		and at.z >= roam.position.z
+		and at.z <= roam.position.z + roam.size.z
+	)
+
+
+func roam_home() -> Vector3:
+	var center := roam.get_center()
+	center.y = global_position.y
+	return center
+
+
+func roam_sample() -> Vector3:
+	return Vector3(
+		roam.position.x + randf() * roam.size.x,
+		global_position.y,
+		roam.position.z + randf() * roam.size.z
+	)
 
 
 ## The shove a single hit lands. Kept horizontal so shooting down at a zombie below

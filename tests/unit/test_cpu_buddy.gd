@@ -71,7 +71,9 @@ func test_the_cpu_shoots_enemies() -> void:
 
 
 func test_a_long_approach_wants_more_power_than_a_chip() -> void:
-	var drive := CpuBuddy.wanted_power(Vector3.ZERO, Vector3(0.0, 0.0, -120.0))
+	var drive := CpuBuddy.wanted_power(
+		Vector3.ZERO, Vector3(0.0, 0.0, -ClubKit.starter().scaled_carry() * 0.85)
+	)
 	var chip := CpuBuddy.wanted_power(Vector3.ZERO, Vector3(0.0, 0.0, -8.0))
 	assert_gt(drive, 0.7)
 	assert_lt(chip, 0.3)
@@ -151,10 +153,12 @@ func test_driving_holds_forward() -> void:
 	cart.global_position = Vector3.ZERO
 	cart.board(cpu)
 	cpu.set_physics_process(false)
+	assert_eq(cart.passenger, cpu, "the buddy rides shotgun")
+	assert_null(cart.driver)
 	cpu.brain.tick(0.016)
 	var pad := cpu.input as CpuInput
-	assert_lt(pad.move.y, -0.5, "drive down the fairway")
-	assert_true(pad.pressed("shoot"), "boost like a human holding the trigger")
+	assert_false(cpu.is_driving(), "they never take the wheel")
+	assert_eq(pad.move.y, 0.0, "shotgun does not throttle")
 
 
 func test_the_cpu_does_not_golf_until_asked() -> void:
@@ -190,7 +194,7 @@ func test_the_cpu_plants_a_shield_when_the_partner_draws_the_sniper() -> void:
 	var pair := _cover_pair()
 	var cpu: Player = pair[0]
 	var human: Player = pair[1]
-	human.weapon.index = human.weapon.loadout.find(preload("res://resources/weapons/sniper.tres"))
+	assert_true(human.weapon.add_gun(preload("res://resources/weapons/sniper.tres")))
 	assert_true(human.is_holding_sniper())
 	cpu.brain.tick(0.016)
 	var pad := cpu.input as CpuInput
@@ -258,3 +262,28 @@ func _cover_pair() -> Array:
 	sniper.global_position = Vector3(0.0, 0.0, -80.0)
 	cpu.global_position = CpuBuddy.cover_point(human.global_position, sniper.global_position)
 	return [cpu, human, sniper]
+
+
+class FlowStub:
+	var hole: HoleData
+	var phase := 0
+
+
+func test_the_cpu_walks_to_a_gun_in_the_arena() -> void:
+	var cpu: Player = preload("res://scenes/players/player.tscn").instantiate()
+	var pickup: GunPickup = preload("res://scenes/course/props/gun_pickup.tscn").instantiate()
+	add_child_autofree(cpu)
+	add_child_autofree(pickup)
+	cpu.possess_cpu()
+	cpu.set_physics_process(false)
+	var hole := HoleData.new()
+	hole.index = ArenaHole.INDEX
+	var flow := FlowStub.new()
+	flow.hole = hole
+	cpu.flow = flow
+	cpu.global_position = Vector3(0.0, 1.2, 0.0)
+	pickup.global_position = Vector3(8.0, 1.0, 0.0)
+	cpu.brain.tick(0.016)
+	var pad := cpu.input as CpuInput
+	assert_gt(pad.move.length(), 0.2, "unarmed, the buddy has to walk to a pickup")
+	assert_false(cpu.weapon.has_weapon())

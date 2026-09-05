@@ -9,6 +9,8 @@ extends Node
 ## spark is invisible; a jammed link is a freeze. Things that must exist
 ## (walls, rockets, ammo, the cart girl) stay reliable.
 
+const _ShapeDrop := preload("res://scripts/player/shape_drop.gd")
+
 var _ammo_seq := 0
 var _ammo: Dictionary = {}
 
@@ -37,12 +39,30 @@ static func announce_barrier(from: Node, at: Vector3, yaw_deg: float) -> void:
 		fx._replicate_barrier.rpc(at, yaw_deg)
 
 
+static func announce_ladder(from: Node, at: Vector3, yaw_deg: float, length: float) -> void:
+	var fx := _broadcaster(from)
+	if fx != null:
+		fx._replicate_ladder.rpc(at, yaw_deg, length)
+
+
+static func announce_ladder_fall(from: Node, at: Vector3) -> void:
+	var fx := _broadcaster(from)
+	if fx != null:
+		fx._replicate_ladder_fall.rpc(at)
+
+
 static func announce_rocket(
 	from: Node, origin: Vector3, fly: Vector3, damage: float, radius: float, range_m: float
 ) -> void:
 	var fx := _broadcaster(from)
 	if fx != null:
 		fx._replicate_rocket.rpc(origin, fly, damage, radius, range_m)
+
+
+static func announce_wall_break(from: Node, at: Vector3, seed: int) -> void:
+	var fx := _broadcaster(from)
+	if fx != null:
+		fx._replicate_wall_break.rpc(at, seed)
 
 
 static func announce_net(
@@ -69,6 +89,20 @@ static func announce_door(
 		fx._replicate_door.rpc(at, face, duration, shooter_peer)
 
 
+static func announce_shape_drop(from: Node, at: Vector3, count: int, seed: int) -> void:
+	var fx := _broadcaster(from)
+	if fx != null:
+		fx._replicate_shape_drop.rpc(at, count, seed)
+
+
+static func announce_shape_kick(
+	from: Node, origin: Vector3, forward: Vector3, strength: float
+) -> void:
+	var fx := _broadcaster(from)
+	if fx != null:
+		fx._replicate_shape_kick.rpc(origin, forward, strength)
+
+
 static func announce_grapple(
 	from: Node, origin: Vector3, fly: Vector3, skip_peer := 0
 ) -> void:
@@ -81,6 +115,12 @@ static func announce_trap(from: Node, at: Vector3, radius: float, duration: floa
 	var fx := _broadcaster(from)
 	if fx != null:
 		fx._replicate_trap.rpc(at, radius, duration)
+
+
+static func announce_mine(from: Node, at: Vector3) -> void:
+	var fx := _broadcaster(from)
+	if fx != null:
+		fx._replicate_mine.rpc(at)
 
 
 static func announce_beer(from: Node, origin: Vector3, fly: Vector3) -> void:
@@ -186,10 +226,34 @@ func apply_barrier(at: Vector3, yaw_deg: float) -> Node:
 	return HexBarrier.spawn(_fx_root(), at, yaw_deg)
 
 
+func apply_ladder(at: Vector3, yaw_deg: float, length: float) -> Node:
+	return LeanLadder.spawn(_fx_root(), at, yaw_deg, length)
+
+
+func apply_ladder_fall(at: Vector3) -> Node:
+	var best: LeanLadder
+	var best_d := 1.6
+	for node in get_tree().get_nodes_in_group("climb_walls"):
+		var ladder := node as LeanLadder
+		if ladder == null or not ladder.is_live():
+			continue
+		var d := ladder.global_position.distance_to(at)
+		if d < best_d:
+			best = ladder
+			best_d = d
+	if best != null:
+		best.kick()
+	return best
+
+
 func apply_rocket(
 	origin: Vector3, fly: Vector3, damage: float, radius: float, range_m: float
 ) -> Rocket:
 	return Rocket.spawn_flight(_fx_root(), origin, fly, damage, radius, range_m, true)
+
+
+func apply_wall_break(at: Vector3, seed: int) -> int:
+	return WallBreak.punch(self, at, null, Vector3.ZERO, seed)
 
 
 func apply_net_shot(
@@ -210,6 +274,14 @@ func apply_door(
 	return WarpDoor.spawn_facing(_fx_root(), at, face, duration, shooter_peer, true)
 
 
+func apply_shape_drop(at: Vector3, count: int, seed: int) -> Node3D:
+	return _ShapeDrop.rain(_fx_root(), at, count, seed, true)
+
+
+func apply_shape_kick(origin: Vector3, forward: Vector3, strength: float) -> int:
+	return _ShapeDrop.yeet_in_arc(get_tree(), origin, forward, strength)
+
+
 func apply_grapple(origin: Vector3, fly: Vector3, skip_peer := 0) -> GrappleHook:
 	if _skip(skip_peer):
 		return null
@@ -221,6 +293,10 @@ func apply_grapple(origin: Vector3, fly: Vector3, skip_peer := 0) -> GrappleHook
 
 func apply_trap(at: Vector3, radius: float, duration: float) -> NetTrap:
 	return NetTrap.deploy(_fx_root(), at, radius, duration, true)
+
+
+func apply_mine(at: Vector3) -> CartMine:
+	return CartMine.deploy(_fx_root(), at, true)
 
 
 func apply_beer(origin: Vector3, fly: Vector3) -> ThrownBeer:
@@ -302,10 +378,25 @@ func _replicate_barrier(at: Vector3, yaw_deg: float) -> void:
 
 
 @rpc("authority", "call_remote", "reliable")
+func _replicate_ladder(at: Vector3, yaw_deg: float, length: float) -> void:
+	apply_ladder(at, yaw_deg, length)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _replicate_ladder_fall(at: Vector3) -> void:
+	apply_ladder_fall(at)
+
+
+@rpc("authority", "call_remote", "reliable")
 func _replicate_rocket(
 	origin: Vector3, fly: Vector3, damage: float, radius: float, range_m: float
 ) -> void:
 	apply_rocket(origin, fly, damage, radius, range_m)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _replicate_wall_break(at: Vector3, seed: int) -> void:
+	apply_wall_break(at, seed)
 
 
 @rpc("authority", "call_remote", "reliable")
@@ -329,6 +420,16 @@ func _replicate_door(
 	apply_door(at, face, duration, shooter_peer)
 
 
+@rpc("authority", "call_remote", "reliable")
+func _replicate_shape_drop(at: Vector3, count: int, seed: int) -> void:
+	apply_shape_drop(at, count, seed)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _replicate_shape_kick(origin: Vector3, forward: Vector3, strength: float) -> void:
+	apply_shape_kick(origin, forward, strength)
+
+
 @rpc("authority", "call_remote", "unreliable")
 func _replicate_grapple(origin: Vector3, fly: Vector3, skip_peer: int) -> void:
 	apply_grapple(origin, fly, skip_peer)
@@ -337,6 +438,11 @@ func _replicate_grapple(origin: Vector3, fly: Vector3, skip_peer: int) -> void:
 @rpc("authority", "call_remote", "reliable")
 func _replicate_trap(at: Vector3, radius: float, duration: float) -> void:
 	apply_trap(at, radius, duration)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _replicate_mine(at: Vector3) -> void:
+	apply_mine(at)
 
 
 @rpc("authority", "call_remote", "reliable")

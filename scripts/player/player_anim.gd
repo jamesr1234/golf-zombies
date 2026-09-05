@@ -6,6 +6,7 @@ extends RefCounted
 const REMOTE_POSE_EASE := 18.0
 const DOWNED_HEAD_HEIGHT := 0.45
 const SIT_HEAD_HEIGHT := 0.96
+const SLIDE_HEAD_HEIGHT := 0.55
 const STAND_HEAD_HEIGHT := 1.55
 
 var remote_pace := 0.0
@@ -32,6 +33,10 @@ func apply_replicated_pose(player: Player, delta: float) -> void:
 		player.head.position.y = DOWNED_HEAD_HEIGHT
 	elif player.is_riding():
 		player.head.position.y = SIT_HEAD_HEIGHT
+	elif player.is_poker_seated():
+		player.head.position.y = SIT_HEAD_HEIGHT
+	elif player.sync_slide or player.is_sliding():
+		player.head.position.y = SLIDE_HEAD_HEIGHT
 	else:
 		player.head.position.y = STAND_HEAD_HEIGHT
 
@@ -40,6 +45,8 @@ func apply_replicated_pose(player: Player, delta: float) -> void:
 ## when you go down.
 func tick(player: Player, delta: float) -> void:
 	if player.net_driven and not player.is_multiplayer_authority():
+		player.slide.apply_replicated(player, player.sync_slide)
+		player.glide.apply_replicated(player, player.sync_glide, player.sync_glide_worn)
 		apply_replicated_pose(player, delta)
 	if player.health.is_alive() and player.body != null and player.body.is_locked_limp():
 		player.body.stop_limp()
@@ -53,19 +60,30 @@ func tick(player: Player, delta: float) -> void:
 			wheel = player.cart.wheel_angle_deg()
 			grips = player.cart.wheel_grips()
 		player.body.sit(player.is_driving(), wheel, grips)
-	elif player.is_swimming():
-		player.body.swim(delta, player.pace(), player.swim.underwater)
+	elif player.is_poker_seated():
+		player.body.hold_cards()
 	elif player.is_celebrating():
 		player.body.cheer(delta, player.look.cheer_left)
+	elif player.is_swimming():
+		player.body.swim(delta, player.pace(), player.swim.underwater)
 	elif player.is_climbing():
-		player.body.climb(
-			player.climber.pose_left(), player.climber.pose_right(), player.climber.left_aim,
-			player.climber.left != Vector3.INF, player.climber.right != Vector3.INF
-		)
+		if player.climber.is_mantling():
+			player.body.mantle(player.climber.mantle_progress())
+		else:
+			player.body.climb(
+				player.climber.pose_left(), player.climber.pose_right(), player.climber.left_aim,
+				player.climber.left != Vector3.INF, player.climber.right != Vector3.INF
+			)
+	elif player.state == Player.State.ZIPLINING:
+		player.body.zip(player.zipliner.grip_left(), player.zipliner.grip_right())
 	elif player.is_grappling():
 		player.body.tow(player.grappler.line_end(), player.pace())
 	elif player.is_shielding():
 		player.body.guard()
+	elif player.is_sliding():
+		player.body.slide()
+	elif player.is_gliding():
+		player.body.glide()
 	else:
 		player.body.animate(delta, travel)
 	if not player.is_celebrating():
@@ -80,10 +98,15 @@ func tick(player: Player, delta: float) -> void:
 		player.health.is_alive() and player.state != Player.State.GOLFING and not player.is_driving()
 		and not player.is_swimming() and not player.is_shielding() and not player.is_placing()
 		and not player.is_climbing()
+		and not player.is_ziplining()
 		and not player.is_milling()
 		and not player.is_in_mech()
-		and not player.is_holding_beer() and not player.weapon.is_scoped() and not player.is_celebrating()
+		and not player.is_holding_beer() and not player.is_holding_mines()
+		and not player.weapon.is_scoped() and not player.is_celebrating()
 		and not player.shopping
+		and not player.is_poker_seated()
+		and not player.is_gliding()
+		and player.weapon.has_weapon()
 	)
 	player.raygun.visible = show_gun
 	if show_gun:

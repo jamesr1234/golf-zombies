@@ -57,7 +57,7 @@ static func spawn_flight(
 ## the blast can be checked without waiting on a flying shell.
 static func detonate(
 	tree: SceneTree, at: Vector3, amount: float, radius: float, fx: Node = null,
-	shooter: Player = null
+	shooter: Player = null, collider: Object = null, normal := Vector3.ZERO
 ) -> int:
 	var hits := 0
 	if tree == null:
@@ -87,6 +87,12 @@ static func detonate(
 		var hull := mech.blast_point()
 		if in_blast(hull.distance_to(at), radius + MechVisuals.WIDTH * 0.35):
 			mech.take_rocket(shooter)
+	var from: Node = shooter
+	if from == null:
+		from = fx
+	var seed := WallBreak.fresh_seed()
+	if WallBreak.punch(from, at, collider, normal, seed) > 0 and from != null:
+		WorldFx.announce_wall_break(from, at, seed)
 	HitFx.blast(fx, at, radius, COLOR)
 	Sfx.play("rocket_explode")
 	return hits
@@ -96,13 +102,17 @@ static func in_blast(distance: float, radius: float) -> bool:
 	return distance <= radius
 
 
-func _build() -> void:
+static func build_visual(parent: Node3D) -> void:
 	var shell := MeshFactory.cylinder(0.07, 0.38, COLOR, Palette.GLOW_STRONG)
 	shell.rotation.x = deg_to_rad(90.0)
-	add_child(shell)
+	parent.add_child(shell)
 	var nose := MeshFactory.sphere(0.09, Palette.AMBER, Palette.GLOW_STRONG)
 	nose.position.z = -0.22
-	add_child(nose)
+	parent.add_child(nose)
+
+
+func _build() -> void:
+	build_visual(self)
 	var lamp := OmniLight3D.new()
 	lamp.light_color = COLOR
 	lamp.light_energy = 4.0
@@ -122,7 +132,7 @@ func _physics_process(delta: float) -> void:
 	query.exclude = _exclude
 	var hit := get_world_3d().direct_space_state.intersect_ray(query)
 	if not hit.is_empty():
-		_explode(hit["position"])
+		_explode(hit["position"], hit.get("collider"), hit.get("normal", Vector3.ZERO))
 		return
 	global_position = to
 	_travelled += step
@@ -130,7 +140,7 @@ func _physics_process(delta: float) -> void:
 		_explode(to)
 
 
-func _explode(at: Vector3) -> void:
+func _explode(at: Vector3, collider: Object = null, normal := Vector3.ZERO) -> void:
 	if _dead:
 		return
 	_dead = true
@@ -139,5 +149,5 @@ func _explode(at: Vector3) -> void:
 		HitFx.blast(root, at, blast_radius, COLOR)
 		Sfx.play("rocket_explode")
 	else:
-		detonate(get_tree(), at, damage, blast_radius, root, shooter)
+		detonate(get_tree(), at, damage, blast_radius, root, shooter, collider, normal)
 	queue_free()

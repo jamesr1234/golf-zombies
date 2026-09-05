@@ -1,0 +1,36 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="PackedScene" uid="uid://pitdo3yy0w2j" path="res://assets/obstacles/pillar_large.glb" id="1_pillar_large"]
+[ext_resource type="PackedScene" uid="uid://cp185o3uqir2p" path="res://assets/obstacles/arch_large.glb" id="2_arch_large"]
+[ext_resource type="PackedScene" uid="uid://codfdqqkmltet" path="res://assets/obstacles/platform_extra_large.glb" id="3_platform_extra_large"]
+[ext_resource type="PackedScene" uid="uid://c372486rn6jcn" path="res://assets/obstacles/cube_medium.glb" id="4_cube_medium"]
+[ext_resource type="PackedScene" uid="uid://ds2ko2se24nna" path="res://assets/obstacles/steps_medium.glb" id="5_steps_medium"]
+
+[node name="Pavilion" type="Node3D"]
+
+[node name="pillar_large" parent="." instance=ExtResource("1_pillar_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="pillar_large2" parent="." instance=ExtResource("1_pillar_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.1, 0, 0)
+
+[node name="pillar_large3" parent="." instance=ExtResource("1_pillar_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -8.1)
+
+[node name="pillar_large4" parent="." instance=ExtResource("1_pillar_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.1, 0, -8.1)
+
+[node name="arch_large" parent="." instance=ExtResource("2_arch_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="arch_large2" parent="." instance=ExtResource("2_arch_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -8.1)
+
+[node name="platform_extra_large" parent="." instance=ExtResource("3_platform_extra_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6.75, 0)
+
+[node name="cube_medium" parent="." instance=ExtResource("4_cube_medium")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.7, 8.1, -2.7)
+
+[node name="steps_medium" parent="." instance=ExtResource("5_steps_medium")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.05, 0, -2.7)

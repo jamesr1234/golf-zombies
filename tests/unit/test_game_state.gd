@@ -157,6 +157,29 @@ func test_barrier_charges_survive_holing_out() -> void:
 	assert_eq(score.barrier_charges, 3)
 
 
+func test_ladder_charges_start_empty_and_decrement_on_place() -> void:
+	assert_eq(score.ladder_charges, 0)
+	assert_false(score.try_place_ladder())
+	score.add_ladder_charges(2)
+	assert_eq(score.ladder_charges, 2)
+	score.add_ladder_charges(0)
+	score.add_ladder_charges(-2)
+	assert_eq(score.ladder_charges, 2)
+	assert_true(score.try_place_ladder())
+	assert_eq(score.ladder_charges, 1)
+	assert_true(score.try_place_ladder())
+	assert_eq(score.ladder_charges, 0)
+	assert_false(score.try_place_ladder())
+
+
+func test_ladder_charges_survive_holing_out() -> void:
+	score.add_ladder_charges(2)
+	score.add_stroke(3)
+	score.hole_out()
+	assert_eq(score.hole_index, 1)
+	assert_eq(score.ladder_charges, 2)
+
+
 func test_club_kits_only_upgrade() -> void:
 	assert_eq(score.club_id, ClubKit.STARTER_ID)
 	score.equip_club(ClubKit.TOUR_ID)

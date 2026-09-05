@@ -1,0 +1,32 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="PackedScene" uid="uid://dv5k5mdbki4t5" path="res://assets/obstacles/ramp_extra_large.glb" id="1_ramp_extra_large"]
+[ext_resource type="PackedScene" uid="uid://cqqh1e4pr81n3" path="res://assets/obstacles/wall_large.glb" id="2_wall_large"]
+[ext_resource type="PackedScene" uid="uid://pitdo3yy0w2j" path="res://assets/obstacles/pillar_large.glb" id="3_pillar_large"]
+[ext_resource type="PackedScene" uid="uid://cbbs48ffxgq1a" path="res://assets/obstacles/cube_small.glb" id="4_cube_small"]
+
+[node name="Drawbridge" type="Node3D"]
+
+[node name="ramp_extra_large" parent="." instance=ExtResource("1_ramp_extra_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 0, 0)
+
+[node name="wall_large" parent="." instance=ExtResource("2_wall_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="wall_large2" parent="." instance=ExtResource("2_wall_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.5, 0, 0)
+
+[node name="pillar_large" parent="." instance=ExtResource("3_pillar_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="pillar_large2" parent="." instance=ExtResource("3_pillar_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.7, 0, 0)
+
+[node name="pillar_large3" parent="." instance=ExtResource("3_pillar_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.5, 0, 0)
+
+[node name="pillar_large4" parent="." instance=ExtResource("3_pillar_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.2, 0, 0)
+
+[node name="cube_small" parent="." instance=ExtResource("4_cube_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.5, 6.75, 0)

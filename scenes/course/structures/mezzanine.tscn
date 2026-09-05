@@ -1,0 +1,32 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="PackedScene" uid="uid://b30crjp80ahjf" path="res://assets/obstacles/cube_extra_large.glb" id="1_cube_extra_large"]
+[ext_resource type="PackedScene" uid="uid://codfdqqkmltet" path="res://assets/obstacles/platform_extra_large.glb" id="2_platform_extra_large"]
+[ext_resource type="PackedScene" uid="uid://ds2ko2se24nna" path="res://assets/obstacles/steps_medium.glb" id="3_steps_medium"]
+[ext_resource type="PackedScene" uid="uid://cqqh1e4pr81n3" path="res://assets/obstacles/wall_large.glb" id="4_wall_large"]
+[ext_resource type="PackedScene" uid="uid://cbbs48ffxgq1a" path="res://assets/obstacles/cube_small.glb" id="5_cube_small"]
+[ext_resource type="PackedScene" uid="uid://pfp86xbuqujd" path="res://assets/obstacles/ladder_medium.glb" id="6_ladder_medium"]
+[ext_resource type="PackedScene" uid="uid://bvywikjp6p81e" path="res://assets/obstacles/pillar_extra_small.glb" id="7_pillar_extra_small"]
+
+[node name="Mezzanine" type="Node3D"]
+
+[node name="cube_extra_large" parent="." instance=ExtResource("1_cube_extra_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="platform_extra_large" parent="." instance=ExtResource("2_platform_extra_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.45, 4.05, -1.35)
+
+[node name="steps_medium" parent="." instance=ExtResource("3_steps_medium")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.45, 0, -2.7)
+
+[node name="wall_large" parent="." instance=ExtResource("4_wall_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.45, 4.05, -1.35)
+
+[node name="cube_small" parent="." instance=ExtResource("5_cube_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.5, 5.4, -4.05)
+
+[node name="ladder_medium" parent="." instance=ExtResource("6_ladder_medium")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18.9, 0, -5.4)
+
+[node name="pillar_extra_small" parent="." instance=ExtResource("7_pillar_extra_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.45, 5.4, -1.35)

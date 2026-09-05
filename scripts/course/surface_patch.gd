@@ -5,6 +5,9 @@ extends Area3D
 ## so a shot flying overhead keeps its air physics.
 
 const DETECT_SPAN := 16.0
+## Extra metres above and below the sampled turf so a ball on a peak or in a
+## trench still overlaps the column.
+const DETECT_PAD := 2.0
 ## Neon lip around a putting surface. Fat enough to read from the tee, short
 ## enough that a putt never feels like it is rolling through a wall.
 const RIM_THICK := 0.7
@@ -30,19 +33,50 @@ static func create(patch: Dictionary, height: HeightField = null) -> SurfacePatc
 	return node
 
 
+## World-Y bottom and top of the lie detector. Water is the pond column. Dry
+## lies follow the heightmap so a ridge or trench cannot sit outside the box.
+static func detector_column(patch: Dictionary, height: HeightField = null) -> Vector2:
+	if patch["type"] == Surface.Type.WATER:
+		var top := water_level(patch) + 0.3
+		return Vector2(top - HeightField.WATER_DEPTH - 1.5, top)
+	if height == null:
+		return Vector2(DETECT_SPAN * -0.25, DETECT_SPAN * 0.75)
+	var lo := INF
+	var hi := -INF
+	var size: Vector2 = patch["size"]
+	var position: Vector3 = patch["position"]
+	var yaw := deg_to_rad(float(patch["yaw"]))
+	var round_patch := bool(patch["round"])
+	var steps_x := maxi(1, int(ceil(size.x / HeightField.CELL)))
+	var steps_z := maxi(1, int(ceil(size.y / HeightField.CELL)))
+	var radius := size.x * 0.5
+	for z in steps_z + 1:
+		for x in steps_x + 1:
+			var local := Vector3(
+				(float(x) / float(steps_x) - 0.5) * size.x,
+				0.0,
+				(float(z) / float(steps_z) - 0.5) * size.y
+			)
+			if round_patch and Vector2(local.x, local.z).length() > radius + 0.001:
+				continue
+			var world := local.rotated(Vector3.UP, yaw) + Vector3(position.x, 0.0, position.z)
+			var h := height.height_at(world.x, world.z)
+			lo = minf(lo, h)
+			hi = maxf(hi, h)
+	if lo == INF:
+		lo = 0.0
+		hi = 0.0
+	return Vector2(lo - DETECT_PAD, hi + DETECT_PAD)
+
+
 ## Water is the column between its surface and its floor. Stopping at the surface
 ## is what keeps a ball resting on the dry bank inside the rectangle from reading
 ## as a splash.
-static func _fit_detector(shape: CollisionShape3D, patch: Dictionary, _height: HeightField) -> void:
+static func _fit_detector(shape: CollisionShape3D, patch: Dictionary, height: HeightField) -> void:
 	var size: Vector2 = patch["size"]
-	var span := DETECT_SPAN
-	var mid := DETECT_SPAN * 0.25
-	if patch["type"] == Surface.Type.WATER:
-		var top := water_level(patch) + 0.3
-		var bottom := top - HeightField.WATER_DEPTH - 1.5
-		span = top - bottom
-		mid = (top + bottom) * 0.5
-	shape.position.y = mid
+	var column := detector_column(patch, height)
+	var span := column.y - column.x
+	shape.position.y = (column.x + column.y) * 0.5
 	if patch["round"]:
 		var cylinder := CylinderShape3D.new()
 		cylinder.radius = size.x * 0.5
@@ -80,7 +114,7 @@ static func water_level(patch: Dictionary) -> float:
 	return float(patch.get("water_y", position.y))
 
 
-## The painted lie follows the heightmap so a downhill fairway does not float
+## The painted lie follows the heightmap so a fairway overlay does not float
 ## above the ground or clip through a rise. Water is the exception: a pond surface
 ## is flat, and the ground was levelled to its edge to meet it.
 static func _draped_mesh(

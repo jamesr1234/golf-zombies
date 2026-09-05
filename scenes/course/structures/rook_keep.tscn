@@ -1,0 +1,29 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="PackedScene" uid="uid://b30crjp80ahjf" path="res://assets/obstacles/cube_extra_large.glb" id="1_cube_extra_large"]
+[ext_resource type="PackedScene" uid="uid://bmnsybxxauqal" path="res://assets/obstacles/pillar_medium.glb" id="2_pillar_medium"]
+[ext_resource type="PackedScene" uid="uid://doccqy0gay68w" path="res://assets/obstacles/cube_extra_small.glb" id="3_cube_extra_small"]
+[ext_resource type="PackedScene" uid="uid://du16qxxc4t3rh" path="res://assets/obstacles/steps_large.glb" id="4_steps_large"]
+
+[node name="RookKeep" type="Node3D"]
+
+[node name="cube_extra_large" parent="." instance=ExtResource("1_cube_extra_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="pillar_medium" parent="." instance=ExtResource("2_pillar_medium")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 9.45, 0)
+
+[node name="pillar_medium2" parent="." instance=ExtResource("2_pillar_medium")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.1, 9.45, 0)
+
+[node name="pillar_medium3" parent="." instance=ExtResource("2_pillar_medium")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 9.45, -8.1)
+
+[node name="pillar_medium4" parent="." instance=ExtResource("2_pillar_medium")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.1, 9.45, -8.1)
+
+[node name="cube_extra_small" parent="." instance=ExtResource("3_cube_extra_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 9.45, -4.05)
+
+[node name="steps_large" parent="." instance=ExtResource("4_steps_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.75, 0, -1.35)

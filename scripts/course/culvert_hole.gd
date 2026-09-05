@@ -16,7 +16,7 @@ const FACE := 3.0
 
 
 static func applies(data: HoleData) -> bool:
-	return data != null and data.index == 1
+	return data != null and data.custom == null and data.index == 1
 
 
 static func layout(data: HoleData, _headings: Array[float], _width: float) -> void:
@@ -144,7 +144,7 @@ static func _ridge_end() -> float:
 
 
 static func _strip_half(data: HoleData) -> float:
-	return HoleGenerator.fairway_width(data.par) * 0.5
+	return HoleGenerator.fairway_width(data.par, data.index) * 0.5
 
 
 static func _pipe_t(data: HoleData) -> float:

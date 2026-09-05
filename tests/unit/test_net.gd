@@ -28,18 +28,15 @@ func test_the_net_is_a_giant_trap_not_an_explosive() -> void:
 	assert_false(NET.automatic)
 
 
-func test_hole_one_starts_with_flare_and_still_carries_net_and_rocket() -> void:
+func test_the_net_is_in_the_bag_once_you_pick_it_up() -> void:
 	var gun := Weapon.new()
 	add_child_autofree(gun)
-	assert_eq(gun.stats().display_name, "Flare Driver")
-	assert_true(gun.has_gun(NET))
-	assert_true(gun.has_gun(ROCKET))
-	gun.swap(1)
-	assert_eq(gun.stats().display_name, "Cart Nailer")
-	gun.swap(1)
-	assert_eq(gun.stats(), NET)
-	gun.swap(1)
+	assert_false(gun.has_weapon())
+	assert_true(gun.add_gun(NET))
+	assert_true(gun.add_gun(ROCKET))
 	assert_eq(gun.stats(), ROCKET)
+	gun.swap(-1)
+	assert_eq(gun.stats(), NET)
 
 
 func test_the_reach_circle_has_a_hard_edge() -> void:
@@ -118,7 +115,7 @@ func test_a_rocket_without_a_net_does_not_chain() -> void:
 func test_firing_the_net_spends_a_round_and_spawns_one() -> void:
 	var gun := Weapon.new()
 	add_child_autofree(gun)
-	gun.index = gun.loadout.find(NET)
+	assert_true(gun.add_gun(NET))
 	assert_eq(gun.stats(), NET)
 	var before := get_tree().get_nodes_in_group("net_shots").size()
 	gun.tick(0.0, Transform3D.IDENTITY, false, true, false)

@@ -1,0 +1,1192 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/course/maze.gd" id="0_maze"]
+[ext_resource type="PackedScene" uid="uid://buohnciv1ie58" path="res://assets/obstacles/wall_small.glb" id="1_wall_small"]
+[ext_resource type="PackedScene" uid="uid://6iiejv77q5hf" path="res://assets/obstacles/arch_small.glb" id="2_arch_small"]
+[ext_resource type="PackedScene" uid="uid://my7dkqia2h6j" path="res://assets/obstacles/pillar_small.glb" id="3_pillar_small"]
+[ext_resource type="PackedScene" uid="uid://doccqy0gay68w" path="res://assets/obstacles/cube_extra_small.glb" id="4_cube_extra_small"]
+
+[node name="Maze" type="Node3D"]
+script = ExtResource("0_maze")
+
+[node name="wall_small" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.4, 0, 0)
+
+[node name="wall_small2" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.45, 0, 0)
+
+[node name="wall_small3" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.5, 0, 0)
+
+[node name="wall_small4" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17.55, 0, 0)
+
+[node name="wall_small5" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 21.6, 0, 0)
+
+[node name="wall_small6" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25.65, 0, 0)
+
+[node name="wall_small7" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 29.7, 0, 0)
+
+[node name="wall_small8" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 33.75, 0, 0)
+
+[node name="wall_small9" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 37.8, 0, 0)
+
+[node name="wall_small10" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 41.85, 0, 0)
+
+[node name="wall_small11" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 45.9, 0, 0)
+
+[node name="wall_small12" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 49.95, 0, 0)
+
+[node name="wall_small13" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.35, 0, -4.05)
+
+[node name="wall_small14" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.4, 0, -4.05)
+
+[node name="wall_small15" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17.55, 0, -4.05)
+
+[node name="wall_small16" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 21.6, 0, -4.05)
+
+[node name="wall_small17" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 29.7, 0, -4.05)
+
+[node name="wall_small18" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 33.75, 0, -4.05)
+
+[node name="wall_small19" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 37.8, 0, -4.05)
+
+[node name="wall_small20" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 45.9, 0, -4.05)
+
+[node name="wall_small21" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.45, 0, -8.1)
+
+[node name="wall_small22" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.5, 0, -8.1)
+
+[node name="wall_small23" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17.55, 0, -8.1)
+
+[node name="wall_small24" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 21.6, 0, -8.1)
+
+[node name="wall_small25" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 29.7, 0, -8.1)
+
+[node name="wall_small26" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 33.75, 0, -8.1)
+
+[node name="wall_small27" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.4, 0, -12.15)
+
+[node name="wall_small28" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25.65, 0, -12.15)
+
+[node name="wall_small29" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 37.8, 0, -12.15)
+
+[node name="wall_small30" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 41.85, 0, -12.15)
+
+[node name="wall_small31" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 49.95, 0, -12.15)
+
+[node name="wall_small32" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.4, 0, -16.2)
+
+[node name="wall_small33" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.5, 0, -16.2)
+
+[node name="wall_small34" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17.55, 0, -16.2)
+
+[node name="wall_small35" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25.65, 0, -16.2)
+
+[node name="wall_small36" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 29.7, 0, -16.2)
+
+[node name="wall_small37" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 33.75, 0, -16.2)
+
+[node name="wall_small38" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 41.85, 0, -16.2)
+
+[node name="wall_small39" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 45.9, 0, -16.2)
+
+[node name="wall_small40" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.45, 0, -20.25)
+
+[node name="wall_small41" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17.55, 0, -20.25)
+
+[node name="wall_small42" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 21.6, 0, -20.25)
+
+[node name="wall_small43" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25.65, 0, -20.25)
+
+[node name="wall_small44" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 29.7, 0, -20.25)
+
+[node name="wall_small45" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 37.8, 0, -20.25)
+
+[node name="wall_small46" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.4, 0, -24.3)
+
+[node name="wall_small47" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17.55, 0, -24.3)
+
+[node name="wall_small48" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 21.6, 0, -24.3)
+
+[node name="wall_small49" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25.65, 0, -24.3)
+
+[node name="wall_small50" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 29.7, 0, -24.3)
+
+[node name="wall_small51" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 33.75, 0, -24.3)
+
+[node name="wall_small52" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 41.85, 0, -24.3)
+
+[node name="wall_small53" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 45.9, 0, -24.3)
+
+[node name="wall_small54" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.45, 0, -28.35)
+
+[node name="wall_small55" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.5, 0, -28.35)
+
+[node name="wall_small56" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 21.6, 0, -28.35)
+
+[node name="wall_small57" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25.65, 0, -28.35)
+
+[node name="wall_small58" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 29.7, 0, -28.35)
+
+[node name="wall_small59" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 41.85, 0, -28.35)
+
+[node name="wall_small60" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.35, 0, -32.4)
+
+[node name="wall_small61" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.4, 0, -32.4)
+
+[node name="wall_small62" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.5, 0, -32.4)
+
+[node name="wall_small63" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17.55, 0, -32.4)
+
+[node name="wall_small64" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 21.6, 0, -32.4)
+
+[node name="wall_small65" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25.65, 0, -32.4)
+
+[node name="wall_small66" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 37.8, 0, -32.4)
+
+[node name="wall_small67" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 45.9, 0, -32.4)
+
+[node name="wall_small68" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 49.95, 0, -32.4)
+
+[node name="wall_small69" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.45, 0, -36.45)
+
+[node name="wall_small70" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17.55, 0, -36.45)
+
+[node name="wall_small71" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 29.7, 0, -36.45)
+
+[node name="wall_small72" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 33.75, 0, -36.45)
+
+[node name="wall_small73" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 37.8, 0, -36.45)
+
+[node name="wall_small74" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 41.85, 0, -36.45)
+
+[node name="wall_small75" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 45.9, 0, -36.45)
+
+[node name="wall_small76" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.4, 0, -40.5)
+
+[node name="wall_small77" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.5, 0, -40.5)
+
+[node name="wall_small78" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25.65, 0, -40.5)
+
+[node name="wall_small79" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 37.8, 0, -40.5)
+
+[node name="wall_small80" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 41.85, 0, -40.5)
+
+[node name="wall_small81" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 45.9, 0, -40.5)
+
+[node name="wall_small82" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.35, 0, -44.55)
+
+[node name="wall_small83" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.45, 0, -44.55)
+
+[node name="wall_small84" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17.55, 0, -44.55)
+
+[node name="wall_small85" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25.65, 0, -44.55)
+
+[node name="wall_small86" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 37.8, 0, -44.55)
+
+[node name="wall_small87" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.4, 0, -48.6)
+
+[node name="wall_small88" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.45, 0, -48.6)
+
+[node name="wall_small89" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.5, 0, -48.6)
+
+[node name="wall_small90" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17.55, 0, -48.6)
+
+[node name="wall_small91" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 21.6, 0, -48.6)
+
+[node name="wall_small92" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 29.7, 0, -48.6)
+
+[node name="wall_small93" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 33.75, 0, -48.6)
+
+[node name="wall_small94" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 45.9, 0, -48.6)
+
+[node name="wall_small95" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 49.95, 0, -48.6)
+
+[node name="wall_small96" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.35, 0, -52.65)
+
+[node name="wall_small97" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.4, 0, -52.65)
+
+[node name="wall_small98" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.45, 0, -52.65)
+
+[node name="wall_small99" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.5, 0, -52.65)
+
+[node name="wall_small100" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17.55, 0, -52.65)
+
+[node name="wall_small101" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 21.6, 0, -52.65)
+
+[node name="wall_small102" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25.65, 0, -52.65)
+
+[node name="wall_small103" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 29.7, 0, -52.65)
+
+[node name="wall_small104" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 33.75, 0, -52.65)
+
+[node name="wall_small105" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 37.8, 0, -52.65)
+
+[node name="wall_small106" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 41.85, 0, -52.65)
+
+[node name="wall_small107" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 45.9, 0, -52.65)
+
+[node name="wall_small108" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 1.35, 0, -1.35)
+
+[node name="wall_small109" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 13.5, 0, -1.35)
+
+[node name="wall_small110" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 41.85, 0, -1.35)
+
+[node name="wall_small111" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 54, 0, -1.35)
+
+[node name="wall_small112" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 1.35, 0, -5.4)
+
+[node name="wall_small113" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 5.4, 0, -5.4)
+
+[node name="wall_small114" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 13.5, 0, -5.4)
+
+[node name="wall_small115" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 25.65, 0, -5.4)
+
+[node name="wall_small116" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 41.85, 0, -5.4)
+
+[node name="wall_small117" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 45.9, 0, -5.4)
+
+[node name="wall_small118" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 54, 0, -5.4)
+
+[node name="wall_small119" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 1.35, 0, -9.45)
+
+[node name="wall_small120" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 9.45, 0, -9.45)
+
+[node name="wall_small121" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 17.55, 0, -9.45)
+
+[node name="wall_small122" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 25.65, 0, -9.45)
+
+[node name="wall_small123" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 33.75, 0, -9.45)
+
+[node name="wall_small124" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 37.8, 0, -9.45)
+
+[node name="wall_small125" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 45.9, 0, -9.45)
+
+[node name="wall_small126" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 49.95, 0, -9.45)
+
+[node name="wall_small127" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 54, 0, -9.45)
+
+[node name="wall_small128" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 1.35, 0, -13.5)
+
+[node name="wall_small129" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 5.4, 0, -13.5)
+
+[node name="wall_small130" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 13.5, 0, -13.5)
+
+[node name="wall_small131" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 21.6, 0, -13.5)
+
+[node name="wall_small132" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 25.65, 0, -13.5)
+
+[node name="wall_small133" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 45.9, 0, -13.5)
+
+[node name="wall_small134" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 54, 0, -13.5)
+
+[node name="wall_small135" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 1.35, 0, -17.55)
+
+[node name="wall_small136" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 5.4, 0, -17.55)
+
+[node name="wall_small137" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 13.5, 0, -17.55)
+
+[node name="wall_small138" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 21.6, 0, -17.55)
+
+[node name="wall_small139" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 37.8, 0, -17.55)
+
+[node name="wall_small140" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 41.85, 0, -17.55)
+
+[node name="wall_small141" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 49.95, 0, -17.55)
+
+[node name="wall_small142" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 54, 0, -17.55)
+
+[node name="wall_small143" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 1.35, 0, -21.6)
+
+[node name="wall_small144" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 5.4, 0, -21.6)
+
+[node name="wall_small145" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 13.5, 0, -21.6)
+
+[node name="wall_small146" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 37.8, 0, -21.6)
+
+[node name="wall_small147" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 45.9, 0, -21.6)
+
+[node name="wall_small148" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 54, 0, -21.6)
+
+[node name="wall_small149" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 1.35, 0, -25.65)
+
+[node name="wall_small150" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 5.4, 0, -25.65)
+
+[node name="wall_small151" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 13.5, 0, -25.65)
+
+[node name="wall_small152" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 21.6, 0, -25.65)
+
+[node name="wall_small153" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 41.85, 0, -25.65)
+
+[node name="wall_small154" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 49.95, 0, -25.65)
+
+[node name="wall_small155" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 54, 0, -25.65)
+
+[node name="wall_small156" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 1.35, 0, -29.7)
+
+[node name="wall_small157" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 9.45, 0, -29.7)
+
+[node name="wall_small158" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 17.55, 0, -29.7)
+
+[node name="wall_small159" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 33.75, 0, -29.7)
+
+[node name="wall_small160" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 37.8, 0, -29.7)
+
+[node name="wall_small161" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 45.9, 0, -29.7)
+
+[node name="wall_small162" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 54, 0, -29.7)
+
+[node name="wall_small163" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 1.35, 0, -33.75)
+
+[node name="wall_small164" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 9.45, 0, -33.75)
+
+[node name="wall_small165" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 25.65, 0, -33.75)
+
+[node name="wall_small166" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 33.75, 0, -33.75)
+
+[node name="wall_small167" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 41.85, 0, -33.75)
+
+[node name="wall_small168" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 54, 0, -33.75)
+
+[node name="wall_small169" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 1.35, 0, -37.8)
+
+[node name="wall_small170" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 5.4, 0, -37.8)
+
+[node name="wall_small171" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 13.5, 0, -37.8)
+
+[node name="wall_small172" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 21.6, 0, -37.8)
+
+[node name="wall_small173" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 25.65, 0, -37.8)
+
+[node name="wall_small174" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 33.75, 0, -37.8)
+
+[node name="wall_small175" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 54, 0, -37.8)
+
+[node name="wall_small176" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 1.35, 0, -41.85)
+
+[node name="wall_small177" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 9.45, 0, -41.85)
+
+[node name="wall_small178" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 17.55, 0, -41.85)
+
+[node name="wall_small179" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 21.6, 0, -41.85)
+
+[node name="wall_small180" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 29.7, 0, -41.85)
+
+[node name="wall_small181" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 33.75, 0, -41.85)
+
+[node name="wall_small182" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 37.8, 0, -41.85)
+
+[node name="wall_small183" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 49.95, 0, -41.85)
+
+[node name="wall_small184" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 54, 0, -41.85)
+
+[node name="wall_small185" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 1.35, 0, -45.9)
+
+[node name="wall_small186" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 9.45, 0, -45.9)
+
+[node name="wall_small187" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 25.65, 0, -45.9)
+
+[node name="wall_small188" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 33.75, 0, -45.9)
+
+[node name="wall_small189" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 41.85, 0, -45.9)
+
+[node name="wall_small190" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 45.9, 0, -45.9)
+
+[node name="wall_small191" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 54, 0, -45.9)
+
+[node name="wall_small192" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 1.35, 0, -49.95)
+
+[node name="wall_small193" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 41.85, 0, -49.95)
+
+[node name="wall_small194" parent="." instance=ExtResource("1_wall_small")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 54, 0, -49.95)
+
+[node name="arch_small" parent="." instance=ExtResource("2_arch_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="arch_small2" parent="." instance=ExtResource("2_arch_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 48.6, 0, -52.65)
+
+[node name="pillar_small" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="pillar_small2" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 0, 0)
+
+[node name="pillar_small3" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.1, 0, 0)
+
+[node name="pillar_small4" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.15, 0, 0)
+
+[node name="pillar_small5" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.2, 0, 0)
+
+[node name="pillar_small6" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20.25, 0, 0)
+
+[node name="pillar_small7" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 24.3, 0, 0)
+
+[node name="pillar_small8" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28.35, 0, 0)
+
+[node name="pillar_small9" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32.4, 0, 0)
+
+[node name="pillar_small10" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 36.45, 0, 0)
+
+[node name="pillar_small11" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40.5, 0, 0)
+
+[node name="pillar_small12" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 44.55, 0, 0)
+
+[node name="pillar_small13" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 48.6, 0, 0)
+
+[node name="pillar_small14" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 52.65, 0, 0)
+
+[node name="pillar_small15" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -4.05)
+
+[node name="pillar_small16" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 0, -4.05)
+
+[node name="pillar_small17" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.1, 0, -4.05)
+
+[node name="pillar_small18" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.15, 0, -4.05)
+
+[node name="pillar_small19" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.2, 0, -4.05)
+
+[node name="pillar_small20" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20.25, 0, -4.05)
+
+[node name="pillar_small21" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 24.3, 0, -4.05)
+
+[node name="pillar_small22" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28.35, 0, -4.05)
+
+[node name="pillar_small23" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32.4, 0, -4.05)
+
+[node name="pillar_small24" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 36.45, 0, -4.05)
+
+[node name="pillar_small25" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40.5, 0, -4.05)
+
+[node name="pillar_small26" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 44.55, 0, -4.05)
+
+[node name="pillar_small27" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 48.6, 0, -4.05)
+
+[node name="pillar_small28" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 52.65, 0, -4.05)
+
+[node name="pillar_small29" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -8.1)
+
+[node name="pillar_small30" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 0, -8.1)
+
+[node name="pillar_small31" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.1, 0, -8.1)
+
+[node name="pillar_small32" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.15, 0, -8.1)
+
+[node name="pillar_small33" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.2, 0, -8.1)
+
+[node name="pillar_small34" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20.25, 0, -8.1)
+
+[node name="pillar_small35" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 24.3, 0, -8.1)
+
+[node name="pillar_small36" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28.35, 0, -8.1)
+
+[node name="pillar_small37" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32.4, 0, -8.1)
+
+[node name="pillar_small38" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 36.45, 0, -8.1)
+
+[node name="pillar_small39" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40.5, 0, -8.1)
+
+[node name="pillar_small40" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 44.55, 0, -8.1)
+
+[node name="pillar_small41" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 48.6, 0, -8.1)
+
+[node name="pillar_small42" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 52.65, 0, -8.1)
+
+[node name="pillar_small43" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -12.15)
+
+[node name="pillar_small44" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 0, -12.15)
+
+[node name="pillar_small45" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.1, 0, -12.15)
+
+[node name="pillar_small46" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.15, 0, -12.15)
+
+[node name="pillar_small47" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.2, 0, -12.15)
+
+[node name="pillar_small48" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20.25, 0, -12.15)
+
+[node name="pillar_small49" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 24.3, 0, -12.15)
+
+[node name="pillar_small50" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28.35, 0, -12.15)
+
+[node name="pillar_small51" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32.4, 0, -12.15)
+
+[node name="pillar_small52" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 36.45, 0, -12.15)
+
+[node name="pillar_small53" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40.5, 0, -12.15)
+
+[node name="pillar_small54" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 44.55, 0, -12.15)
+
+[node name="pillar_small55" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 48.6, 0, -12.15)
+
+[node name="pillar_small56" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 52.65, 0, -12.15)
+
+[node name="pillar_small57" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -16.2)
+
+[node name="pillar_small58" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 0, -16.2)
+
+[node name="pillar_small59" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.1, 0, -16.2)
+
+[node name="pillar_small60" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.15, 0, -16.2)
+
+[node name="pillar_small61" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.2, 0, -16.2)
+
+[node name="pillar_small62" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20.25, 0, -16.2)
+
+[node name="pillar_small63" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 24.3, 0, -16.2)
+
+[node name="pillar_small64" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28.35, 0, -16.2)
+
+[node name="pillar_small65" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32.4, 0, -16.2)
+
+[node name="pillar_small66" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 36.45, 0, -16.2)
+
+[node name="pillar_small67" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40.5, 0, -16.2)
+
+[node name="pillar_small68" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 44.55, 0, -16.2)
+
+[node name="pillar_small69" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 48.6, 0, -16.2)
+
+[node name="pillar_small70" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 52.65, 0, -16.2)
+
+[node name="pillar_small71" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -20.25)
+
+[node name="pillar_small72" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 0, -20.25)
+
+[node name="pillar_small73" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.1, 0, -20.25)
+
+[node name="pillar_small74" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.15, 0, -20.25)
+
+[node name="pillar_small75" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.2, 0, -20.25)
+
+[node name="pillar_small76" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20.25, 0, -20.25)
+
+[node name="pillar_small77" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 24.3, 0, -20.25)
+
+[node name="pillar_small78" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28.35, 0, -20.25)
+
+[node name="pillar_small79" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32.4, 0, -20.25)
+
+[node name="pillar_small80" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 36.45, 0, -20.25)
+
+[node name="pillar_small81" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40.5, 0, -20.25)
+
+[node name="pillar_small82" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 44.55, 0, -20.25)
+
+[node name="pillar_small83" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 48.6, 0, -20.25)
+
+[node name="pillar_small84" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 52.65, 0, -20.25)
+
+[node name="pillar_small85" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -24.3)
+
+[node name="pillar_small86" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 0, -24.3)
+
+[node name="pillar_small87" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.1, 0, -24.3)
+
+[node name="pillar_small88" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.15, 0, -24.3)
+
+[node name="pillar_small89" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.2, 0, -24.3)
+
+[node name="pillar_small90" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20.25, 0, -24.3)
+
+[node name="pillar_small91" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 24.3, 0, -24.3)
+
+[node name="pillar_small92" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28.35, 0, -24.3)
+
+[node name="pillar_small93" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32.4, 0, -24.3)
+
+[node name="pillar_small94" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 36.45, 0, -24.3)
+
+[node name="pillar_small95" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40.5, 0, -24.3)
+
+[node name="pillar_small96" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 44.55, 0, -24.3)
+
+[node name="pillar_small97" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 48.6, 0, -24.3)
+
+[node name="pillar_small98" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 52.65, 0, -24.3)
+
+[node name="pillar_small99" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -28.35)
+
+[node name="pillar_small100" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 0, -28.35)
+
+[node name="pillar_small101" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.1, 0, -28.35)
+
+[node name="pillar_small102" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.15, 0, -28.35)
+
+[node name="pillar_small103" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.2, 0, -28.35)
+
+[node name="pillar_small104" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20.25, 0, -28.35)
+
+[node name="pillar_small105" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 24.3, 0, -28.35)
+
+[node name="pillar_small106" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28.35, 0, -28.35)
+
+[node name="pillar_small107" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32.4, 0, -28.35)
+
+[node name="pillar_small108" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 36.45, 0, -28.35)
+
+[node name="pillar_small109" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40.5, 0, -28.35)
+
+[node name="pillar_small110" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 44.55, 0, -28.35)
+
+[node name="pillar_small111" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 48.6, 0, -28.35)
+
+[node name="pillar_small112" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 52.65, 0, -28.35)
+
+[node name="pillar_small113" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -32.4)
+
+[node name="pillar_small114" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 0, -32.4)
+
+[node name="pillar_small115" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.1, 0, -32.4)
+
+[node name="pillar_small116" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.15, 0, -32.4)
+
+[node name="pillar_small117" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.2, 0, -32.4)
+
+[node name="pillar_small118" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20.25, 0, -32.4)
+
+[node name="pillar_small119" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 24.3, 0, -32.4)
+
+[node name="pillar_small120" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28.35, 0, -32.4)
+
+[node name="pillar_small121" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32.4, 0, -32.4)
+
+[node name="pillar_small122" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 36.45, 0, -32.4)
+
+[node name="pillar_small123" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40.5, 0, -32.4)
+
+[node name="pillar_small124" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 44.55, 0, -32.4)
+
+[node name="pillar_small125" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 48.6, 0, -32.4)
+
+[node name="pillar_small126" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 52.65, 0, -32.4)
+
+[node name="pillar_small127" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -36.45)
+
+[node name="pillar_small128" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 0, -36.45)
+
+[node name="pillar_small129" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.1, 0, -36.45)
+
+[node name="pillar_small130" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.15, 0, -36.45)
+
+[node name="pillar_small131" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.2, 0, -36.45)
+
+[node name="pillar_small132" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20.25, 0, -36.45)
+
+[node name="pillar_small133" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 24.3, 0, -36.45)
+
+[node name="pillar_small134" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28.35, 0, -36.45)
+
+[node name="pillar_small135" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32.4, 0, -36.45)
+
+[node name="pillar_small136" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 36.45, 0, -36.45)
+
+[node name="pillar_small137" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40.5, 0, -36.45)
+
+[node name="pillar_small138" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 44.55, 0, -36.45)
+
+[node name="pillar_small139" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 48.6, 0, -36.45)
+
+[node name="pillar_small140" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 52.65, 0, -36.45)
+
+[node name="pillar_small141" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -40.5)
+
+[node name="pillar_small142" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 0, -40.5)
+
+[node name="pillar_small143" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.1, 0, -40.5)
+
+[node name="pillar_small144" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.15, 0, -40.5)
+
+[node name="pillar_small145" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.2, 0, -40.5)
+
+[node name="pillar_small146" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20.25, 0, -40.5)
+
+[node name="pillar_small147" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 24.3, 0, -40.5)
+
+[node name="pillar_small148" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28.35, 0, -40.5)
+
+[node name="pillar_small149" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32.4, 0, -40.5)
+
+[node name="pillar_small150" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 36.45, 0, -40.5)
+
+[node name="pillar_small151" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40.5, 0, -40.5)
+
+[node name="pillar_small152" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 44.55, 0, -40.5)
+
+[node name="pillar_small153" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 48.6, 0, -40.5)
+
+[node name="pillar_small154" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 52.65, 0, -40.5)
+
+[node name="pillar_small155" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -44.55)
+
+[node name="pillar_small156" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 0, -44.55)
+
+[node name="pillar_small157" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.1, 0, -44.55)
+
+[node name="pillar_small158" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.15, 0, -44.55)
+
+[node name="pillar_small159" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.2, 0, -44.55)
+
+[node name="pillar_small160" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20.25, 0, -44.55)
+
+[node name="pillar_small161" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 24.3, 0, -44.55)
+
+[node name="pillar_small162" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28.35, 0, -44.55)
+
+[node name="pillar_small163" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32.4, 0, -44.55)
+
+[node name="pillar_small164" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 36.45, 0, -44.55)
+
+[node name="pillar_small165" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40.5, 0, -44.55)
+
+[node name="pillar_small166" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 44.55, 0, -44.55)
+
+[node name="pillar_small167" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 48.6, 0, -44.55)
+
+[node name="pillar_small168" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 52.65, 0, -44.55)
+
+[node name="pillar_small169" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -48.6)
+
+[node name="pillar_small170" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 0, -48.6)
+
+[node name="pillar_small171" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.1, 0, -48.6)
+
+[node name="pillar_small172" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.15, 0, -48.6)
+
+[node name="pillar_small173" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.2, 0, -48.6)
+
+[node name="pillar_small174" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20.25, 0, -48.6)
+
+[node name="pillar_small175" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 24.3, 0, -48.6)
+
+[node name="pillar_small176" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28.35, 0, -48.6)
+
+[node name="pillar_small177" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32.4, 0, -48.6)
+
+[node name="pillar_small178" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 36.45, 0, -48.6)
+
+[node name="pillar_small179" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40.5, 0, -48.6)
+
+[node name="pillar_small180" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 44.55, 0, -48.6)
+
+[node name="pillar_small181" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 48.6, 0, -48.6)
+
+[node name="pillar_small182" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 52.65, 0, -48.6)
+
+[node name="pillar_small183" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -52.65)
+
+[node name="pillar_small184" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 0, -52.65)
+
+[node name="pillar_small185" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.1, 0, -52.65)
+
+[node name="pillar_small186" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.15, 0, -52.65)
+
+[node name="pillar_small187" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.2, 0, -52.65)
+
+[node name="pillar_small188" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20.25, 0, -52.65)
+
+[node name="pillar_small189" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 24.3, 0, -52.65)
+
+[node name="pillar_small190" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28.35, 0, -52.65)
+
+[node name="pillar_small191" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32.4, 0, -52.65)
+
+[node name="pillar_small192" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 36.45, 0, -52.65)
+
+[node name="pillar_small193" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40.5, 0, -52.65)
+
+[node name="pillar_small194" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 44.55, 0, -52.65)
+
+[node name="pillar_small195" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 48.6, 0, -52.65)
+
+[node name="pillar_small196" parent="." instance=ExtResource("3_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 52.65, 0, -52.65)
+
+[node name="cube_extra_small" parent="." instance=ExtResource("4_cube_extra_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 49.95, 0, -51.3)
+
+[node name="cube_extra_small2" parent="." instance=ExtResource("4_cube_extra_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.7, 0, -2.7)

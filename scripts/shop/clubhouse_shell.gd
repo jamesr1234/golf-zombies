@@ -8,7 +8,6 @@ static func build(host: Clubhouse) -> void:
 	_inner(host)
 	_stairs(host)
 	_columns(host)
-	_roof(host)
 
 
 static func _floors(host: Clubhouse) -> void:
@@ -172,23 +171,6 @@ static func _columns(host: Clubhouse) -> void:
 		cap.position.y = h * 0.5
 		col.add_child(cap)
 		host.add_child(col)
-
-
-static func _roof(host: Clubhouse) -> void:
-	var w := ClubhouseBuild.WIDTH
-	var d := ClubhouseBuild.DEPTH
-	var h := ClubhouseBuild.WALL
-	var roof := MeshFactory.box(Vector3(w + 0.8, 0.28, d + 0.8), Palette.WALL, Palette.GLOW_FAINT)
-	roof.position.y = h + 0.28
-	host.add_child(roof)
-	var step := 2.2
-	var x := -w * 0.5
-	while x <= w * 0.5 + 0.01:
-		for z_side in [-1.0, 1.0]:
-			var merlon := MeshFactory.box(Vector3(0.7, 0.7, 0.4), Palette.WALL, Palette.GLOW_FAINT)
-			merlon.position = Vector3(x, h + 0.7, z_side * (d * 0.5 + 0.15))
-			host.add_child(merlon)
-		x += step
 
 
 static func _wall(host: Clubhouse, at: Vector3, size: Vector3) -> void:

@@ -50,6 +50,28 @@ static func spark(root: Node, at: Vector3, color: Color) -> void:
 	_fade(node, 0.18)
 
 
+## Flecks flying off a flushed golf shot. Sized to read from the swing camera.
+static func burst(root: Node, at: Vector3, color: Color, count := 18) -> void:
+	if root == null:
+		return
+	blast(root, at, 1.6, color)
+	for i in count:
+		var fly := Vector3(
+			randf_range(-1.0, 1.0), randf_range(0.45, 1.25), randf_range(-1.0, 1.0)
+		).normalized() * randf_range(2.4, 5.2)
+		var tint := color if i % 2 == 0 else Palette.AMBER
+		var fleck := MeshFactory.box(Vector3(0.18, 0.18, 0.7), tint, Palette.GLOW_STRONG)
+		root.add_child(fleck)
+		fleck.global_position = at
+		if fly.length_squared() > 0.0001:
+			fleck.look_at(at + fly, Vector3.UP)
+		var tween := fleck.create_tween()
+		tween.set_parallel()
+		tween.tween_property(fleck, "global_position", at + fly, 0.45)
+		tween.tween_property(fleck, "scale", Vector3(0.08, 0.08, 1.0), 0.45)
+		tween.chain().tween_callback(fleck.queue_free)
+
+
 static func sniper_fade_after() -> float:
 	return SNIPER_FADE_YARDS * YARD
 

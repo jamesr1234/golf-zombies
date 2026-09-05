@@ -13,6 +13,7 @@ func leave(flow: MatchFlow) -> void:
 		flow.start_hole(flow.score.hole_index)
 		return
 	if flow.clubhouse != null and is_instance_valid(flow.clubhouse):
+		PokerTable.stand_everyone(flow.clubhouse.get_tree())
 		flow.clubhouse.open_exit()
 	flow.phase = MatchFlow.Phase.PREP
 	flow.shop = null
@@ -21,9 +22,10 @@ func leave(flow: MatchFlow) -> void:
 		player.stop_talk()
 	flow._refresh_team()
 	flow._rally_cpus()
-	if flow.cart_girl == null or not is_instance_valid(flow.cart_girl):
-		flow._place_cart_girl()
-	flow._aim_at_practice()
+	if not ArenaHole.applies(flow.hole):
+		if flow.cart_girl == null or not is_instance_valid(flow.cart_girl):
+			flow._place_cart_girl()
+		flow._aim_at_practice()
 	flow.scorecard_changed.emit()
 	_Music.follow_clubhouse(flow._clubhouse_fade_far())
 	flow._update_clubhouse_music()
@@ -140,6 +142,7 @@ func attach_next_hole(flow: MatchFlow) -> void:
 	flow._place_cart()
 	flow._place_cart_girl()
 	flow.spawner.clear_zombies()
+	flow.spawner.plant_mazes(flow._hole_node)
 
 
 func place_at_exit(flow: MatchFlow) -> void:

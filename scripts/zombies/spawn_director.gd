@@ -1,6 +1,7 @@
 class_name SpawnDirector
 extends Node
-## Feeds zombies into the current hole, or packs the cart path between holes.
+## Feeds zombies from hole spawn points, packs a maze once, or packs the cart
+## path between holes. A hole with no points stays empty.
 
 signal zombie_killed(bounty: int, killer: Player)
 
@@ -39,15 +40,19 @@ var _hole_index := 0
 var _timer := 0.0
 var _running := false
 var _transit := false
+var _arena := false
 var _burst_left := 0
 
 
-func begin_hole(hole_index: int, spawn_points: Array[Vector3]) -> void:
+func begin_hole(
+	hole_index: int, spawn_points: Array[Vector3], arena := ArenaHole.applies_index(hole_index)
+) -> void:
 	_transit = false
-	_burst_left = 0
+	_arena = arena
+	_burst_left = ArenaHole.SPAWN_BURST if _arena else 0
 	_hole_index = hole_index
 	_points = spawn_points
-	_timer = FIRST_SPAWN_DELAY
+	_timer = ArenaHole.FIRST_SPAWN if _arena else FIRST_SPAWN_DELAY
 	_running = true
 
 
@@ -58,9 +63,33 @@ func place_snipers(perches: Array[Vector3]) -> void:
 		_spawn_at(perch, SNIPER)
 
 
+func plant_mazes(root: Node) -> void:
+	if root == null or container == null:
+		return
+	for node in root.find_children("*", "Maze", true, false):
+		var maze := node as Maze
+		if maze == null:
+			continue
+		maze.seal_gates()
+		var roam := maze.roam_aabb()
+		for entry in maze.pack_plan():
+			var zombie := _spawn_at(
+				maze.to_global(entry["position"]),
+				entry["stats"] as ZombieStats,
+				roam
+			)
+			if zombie == null:
+				continue
+			zombie.patrol_a = maze.to_global(entry["patrol_a"])
+			zombie.patrol_b = maze.to_global(entry["patrol_b"])
+			zombie.aggro_range = Maze.AGGRO
+			zombie.maze_ref = weakref(maze)
+
+
 ## Pack the cart path with walkers so the drive to the next tee is a gauntlet.
 func begin_transit(hole_index: int, spawn_points: Array[Vector3]) -> void:
 	_transit = true
+	_arena = false
 	_hole_index = hole_index
 	_points = spawn_points
 	_timer = TRANSIT_INTERVAL
@@ -84,12 +113,16 @@ func live_count() -> int:
 
 func cap() -> int:
 	var raw := TRANSIT_CAP if _transit else mini(MAX_CAP, BASE_CAP + _hole_index * CAP_PER_HOLE)
+	if _arena:
+		raw = ArenaHole.SPAWN_CAP
 	return maxi(1, int(round(float(raw) * GameSettings.spawn_cap_scale())))
 
 
 func interval() -> float:
 	var value := TRANSIT_INTERVAL
-	if not _transit:
+	if _arena:
+		value = ArenaHole.SPAWN_INTERVAL
+	elif not _transit:
 		value = maxf(MIN_INTERVAL, BASE_INTERVAL - _hole_index * INTERVAL_PER_HOLE)
 		if _anyone_golfing():
 			value *= GOLFING_PRESSURE
@@ -142,9 +175,9 @@ func _anyone_golfing() -> bool:
 	return golf != null and golf.golfer != null
 
 
-func _spawn_at(at: Vector3, stats: ZombieStats) -> void:
+func _spawn_at(at: Vector3, stats: ZombieStats, roam := AABB()) -> Zombie:
 	if container == null or stats == null:
-		return
+		return null
 	var zombie: Zombie
 	if net_factory != null and NetSession.is_active():
 		zombie = net_factory.spawn_zombie_at(at, stats)
@@ -154,9 +187,12 @@ func _spawn_at(at: Vector3, stats: ZombieStats) -> void:
 		container.add_child(zombie)
 		zombie.global_position = at
 	if zombie == null:
-		return
+		return null
+	if roam.size.x > 0.5:
+		zombie.roam = roam
 	if not zombie.died.is_connected(_on_zombie_died):
 		zombie.died.connect(_on_zombie_died)
+	return zombie
 
 
 func _on_zombie_died(zombie: Zombie) -> void:
@@ -172,6 +208,8 @@ func _candidate_points() -> Array[Vector3]:
 	var players := get_tree().get_nodes_in_group("players")
 	var candidates: Array[Vector3] = []
 	var keep_away := TRANSIT_MIN_DISTANCE if _transit else MIN_PLAYER_DISTANCE
+	if _arena:
+		keep_away = ArenaHole.SPAWN_KEEP_AWAY
 	for point in _points:
 		if _nearest_player_distance(point, players) >= keep_away:
 			candidates.append(point)

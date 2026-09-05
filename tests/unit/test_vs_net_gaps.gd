@@ -11,7 +11,7 @@ func after_each() -> void:
 	NetSession.close()
 	NetSession.seats.clear()
 	GameSettings.reset()
-	for group in ["rockets", "net_shots", "net_traps", "door_shots", "warp_doors", "thrown_beers", "fireworks", "sniper_beams", "grapple_hooks"]:
+	for group in ["rockets", "net_shots", "net_traps", "door_shots", "warp_doors", "shape_drops", "shape_drop_piles", "thrown_beers", "fireworks", "sniper_beams", "grapple_hooks", "wall_debris", "wall_craters"]:
 		for node in get_tree().get_nodes_in_group(group):
 			node.remove_from_group(group)
 			node.queue_free()
@@ -35,6 +35,7 @@ func test_a_pawn_sync_speaks_for_its_owner() -> void:
 	assert_true(pawn_sync.replication_config.has_property(NodePath(":aiming")))
 	assert_true(pawn_sync.replication_config.has_property(NodePath(":sync_gun")))
 	assert_true(pawn_sync.replication_config.has_property(NodePath(":holding_beer")))
+	assert_true(pawn_sync.replication_config.has_property(NodePath(":holding_mines")))
 	assert_true(pawn_sync.replication_config.has_property(NodePath(":sync_state")))
 	assert_true(pawn_sync.replication_config.has_property(NodePath(":sync_dive")))
 	assert_true(pawn_sync.replication_config.has_property(NodePath(":sync_firing")))
@@ -46,6 +47,9 @@ func test_a_pawn_sync_speaks_for_its_owner() -> void:
 	# what puts every uneven arrival on screen.
 	assert_true(pawn_sync.replication_config.has_property(NodePath(":sync_stick")))
 	assert_true(pawn_sync.replication_config.has_property(NodePath(":sync_sprint")))
+	assert_true(pawn_sync.replication_config.has_property(NodePath(":sync_slide")))
+	assert_true(pawn_sync.replication_config.has_property(NodePath(":sync_glide")))
+	assert_true(pawn_sync.replication_config.has_property(NodePath(":sync_glide_worn")))
 	assert_true(pawn_sync.replication_config.has_property(NodePath(":sync_jumps")))
 
 
@@ -71,10 +75,16 @@ func test_zombie_and_cart_sync_carry_the_look_flags() -> void:
 	assert_true(cart_sync.replication_config.has_property(NodePath(":turbo")))
 	assert_true(cart_sync.replication_config.has_property(NodePath(":ram_plate")))
 	assert_true(cart_sync.replication_config.has_property(NodePath(":armored")))
+	assert_true(cart_sync.replication_config.has_property(NodePath(":mines")))
 	# Without the stick a watcher can only replay the pose, and replaying a pose
 	# is what puts every uneven arrival on screen.
 	assert_true(cart_sync.replication_config.has_property(NodePath(":sync_stick")))
 	assert_true(cart_sync.replication_config.has_property(NodePath(":sync_boost")))
+	assert_true(cart_sync.replication_config.has_property(NodePath(":sync_brake")))
+	assert_true(cart_sync.replication_config.has_property(NodePath(":sync_brake_pitch")))
+	assert_true(cart_sync.replication_config.has_property(NodePath(":sync_tipped")))
+	assert_true(cart_sync.replication_config.has_property(NodePath(":sync_tip_sign")))
+	assert_true(cart_sync.replication_config.has_property(NodePath(":sync_right")))
 	var mech := Node3D.new()
 	add_child_autofree(mech)
 	var mech_sync := NetSync.attach_mech(mech)
@@ -165,7 +175,7 @@ func test_host_fire_rejects_an_empty_mag() -> void:
 	var gun := Weapon.new()
 	add_child_autofree(gun)
 	var rifle: WeaponStats = preload("res://resources/weapons/rifle.tres")
-	gun.index = gun.loadout.find(rifle)
+	assert_true(gun.add_gun(rifle))
 	gun.mags[gun.index] = 0
 	assert_false(gun.host_fire(Transform3D.IDENTITY, false, gun.index))
 	gun.mags[gun.index] = 1
@@ -208,7 +218,7 @@ func test_the_host_keeps_its_own_reload_clock() -> void:
 func test_a_watched_pawn_ticks_combat_clocks() -> void:
 	var player := _remote_pawn()
 	var rifle: WeaponStats = preload("res://resources/weapons/rifle.tres")
-	player.weapon.index = player.weapon.loadout.find(rifle)
+	assert_true(player.weapon.add_gun(rifle))
 	assert_true(player.weapon.host_fire(Transform3D.IDENTITY, false, player.weapon.index))
 	assert_false(player.weapon.host_fire(Transform3D.IDENTITY, false, player.weapon.index))
 	assert_true(player.melee.shove(Vector3.ZERO, Vector3.FORWARD))
@@ -240,6 +250,9 @@ func test_a_replicated_index_selects_that_gun() -> void:
 	var gun := Weapon.new()
 	add_child_autofree(gun)
 	var rifle: WeaponStats = preload("res://resources/weapons/rifle.tres")
+	var sniper: WeaponStats = preload("res://resources/weapons/sniper.tres")
+	assert_true(gun.add_gun(rifle))
+	assert_true(gun.add_gun(sniper))
 	var idx := gun.loadout.find(rifle)
 	gun.apply_replicated_index(idx)
 	assert_eq(gun.stats(), rifle)
@@ -254,6 +267,7 @@ func test_a_remote_pawn_shows_the_synced_gun() -> void:
 	player.net_driven = true
 	player.set_multiplayer_authority(99)
 	var rifle: WeaponStats = preload("res://resources/weapons/rifle.tres")
+	assert_true(player.weapon.add_gun(rifle))
 	player.sync_gun = player.weapon.loadout.find(rifle)
 	player._animate(1.0 / 60.0)
 	assert_eq(player.weapon.stats(), rifle)
@@ -262,6 +276,11 @@ func test_a_remote_pawn_shows_the_synced_gun() -> void:
 	assert_true(player.is_holding_beer(), "remotes keep the replicated beer flag")
 	player._animate(1.0 / 60.0)
 	assert_true(player._beer.visible)
+	assert_false(player.raygun.visible)
+	player.holding_beer = false
+	player.holding_mines = true
+	assert_true(player.is_holding_mines(), "remotes keep the replicated mine flag")
+	player._animate(1.0 / 60.0)
 	assert_false(player.raygun.visible)
 
 
@@ -300,6 +319,7 @@ func test_a_replicated_pose_picks_shield_swim_and_scope() -> void:
 	assert_true(player.is_underwater())
 	assert_false(player.raygun.visible)
 	var sniper: WeaponStats = preload("res://resources/weapons/sniper.tres")
+	assert_true(player.weapon.add_gun(sniper))
 	player.sync_state = int(Player.State.NORMAL)
 	player.sync_dive = false
 	player.sync_gun = player.weapon.loadout.find(sniper)
@@ -324,12 +344,14 @@ func test_a_remote_pawn_crouches_when_downed_and_hides_the_gun_while_placing() -
 func test_a_replicated_gun_pose_shows_reload_and_fire() -> void:
 	var gun := Weapon.new()
 	add_child_autofree(gun)
+	var rifle: WeaponStats = preload("res://resources/weapons/rifle.tres")
+	assert_true(gun.add_gun(rifle))
 	gun.apply_replicated_pose(true, 0.4, false)
 	assert_true(gun.is_firing())
 	assert_almost_eq(gun.reload_fraction(), 0.4, 0.001)
 	assert_false(gun.is_scoped())
 	var sniper: WeaponStats = preload("res://resources/weapons/sniper.tres")
-	gun.index = gun.loadout.find(sniper)
+	assert_true(gun.add_gun(sniper))
 	gun.apply_replicated_pose(false, 0.0, true)
 	assert_true(gun.is_scoped())
 	assert_false(gun.is_firing())
@@ -348,6 +370,38 @@ func test_a_replicated_barrier_sits_at_the_pose() -> void:
 	assert_almost_eq(hex.global_position.x, 2.0, 0.001)
 	assert_almost_eq(hex.global_position.z, 4.0, 0.001)
 	assert_almost_eq(hex.rotation.y, deg_to_rad(90.0), 0.001)
+
+
+func test_a_replicated_ladder_sits_at_the_pose() -> void:
+	var world := _world_fx()
+	var ladder: Node3D = world.apply_ladder(Vector3(1.0, 0.0, 3.0), 90.0, 5.0)
+	assert_not_null(ladder)
+	assert_almost_eq(ladder.global_position.x, 1.0, 0.001)
+	assert_almost_eq(ladder.global_position.z, 3.0, 0.001)
+	assert_almost_eq(ladder.rotation.y, deg_to_rad(90.0), 0.001)
+	assert_almost_eq((ladder as LeanLadder).rail_length(), 5.0, 0.001)
+
+
+func test_a_replicated_ladder_fall_kicks_the_copy() -> void:
+	var world := _world_fx()
+	var ladder: LeanLadder = world.apply_ladder(Vector3(1.0, 0.0, 3.0), 90.0, 5.0)
+	var fallen: LeanLadder = world.apply_ladder_fall(Vector3(1.0, 0.0, 3.0))
+	assert_eq(fallen, ladder)
+	assert_true(ladder.is_falling())
+
+
+func test_a_replicated_wall_break_opens_the_same_hole() -> void:
+	var wall := BoxProp.create({
+		"kind": "wall",
+		"position": Vector3.ZERO,
+		"size": Vector3(6.0, 2.8, 0.6),
+		"yaw": 0.0,
+	})
+	add_child_autofree(wall)
+	var world := _world_fx()
+	await wait_physics_frames(1)
+	assert_eq(world.apply_wall_break(Vector3(0.0, 1.2, 0.3), 21), 1)
+	assert_not_null(wall.get_node_or_null("WallCrater"))
 
 
 func test_a_visual_rocket_does_not_deal_blast_damage() -> void:
@@ -392,6 +446,17 @@ func test_a_visual_door_shot_does_not_plant_a_door() -> void:
 	var door := world.apply_door(Vector3(1.0, 0.0, 2.0), Vector3.FORWARD, 20.0, 7)
 	assert_true(door.visual_only)
 	assert_eq(door.shooter_peer, 7)
+
+
+func test_a_visual_shape_drop_does_not_block() -> void:
+	var world := _world_fx()
+	var pile := world.apply_shape_drop(Vector3.ZERO, 6, 11)
+	assert_not_null(pile)
+	var crates := get_tree().get_nodes_in_group("shape_drops")
+	assert_eq(crates.size(), 6)
+	for node in crates:
+		assert_true(node.get("visual_only"))
+		assert_eq((node as CollisionObject3D).collision_layer, 0)
 
 
 func test_a_visual_ammo_drop_does_not_grant() -> void:
@@ -653,7 +718,7 @@ func _rifle() -> Weapon:
 	var gun := Weapon.new()
 	add_child_autofree(gun)
 	var rifle: WeaponStats = preload("res://resources/weapons/rifle.tres")
-	gun.index = gun.loadout.find(rifle)
+	assert_true(gun.add_gun(rifle))
 	return gun
 
 

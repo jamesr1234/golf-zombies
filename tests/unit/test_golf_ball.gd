@@ -43,6 +43,22 @@ func test_a_fringe_strike_is_a_putt_too() -> void:
 	assert_true(ball.is_on_green(), "the collar still reads as a putting grid")
 
 
+func test_a_rough_strike_is_slower_than_a_fairway_strike() -> void:
+	var fairway := _ball_on(Surface.Type.FAIRWAY)
+	fairway.strike(0.0, 0.0, 1.0)
+	var rough := _ball_on(Surface.Type.ROUGH)
+	rough.strike(0.0, 0.0, 1.0)
+	var bunker := _ball_on(Surface.Type.BUNKER)
+	bunker.strike(0.0, 0.0, 1.0)
+	assert_lt(rough.linear_velocity.length(), fairway.linear_velocity.length())
+	assert_lt(bunker.linear_velocity.length(), rough.linear_velocity.length())
+	assert_almost_eq(
+		rough.linear_velocity.length(),
+		fairway.linear_velocity.length() * Surface.POWER_MULT[Surface.Type.ROUGH],
+		0.001
+	)
+
+
 func test_a_slow_ball_drops_into_the_cup() -> void:
 	var cup := Cup.create(Vector3(0.0, 2.0, 0.0))
 	add_child_autofree(cup)

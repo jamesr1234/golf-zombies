@@ -1,0 +1,32 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="PackedScene" uid="uid://cqqh1e4pr81n3" path="res://assets/obstacles/wall_large.glb" id="1_wall_large"]
+[ext_resource type="PackedScene" uid="uid://ba8fjnsbkn18s" path="res://assets/obstacles/wall_medium.glb" id="2_wall_medium"]
+[ext_resource type="PackedScene" uid="uid://buohnciv1ie58" path="res://assets/obstacles/wall_small.glb" id="3_wall_small"]
+[ext_resource type="PackedScene" uid="uid://fh66wy30qt5q" path="res://assets/obstacles/ramp_medium.glb" id="4_ramp_medium"]
+[ext_resource type="PackedScene" uid="uid://cbbs48ffxgq1a" path="res://assets/obstacles/cube_small.glb" id="5_cube_small"]
+[ext_resource type="PackedScene" uid="uid://bvywikjp6p81e" path="res://assets/obstacles/pillar_extra_small.glb" id="6_pillar_extra_small"]
+[ext_resource type="PackedScene" uid="uid://b3ptlwxh4shx4" path="res://assets/obstacles/steps_extra_small.glb" id="7_steps_extra_small"]
+
+[node name="SandTrapWall" type="Node3D"]
+
+[node name="wall_large" parent="." instance=ExtResource("1_wall_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="wall_medium" parent="." instance=ExtResource("2_wall_medium")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.75, 0, 0)
+
+[node name="wall_small" parent="." instance=ExtResource("3_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.8, 0, 0)
+
+[node name="ramp_medium" parent="." instance=ExtResource("4_ramp_medium")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1.35)
+
+[node name="cube_small" parent="." instance=ExtResource("5_cube_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.75, 0, -4.05)
+
+[node name="pillar_extra_small" parent="." instance=ExtResource("6_pillar_extra_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.8, 2.7, 0)
+
+[node name="steps_extra_small" parent="." instance=ExtResource("7_steps_extra_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.8, 0, -1.35)

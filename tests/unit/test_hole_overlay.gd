@@ -23,6 +23,8 @@ func test_prop_scenes_exist_for_the_sparse_setpieces() -> void:
 		"res://scenes/course/props/culvert.tscn",
 		"res://scenes/course/props/windmill.tscn",
 		"res://scenes/course/props/windmill_control.tscn",
+		"res://scenes/course/props/grapple_point.tscn",
+		"res://scenes/course/props/gun_pickup.tscn",
 	]:
 		assert_true(ResourceLoader.exists(path), path)
 
@@ -169,6 +171,15 @@ func test_hole_one_wires_the_desk_to_the_mill() -> void:
 	assert_eq(desk.mill(), mill, "Computer 2 has to turn the same mill the host is steering")
 
 
+func test_hole_one_keeps_a_live_cart() -> void:
+	var packed := load("res://scenes/course/holes/hole_1.tscn") as PackedScene
+	var root: Node = packed.instantiate()
+	add_child_autofree(root)
+	var cart := root.get_node_or_null("GolfCart") as GolfCart
+	assert_not_null(cart, "a cart placed on the overlay is the real cart scene")
+	assert_true(cart.is_in_group("golf_carts"))
+
+
 func test_hole_one_does_not_embed_a_mech() -> void:
 	var packed := load("res://scenes/course/holes/hole_1.tscn") as PackedScene
 	var root: Node = packed.instantiate()
@@ -185,6 +196,45 @@ func test_hole_one_harvests_a_mech_pad() -> void:
 	var hole := HoleGenerator.generate(0, 20260816)
 	assert_true(hole.has_mech_pad(), "Computer 2 has to receive a host-spawned suit on hole 1")
 	assert_lt(hole.mech_pad.x, -8.0, "the pad sits beside the mill desk, not on the tee")
+
+
+func test_zombie_spawn_markers_are_harvested() -> void:
+	var overlay := Node3D.new()
+	add_child_autofree(overlay)
+	var first := Marker3D.new()
+	first.name = "ZombieSpawn"
+	first.position = Vector3(10.0, 0.0, 40.0)
+	overlay.add_child(first)
+	var folder := Node3D.new()
+	folder.name = "Pack"
+	folder.position = Vector3(5.0, 0.0, 0.0)
+	overlay.add_child(folder)
+	var nested := Marker3D.new()
+	nested.name = "ZombieSpawn2"
+	nested.position = Vector3(-8.0, 0.0, 55.0)
+	folder.add_child(nested)
+	var ignored := Marker3D.new()
+	ignored.name = "MechPad"
+	ignored.position = Vector3(1.0, 0.0, 1.0)
+	overlay.add_child(ignored)
+	var data := HoleData.new()
+	_Overlay.collect_into(data, overlay)
+	assert_eq(data.spawn_points.size(), 2)
+	assert_almost_eq(data.spawn_points[0].x, 10.0, 0.001)
+	assert_almost_eq(data.spawn_points[0].z, 40.0, 0.001)
+	assert_almost_eq(data.spawn_points[1].x, -3.0, 0.001)
+	assert_almost_eq(data.spawn_points[1].z, 55.0, 0.001)
+
+
+func test_spawn_markers_are_stripped_before_the_hole_goes_live() -> void:
+	var overlay := Node3D.new()
+	add_child_autofree(overlay)
+	var marker := Marker3D.new()
+	marker.name = "ZombieSpawn"
+	overlay.add_child(marker)
+	assert_eq(_Overlay.strip_spawns(overlay), 1)
+	assert_eq(overlay.find_children("*", "Marker3D", true, false).size(), 0)
+	assert_false(is_instance_valid(marker))
 
 
 func test_a_baked_suit_is_stripped_before_the_hole_goes_live() -> void:
@@ -215,3 +265,20 @@ func test_an_editor_preview_is_the_generated_hole() -> void:
 	assert_gt(preview.find_children("*", "TreeProp", true, false).size(), 8)
 	assert_eq(preview.find_children("*", "JumpRamp", true, false).size(), 0)
 	assert_null(preview.find_child("Overlay", true, false), "preview must not nest the overlay scene")
+
+
+func test_hole_ten_is_double_wide() -> void:
+	var packed := load("res://scenes/course/holes/hole_10.tscn") as PackedScene
+	assert_not_null(packed)
+	var root: Node3D = packed.instantiate()
+	add_child_autofree(root)
+	assert_eq(root.get("hole_index"), 9)
+	assert_not_null(root.find_child("Maze", true, false))
+	var data := HoleGenerator.generate(9, 20260816)
+	assert_eq(data.par, 4)
+	assert_almost_eq(
+		HoleGenerator.fairway_width(data.par, data.index),
+		HoleGenerator.fairway_width(4) * 2.0,
+		0.01
+	)
+	assert_not_null(_Overlay.packed_for(9))

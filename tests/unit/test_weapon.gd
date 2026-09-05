@@ -10,6 +10,7 @@ const NET: WeaponStats = preload("res://resources/weapons/net.tres")
 const FLARE: WeaponStats = preload("res://resources/weapons/flare_driver.tres")
 const NAILER: WeaponStats = preload("res://resources/weapons/cart_nailer.tres")
 const DOOR: WeaponStats = preload("res://resources/weapons/warp_door.tres")
+const REMOTE: WeaponStats = preload("res://resources/weapons/shape_remote.tres")
 
 
 func test_the_rifle_still_waits_its_full_interval_after_every_shot() -> void:
@@ -72,7 +73,10 @@ func test_a_boosted_shot_pays_the_scaled_damage() -> void:
 
 func test_a_bought_gun_is_added_to_the_loadout() -> void:
 	var gun := _gun()
-	assert_true(gun.has_gun(ROCKET), "the rocket starts in the bag")
+	assert_false(gun.has_weapon())
+	assert_true(gun.add_gun(ROCKET))
+	assert_true(gun.has_gun(ROCKET))
+	assert_eq(gun.stats(), ROCKET)
 	assert_false(gun.add_gun(ROCKET), "owning it once is enough")
 	var spare := WeaponStats.new()
 	spare.display_name = "Spare"
@@ -80,8 +84,40 @@ func test_a_bought_gun_is_added_to_the_loadout() -> void:
 	assert_eq(gun.stats(), spare)
 
 
+func test_the_starter_stash_holds_every_gun() -> void:
+	var gun := _gun()
+	gun.fill_stash()
+	assert_eq(gun.loadout.size(), Weapon.STARTER_GUNS.size())
+	assert_eq(gun.stats(), RIFLE, "the rifle is first in the bag")
+	for stats in Weapon.STARTER_GUNS:
+		assert_true(gun.has_gun(stats), stats.display_name)
+	gun.fill_stash()
+	assert_eq(gun.loadout.size(), Weapon.STARTER_GUNS.size(), "filling twice does not duplicate")
+
+
+func test_the_bag_starts_empty() -> void:
+	var gun := _gun()
+	assert_false(gun.has_weapon())
+	assert_eq(gun.stats(), null)
+	assert_eq(gun.mag(), 0)
+	assert_eq(gun.reserve(), 0)
+	gun.swap(1)
+	assert_eq(gun.stats(), null)
+	assert_true(gun.add_gun(RIFLE))
+	assert_eq(gun.stats(), RIFLE)
+	gun.swap(1)
+	assert_eq(gun.stats(), RIFLE, "one gun cannot swap")
+	assert_true(gun.add_gun(SHOTGUN))
+	assert_eq(gun.stats(), SHOTGUN)
+	gun.swap(1)
+	assert_eq(gun.stats(), RIFLE)
+
+
 func test_swapping_steps_forward_and_back_through_the_loadout() -> void:
 	var gun := _gun()
+	for stats in [FLARE, NAILER, NET, ROCKET, RIFLE, SHOTGUN, SNIPER, DOOR, REMOTE]:
+		assert_true(gun.add_gun(stats))
+	gun.index = 0
 	assert_eq(gun.stats(), FLARE)
 	gun.swap(1)
 	assert_eq(gun.stats(), NAILER)
@@ -98,20 +134,37 @@ func test_swapping_steps_forward_and_back_through_the_loadout() -> void:
 	gun.swap(1)
 	assert_eq(gun.stats(), DOOR)
 	gun.swap(1)
+	assert_eq(gun.stats(), REMOTE)
+	gun.swap(1)
 	assert_eq(gun.stats(), FLARE)
+	gun.swap(-1)
+	assert_eq(gun.stats(), REMOTE)
 	gun.swap(-1)
 	assert_eq(gun.stats(), DOOR)
 	gun.swap(-1)
 	assert_eq(gun.stats(), SNIPER)
 
 
-func test_the_flare_and_nailer_start_in_the_bag() -> void:
+func test_the_warp_door_is_a_gun_you_can_add() -> void:
 	var gun := _gun()
-	assert_true(gun.has_gun(FLARE))
-	assert_true(gun.has_gun(NAILER))
-	assert_eq(gun.stats(), FLARE, "hole one starts on the Flare Driver")
-	assert_false(gun.add_gun(FLARE), "owning it once is enough")
-	assert_false(gun.add_gun(NAILER), "owning it once is enough")
+	assert_true(DOOR.is_door())
+	assert_false(DOOR.is_net())
+	assert_false(DOOR.is_explosive())
+	assert_eq(DOOR.visual, "door")
+	assert_true(gun.add_gun(DOOR))
+	assert_true(gun.has_gun(DOOR))
+	assert_false(gun.add_gun(DOOR), "owning it once is enough")
+
+
+func test_the_shape_remote_is_a_gun_you_can_add() -> void:
+	var gun := _gun()
+	assert_true(REMOTE.is_drop())
+	assert_false(REMOTE.is_net())
+	assert_false(REMOTE.is_door())
+	assert_eq(REMOTE.visual, "remote")
+	assert_true(gun.add_gun(REMOTE))
+	assert_true(gun.has_gun(REMOTE))
+	assert_false(gun.add_gun(REMOTE), "owning it once is enough")
 
 
 func test_the_warp_door_starts_in_the_bag() -> void:
@@ -141,6 +194,8 @@ func test_the_sniper_cycles_2x_5x_10x_then_hip() -> void:
 func test_swapping_off_the_sniper_drops_the_scope() -> void:
 	var gun := _gun()
 	_hold(gun, SNIPER)
+	gun.add_gun(RIFLE)
+	gun.index = gun.loadout.find(SNIPER)
 	gun.cycle_zoom()
 	assert_almost_eq(gun.zoom_mult(), 2.0, 0.001)
 	gun.swap(1)
@@ -185,6 +240,8 @@ func _gun() -> Weapon:
 
 
 func _hold(gun: Weapon, current: WeaponStats) -> void:
+	if not gun.has_gun(current):
+		gun.add_gun(current)
 	gun.index = gun.loadout.find(current)
 	assert_eq(gun.stats(), current)
 

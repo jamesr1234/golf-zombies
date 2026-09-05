@@ -16,7 +16,7 @@ func setup(player: Player) -> void:
 func update_shield(player: Player) -> void:
 	if (
 		player.is_placing() or player.is_climbing() or player.is_grappling()
-		or player.is_milling() or player.is_in_mech()
+		or player.is_ziplining() or player.is_milling() or player.is_in_mech()
 	):
 		return
 	var was_up := player.state == Player.State.SHIELDING
@@ -44,12 +44,23 @@ func wants_shield(player: Player) -> bool:
 		and not player.is_carrying_ball()
 		and not player.is_climbing()
 		and not player.is_grappling()
+		and not player.is_ziplining()
 		and not player.is_milling()
 		and not player.motion.can_latch_climb(player)
 	)
 
 
 func tick_scope(player: Player) -> void:
+	if player.weapon == null or not player.weapon.has_weapon():
+		player.aiming = player.input.pressed("aim")
+		return
+	if player.motion.sprinting(player) and player.input.just_pressed("slide"):
+		if player.weapon.stats().has_scope():
+			player.aiming = player.weapon.is_scoped()
+		else:
+			player.weapon.zoom_step = -1
+			player.aiming = player.input.pressed("aim")
+		return
 	if player.weapon.stats().has_scope():
 		if player.input.just_pressed("zoom"):
 			player.weapon.cycle_zoom()
@@ -89,9 +100,11 @@ func tick(player: Player, delta: float) -> void:
 	# tows you along the rope but your hands are free. Water is a swim: R2 dives
 	# or throws the ball instead of firing.
 	var can_fight := (
-		player.health.is_alive() and player.state != Player.State.GOLFING and not player.is_driving()
+		player.health.is_alive() and not player.is_floored()
+		and player.state != Player.State.GOLFING and not player.is_driving()
 		and not player.is_swimming() and not player.is_carrying_ball() and not player.is_shielding()
 		and not player.is_climbing()
+		and not player.is_ziplining()
 		and not player.is_milling()
 		and not player.is_in_mech()
 		and not player._in_clubhouse() and not player.is_celebrating()
@@ -119,6 +132,18 @@ func tick(player: Player, delta: float) -> void:
 		if player.is_carrying_ball() and not player.is_underwater() and player.input.just_pressed("shoot"):
 			player.swim.throw_ball(player)
 		return
+	if player.is_holding_mines():
+		player.aiming = false
+		player.weapon.tick(delta, player.head.global_transform, false, false, false)
+		if player.input.just_pressed("shoot"):
+			player.drop_mine()
+		if player.input.just_pressed("swap_weapon"):
+			player.beer.cycle_held(player, 1)
+		elif player.input.just_pressed("swap_weapon_prev"):
+			player.beer.cycle_held(player, -1)
+		if player.input.just_pressed("swap_gear") or player.input.just_pressed("swap_gear_prev"):
+			player.place.swap_gear(player)
+		return
 	if player.is_holding_beer():
 		player.aiming = false
 		player.weapon.tick(delta, player.head.global_transform, false, false, false)
@@ -131,11 +156,18 @@ func tick(player: Player, delta: float) -> void:
 		if player.input.just_pressed("swap_gear") or player.input.just_pressed("swap_gear_prev"):
 			player.place.swap_gear(player)
 		return
+	# Past its line the gun will not fire, but it still throws. Nothing on the
+	# HUD says so; the creator drew the line and the player finds it.
+	var gated := WeaponGate.blocked(player)
 	tick_scope(player)
 	player.weapon.tick(
 		delta, player.head.global_transform,
-		player.input.pressed("shoot"), player.input.just_pressed("shoot"), player.aiming
+		player.input.pressed("shoot") and not gated,
+		player.input.just_pressed("shoot") and not gated,
+		player.aiming
 	)
+	if gated and player.input.just_pressed("shoot"):
+		WeaponGate.throw_gun(player)
 	if player.input.just_pressed("reload"):
 		player.weapon.start_reload()
 	if player.input.just_pressed("swap_weapon"):
@@ -172,6 +204,9 @@ func play_melee(player: Player) -> void:
 
 
 func on_fired(player: Player) -> void:
-	var kick := player.weapon.stats().kick
+	var current := player.weapon.stats() if player.weapon != null else null
+	if current == null:
+		return
+	var kick := current.kick
 	player.raygun.kick(kick)
 	player.add_view_kick(kick * PlayerLook.VIEW_KICK_DEG)

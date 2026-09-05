@@ -15,6 +15,7 @@ var door_right: Node3D
 var exit_left: Node3D
 var exit_right: Node3D
 var plaza: StaticBody3D
+var elevator
 
 
 static func create(at: Vector3, yaw: float) -> Clubhouse:
@@ -72,6 +73,14 @@ func station_for(who: Node3D) -> ShopStation:
 	for station in stations:
 		if is_instance_valid(station) and station.can_use(who):
 			return station
+	return null
+
+
+func elevator_for(who: Node3D):
+	if elevator == null or not is_instance_valid(elevator):
+		return null
+	if elevator.can_use(who):
+		return elevator
 	return null
 
 

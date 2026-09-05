@@ -5,8 +5,8 @@ extends Area3D
 
 const _SCRIPT := preload("res://scripts/course/cart_path_boost.gd")
 
-const SPEED := 56.0
-const PLAYER_SPEED := 24.0
+const SPEED := 112.0 * 0.75
+const PLAYER_SPEED := 24.0 * 0.75
 const ACCEL := 92.0
 const WIDTH := 3.4
 const DETECT_HEIGHT := 2.8
@@ -37,9 +37,8 @@ static func dress(path: Node3D) -> void:
 		path.add_child(create(a, b))
 
 
-static func create(from: Vector3, to: Vector3) -> Area3D:
+static func create(from: Vector3, to: Vector3, width := WIDTH, fill := 0.42) -> Area3D:
 	var pad = _SCRIPT.new()
-	pad.add_to_group("transit_boost")
 	var delta := to - from
 	delta.y = 0.0
 	var span := delta.length()
@@ -47,11 +46,18 @@ static func create(from: Vector3, to: Vector3) -> Area3D:
 	var mid := from.lerp(to, 0.5)
 	pad.position = Vector3(mid.x, from.y + 0.12, mid.z)
 	pad.rotation.y = atan2(-pad.along.x, -pad.along.z)
-	pad.add_child(_detector(span))
-	pad.add_child(_stripe(span))
-	for mark in _chevrons(span):
-		pad.add_child(mark)
+	pad.dress_pad(span, width, fill)
 	return pad
+
+
+func dress_pad(
+	span: float, width := WIDTH, fill := 0.42, thickness := 0.05, lift := 0.02
+) -> void:
+	add_to_group("transit_boost")
+	add_child(_detector(span, width))
+	add_child(_stripe(span, width, fill, thickness, lift))
+	for mark in _chevrons(span, lift + thickness + 0.04):
+		add_child(mark)
 
 
 static func cart_speed(current: float, delta: float) -> float:
@@ -90,30 +96,32 @@ func _on_body_exited(body: Node3D) -> void:
 		body.exit_boost()
 
 
-static func _detector(span: float) -> CollisionShape3D:
+static func _detector(span: float, width := WIDTH) -> CollisionShape3D:
 	var node := CollisionShape3D.new()
 	var box := BoxShape3D.new()
-	box.size = Vector3(WIDTH, DETECT_HEIGHT, span)
+	box.size = Vector3(width, DETECT_HEIGHT, span)
 	node.shape = box
 	return node
 
 
-static func _stripe(span: float) -> MeshInstance3D:
+static func _stripe(
+	span: float, width := WIDTH, fill := 0.42, thickness := 0.05, lift := 0.02
+) -> MeshInstance3D:
 	var strip := MeshFactory.box(
-		Vector3(WIDTH * 0.42, 0.05, span * 0.98), Palette.CYAN, Palette.GLOW_MEDIUM
+		Vector3(width * fill, thickness, span * 0.98), Palette.CYAN, Palette.GLOW_MEDIUM
 	)
-	strip.position.y = 0.02
+	strip.position.y = lift + thickness * 0.5
 	strip.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	return strip
 
 
-static func _chevrons(span: float) -> Array[Node3D]:
+static func _chevrons(span: float, mark_y := 0.06) -> Array[Node3D]:
 	var marks: Array[Node3D] = []
 	var count := maxi(1, int(span / CHEVRON_SPACING))
 	for i in count:
 		var t := (float(i) + 0.5) / float(count)
 		var mark := _arrow()
-		mark.position = Vector3(0.0, 0.06, lerpf(span * 0.5, -span * 0.5, t))
+		mark.position = Vector3(0.0, mark_y, lerpf(span * 0.5, -span * 0.5, t))
 		marks.append(mark)
 	return marks
 

@@ -1,0 +1,37 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="PackedScene" uid="uid://c8t47bsoo4rob" path="res://assets/obstacles/steps_extra_large.glb" id="1_steps_extra_large"]
+[ext_resource type="PackedScene" uid="uid://b30crjp80ahjf" path="res://assets/obstacles/cube_extra_large.glb" id="2_cube_extra_large"]
+[ext_resource type="PackedScene" uid="uid://ca86kbsman8fu" path="res://assets/obstacles/cube_large.glb" id="3_cube_large"]
+[ext_resource type="PackedScene" uid="uid://c372486rn6jcn" path="res://assets/obstacles/cube_medium.glb" id="4_cube_medium"]
+[ext_resource type="PackedScene" uid="uid://cbbs48ffxgq1a" path="res://assets/obstacles/cube_small.glb" id="5_cube_small"]
+[ext_resource type="PackedScene" uid="uid://my7dkqia2h6j" path="res://assets/obstacles/pillar_small.glb" id="6_pillar_small"]
+
+[node name="CubeCastle" type="Node3D"]
+
+[node name="steps_extra_large" parent="." instance=ExtResource("1_steps_extra_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.45, 0, 0)
+
+[node name="cube_extra_large" parent="." instance=ExtResource("2_cube_extra_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="cube_large" parent="." instance=ExtResource("3_cube_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.45, 0, 0)
+
+[node name="cube_medium" parent="." instance=ExtResource("4_cube_medium")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.45, 6.75, 0)
+
+[node name="cube_small" parent="." instance=ExtResource("5_cube_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.5, 6.75, 0)
+
+[node name="pillar_small" parent="." instance=ExtResource("6_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 9.45, 0)
+
+[node name="pillar_small2" parent="." instance=ExtResource("6_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.1, 9.45, 0)
+
+[node name="pillar_small3" parent="." instance=ExtResource("6_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 9.45, -8.1)
+
+[node name="pillar_small4" parent="." instance=ExtResource("6_pillar_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.1, 9.45, -8.1)

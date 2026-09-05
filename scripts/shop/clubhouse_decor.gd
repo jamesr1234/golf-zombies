@@ -19,6 +19,7 @@ const DOOR_SIGNS: Array[Dictionary] = [
 	{"title": "Clubs", "where": Vector3(-5.78, 3.48, -1.0), "yaw": -90.0},
 	{"title": "Items", "where": Vector3(5.78, 3.48, -1.0), "yaw": 90.0},
 	{"title": "Cart", "where": Vector3(-5.78, 3.48, -11.0), "yaw": -90.0},
+	{"title": "Elevator", "where": Vector3(5.78, 3.48, -11.0), "yaw": 90.0},
 	{"title": "Lounge", "where": Vector3(0.0, 5.02, 4.22), "yaw": 0.0},
 	{"title": "Next Hole", "where": Vector3(0.0, 5.05, -15.72), "yaw": 0.0},
 ]

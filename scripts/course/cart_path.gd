@@ -1,8 +1,9 @@
 class_name CartPath
 extends Node3D
-## Drive from the finished green to a staging tee. Trees are the boundary; fly
-## into them and you explode back onto the path. Windmill pillars on the racing
-## line throw you off first, then the blast lands a second later.
+## Drive from the finished green to a staging tee. A forcefield on both lips
+## tries to keep you on the tarmac; slip into the trees and you reappear on the
+## line beside the crash. Windmill pillars throw you off first, then the blast
+## lands a second later.
 
 const PATH_WIDTH := 25.0
 const PATH_THICKNESS := 1.4
@@ -10,8 +11,8 @@ const GATE_WIDTH := 36.0
 const ARROW_SPACING := 18.0
 ## Above the trees, so the clubhouse route stays readable from the cart.
 const ARROW_HEIGHT := 12.0
-const WALL_HEIGHT := 3.2
 const WALL_THICKNESS := 0.7
+const FIELD_GROUP := "cart_path_field"
 const TEE_SIZE := Vector2(12.0, 14.0)
 const START_INSIDE := 6.0
 const GREEN_CLEAR := 8.0
@@ -19,7 +20,8 @@ const GREEN_CLEAR := 8.0
 ## the tee so you can walk onto the plaza.
 const TEE_OPEN := 16.0
 const LANE_LIMIT := PATH_WIDTH * 0.5 + 1.8
-const CRASH_BACK := 10.0
+## Past the tarmac lip. The field sits on the edge; this is the slip through it.
+const ROUGH_SLIP := 0.8
 const CRASH_COOL := 1.15
 const _Gate := preload("res://scripts/course/cart_path_gate.gd")
 const _Forest := preload("res://scripts/course/cart_path_forest.gd")
@@ -66,6 +68,7 @@ static func build(
 		_Forest.dress(path, bounds)
 		path.set_process(false)
 	path._build_road()
+	CartPathRails.dress(path)
 	_Boost.dress(path)
 	path._build_end_cap()
 	path._build_tee_pad()
@@ -95,30 +98,42 @@ func off_path(at: Vector3) -> bool:
 		return false
 	if at.distance_to(tee) < TEE_OPEN + 6.0:
 		return false
-	return CartPathTrack.distance_to(centerline, at) > LANE_LIMIT
+	return CartPathTrack.distance_to(centerline, at) > PATH_WIDTH * 0.5 + ROUGH_SLIP
 
 
 func reset_from(crash: Vector3) -> Dictionary:
 	var along := CartPathTrack.along(centerline, crash)
-	var back := maxf(0.0, along - CRASH_BACK)
-	var at := CartPathTrack.at(centerline, back)
-	var face := CartPathTrack.heading_at(centerline, back)
+	var on := CartPathTrack.at(centerline, along)
+	var face := CartPathTrack.heading_at(centerline, along)
 	return {
-		"position": at + Vector3.UP * 0.4,
+		"position": on + Vector3.UP * 0.4,
 		"yaw": rad_to_deg(_yaw_along(face)),
 	}
 
 
-func tick_crash(cart: Node3D, delta: float) -> bool:
+func tick_crash(body: Node3D, delta: float) -> bool:
+	var bodies: Array[Node3D] = []
+	if body != null:
+		bodies.append(body)
+	return tick_bodies(bodies, delta)
+
+
+func tick_bodies(bodies: Array, delta: float) -> bool:
 	_crash_cool = maxf(0.0, _crash_cool - delta)
 	if _tick_pending(delta):
 		return true
-	if _crash_cool > 0.0 or cart == null or is_flung(cart):
+	if _crash_cool > 0.0:
 		return false
-	if not off_path(cart.global_position):
-		return false
-	_crash_now(cart)
-	return true
+	for body in bodies:
+		var node := body as Node3D
+		if node == null or is_flung(node):
+			continue
+		var at := node.global_position if node.is_inside_tree() else node.position
+		if not off_path(at):
+			continue
+		_crash_now(node, node is GolfCart)
+		return true
+	return false
 
 
 func fling_off(body: Node3D, from: Vector3) -> bool:
@@ -151,7 +166,7 @@ func _tick_pending(delta: float) -> bool:
 		var body := item["body"] as Node3D
 		_pending.remove_at(i)
 		if body != null and is_instance_valid(body):
-			_crash_now(body)
+			_crash_now(body, true)
 			exploded = true
 	return exploded
 
@@ -165,10 +180,11 @@ func _pending_of(body: Node3D) -> int:
 	return -1
 
 
-func _crash_now(body: Node3D) -> void:
+func _crash_now(body: Node3D, blast := true) -> void:
 	var at := body.global_position if body.is_inside_tree() else body.position
 	var pose := reset_from(at)
-	_explode(at)
+	if blast:
+		_explode(at)
 	if body.has_method("recover_at"):
 		body.recover_at(pose["position"], pose["yaw"])
 	elif body.has_method("spawn_at"):

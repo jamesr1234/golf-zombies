@@ -123,9 +123,77 @@ func test_the_builder_opens_the_pipe_and_blocks_the_walls() -> void:
 	assert_false(space.intersect_ray(into).is_empty(), "the walls are solid")
 
 
+func test_block_steps_climb_onto_the_roof() -> void:
+	var hole := HoleGenerator.generate(1, SEED)
+	var root := HoleBuilder.build(hole)
+	add_child_autofree(root)
+	var pipe := root.find_children("*", "Culvert", true, false)[0] as Culvert
+	assert_gte(pipe.step_count(), 8, "the roof is a climb, not a hop")
+	assert_lt(Culvert.STEP_RISE, 1.1, "each block has to be a jump you can make")
+	await wait_physics_frames(2)
+	var space := pipe.get_world_3d().direct_space_state
+	var right := pipe.global_transform.basis.x
+	var along := -pipe.global_transform.basis.z
+	var mouth := pipe.global_position - along * (Culvert.LENGTH * 0.5 - Culvert.STEP_RUN * 0.5)
+	var foot := mouth + right * (Culvert.WIDTH * 0.5 - Culvert.STEP_WIDTH * 0.5)
+	var onto := PhysicsRayQueryParameters3D.create(
+		foot + Vector3.UP * 1.4, foot + Vector3.DOWN * 0.2
+	)
+	onto.collision_mask = Layers.WORLD
+	assert_false(space.intersect_ray(onto).is_empty(), "the first block is standable")
+	var roof := pipe.global_position + Vector3.UP * (Culvert.HEIGHT + Culvert.ROOF)
+	var deck := PhysicsRayQueryParameters3D.create(
+		roof + Vector3.UP * 2.0, roof + Vector3.DOWN * 1.0
+	)
+	deck.collision_mask = Layers.WORLD
+	assert_false(space.intersect_ray(deck).is_empty(), "the roof is a floor")
+	var lane := PhysicsRayQueryParameters3D.create(
+		pipe.global_position + Vector3.UP * 2.0 - along * 10.0,
+		pipe.global_position + Vector3.UP * 2.0 + along * 10.0
+	)
+	lane.collision_mask = Layers.WORLD
+	assert_true(space.intersect_ray(lane).is_empty(), "the cart still fits down the middle")
+
+
 func test_hole_two_tells_you_to_take_the_pipe() -> void:
 	var flow: MatchFlow = autofree(MatchFlow.new())
 	assert_true(flow._warmup_copy(1).contains("culvert"))
+
+
+func test_a_flat_patch_keeps_the_old_column() -> void:
+	var column := SurfacePatch.detector_column({
+		"type": Surface.Type.FAIRWAY,
+		"position": Vector3.ZERO,
+		"size": Vector2(8.0, 10.0),
+		"yaw": 0.0,
+		"round": false,
+	})
+	assert_almost_eq(column.x, SurfacePatch.DETECT_SPAN * -0.25, 0.001)
+	assert_almost_eq(column.y, SurfacePatch.DETECT_SPAN * 0.75, 0.001)
+
+
+func test_the_ridge_fairway_detector_covers_the_peak() -> void:
+	var hole := HoleGenerator.generate(1, SEED)
+	var peak_at := CulvertHole.ridge_peak_at(hole)
+	var peak := hole.height.height_at(peak_at.x, peak_at.z)
+	var covered := false
+	for patch in hole.patches:
+		if patch["type"] != Surface.Type.FAIRWAY:
+			continue
+		if not HoleGenerator.patch_covers(patch, peak_at):
+			continue
+		var column := SurfacePatch.detector_column(patch, hole.height)
+		assert_lte(column.x, peak, "the trench still has to catch a ball")
+		assert_gte(column.y, peak + GolfBall.RADIUS, "the ridge cannot sit above the column")
+		var node := SurfacePatch.create(patch, hole.height)
+		add_child_autofree(node)
+		var shape := _lie_shape(node)
+		assert_almost_eq(shape.position.y, (column.x + column.y) * 0.5, 0.01)
+		var box := shape.shape as BoxShape3D
+		assert_not_null(box)
+		assert_almost_eq(box.size.y, column.y - column.x, 0.01)
+		covered = true
+	assert_true(covered, "the peak has to sit on a fairway patch")
 
 
 func _assert_ramp(hole: HoleData, a: Vector3, b: Vector3) -> void:
@@ -134,3 +202,10 @@ func _assert_ramp(hole: HoleData, a: Vector3, b: Vector3) -> void:
 	var deg := rad_to_deg(atan(rise / maxf(run, 0.01)))
 	assert_lt(deg, GolfCart.FLOOR_MAX_DEG, "the cart has to stay stuck to the ground")
 	assert_gt(rise, 4.0, "the ramp actually changes height")
+
+
+func _lie_shape(node: SurfacePatch) -> CollisionShape3D:
+	for child in node.get_children():
+		if child is CollisionShape3D:
+			return child
+	return null

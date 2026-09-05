@@ -1,0 +1,33 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="PackedScene" uid="uid://bqv1kqkcvufhw" path="res://assets/obstacles/pillar_extra_large.glb" id="1_pillar_extra_large"]
+[ext_resource type="PackedScene" uid="uid://ca86kbsman8fu" path="res://assets/obstacles/cube_large.glb" id="2_cube_large"]
+[ext_resource type="PackedScene" uid="uid://bcjd3mt2o6imu" path="res://assets/obstacles/platform_large.glb" id="3_platform_large"]
+[ext_resource type="PackedScene" uid="uid://bj7y0ltyoxlo3" path="res://assets/obstacles/ladder_extra_large.glb" id="4_ladder_extra_large"]
+[ext_resource type="PackedScene" uid="uid://doccqy0gay68w" path="res://assets/obstacles/cube_extra_small.glb" id="5_cube_extra_small"]
+
+[node name="WaterTower" type="Node3D"]
+
+[node name="pillar_extra_large" parent="." instance=ExtResource("1_pillar_extra_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="pillar_extra_large2" parent="." instance=ExtResource("1_pillar_extra_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 0, 0)
+
+[node name="pillar_extra_large3" parent="." instance=ExtResource("1_pillar_extra_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -4.05)
+
+[node name="pillar_extra_large4" parent="." instance=ExtResource("1_pillar_extra_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 0, -4.05)
+
+[node name="cube_large" parent="." instance=ExtResource("2_cube_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 9.45, 0)
+
+[node name="platform_large" parent="." instance=ExtResource("3_platform_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 16.2, 0)
+
+[node name="ladder_extra_large" parent="." instance=ExtResource("4_ladder_extra_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.4, 0, -1.35)
+
+[node name="cube_extra_small" parent="." instance=ExtResource("5_cube_extra_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.7, 17.55, -2.7)

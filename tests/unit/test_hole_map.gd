@@ -28,14 +28,14 @@ func test_sand_and_water_land_on_the_map() -> void:
 
 
 func test_trees_and_rocks_count_as_course_features() -> void:
-	var hole := HoleGenerator.generate(4, SEED)
+	var hole := HoleGenerator.generate(0, SEED)
 	var kinds := HoleMap.drawn_kinds(hole)
 	assert_true(kinds.has("tree") or kinds.has("rock") or kinds.has("wall"))
 
 
 func test_enemy_spawns_never_make_the_map() -> void:
 	var hole := HoleGenerator.generate(2, SEED)
-	assert_gt(hole.spawn_points.size(), 0)
+	hole.spawn_points.append(hole.tee + Vector3(0.0, 0.0, 40.0))
 	var kinds := HoleMap.drawn_kinds(hole)
 	assert_false(kinds.has("spawn"))
 	assert_false(kinds.has("zombie"))

@@ -1,0 +1,56 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/creator/creator_mode.gd" id="1_creator"]
+[ext_resource type="Shader" path="res://assets/shaders/neon_sky.gdshader" id="2_sky"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_sky"]
+shader = ExtResource("2_sky")
+shader_parameter/horizon_color = Color(0.34, 0.03, 0.35, 1)
+shader_parameter/zenith_color = Color(0.015, 0.01, 0.07, 1)
+shader_parameter/ground_color = Color(0.01, 0.01, 0.03, 1)
+shader_parameter/star_threshold = 0.9987
+shader_parameter/star_energy = 2.5
+shader_parameter/horizon_falloff = 4.0
+
+[sub_resource type="Sky" id="Sky_1"]
+sky_material = SubResource("ShaderMaterial_sky")
+
+[sub_resource type="Environment" id="Environment_1"]
+background_mode = 2
+sky = SubResource("Sky_1")
+ambient_light_source = 2
+ambient_light_color = Color(0.28, 0.24, 0.44, 1)
+ambient_light_energy = 1.35
+tonemap_mode = 3
+tonemap_white = 4.0
+glow_enabled = true
+glow_levels/2 = 0.6
+glow_levels/3 = 1.0
+glow_levels/4 = 1.0
+glow_levels/5 = 0.6
+glow_normalized = true
+glow_intensity = 1.1
+glow_strength = 1.05
+glow_bloom = 0.15
+glow_hdr_threshold = 0.85
+fog_enabled = true
+fog_light_color = Color(0.3, 0.08, 0.42, 1)
+fog_light_energy = 1.2
+fog_density = 0.0016
+fog_sky_affect = 0.15
+adjustment_enabled = true
+adjustment_brightness = 1.05
+adjustment_contrast = 1.08
+adjustment_saturation = 1.35
+
+[node name="HoleCreator" type="Node3D" groups=["fx_root"]]
+script = ExtResource("1_creator")
+
+[node name="Environment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_1")
+
+[node name="Moon" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.8192, 0, -0.5736, -0.4393, 0.6428, -0.6275, 0.3688, 0.766, 0.5266, 0, 40, 0)
+light_color = Color(0.62, 0.72, 1, 1)
+light_energy = 0.85
+shadow_enabled = true

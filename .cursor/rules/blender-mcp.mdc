@@ -1,0 +1,10 @@
+---
+description: Talk to Blender via the official Lab MCP addon protocol
+alwaysApply: true
+---
+
+# Blender MCP
+
+Use the personal **blender-mcp** skill (`~/.cursor/skills/blender-mcp/SKILL.md`)
+when Cursor cannot talk to Blender. Do not use community `uvx blender-mcp`
+against the Lab addon on port 9876.

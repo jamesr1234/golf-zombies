@@ -27,6 +27,8 @@ const TEE_READY_RANGE := 4.0
 @export var starting_hole := 1
 ## Spawn in the hall on that hole so shops and wall art can be checked in-game.
 @export var start_in_clubhouse := false
+## Playtest wallet so shops can be checked without holing out.
+@export var starting_money := 0
 ## Spawn on the clubhouse circuit so the drive can be checked without holing out.
 @export var start_on_cart_path := false
 ## Hole 1 playtest: the CPU boards as driver and throttles up right away so the
@@ -59,7 +61,7 @@ var clubhouse_flow = _ClubhouseFlow.new()
 
 
 func _ready() -> void:
-	score = GameState.new(HoleGenerator.pars())
+	score = GameState.new(_pars())
 	var world := get_parent()
 	for node in get_tree().get_nodes_in_group("players"):
 		if world.is_ancestor_of(node):
@@ -92,13 +94,22 @@ func _process(delta: float) -> void:
 		return
 	hole_time_left = maxf(0.0, hole_time_left - delta)
 	if hole_time_left <= 0.0:
-		_end_run(false, "Time ran out on hole %d." % [score.hole_index + 1])
+		if ArenaHole.applies(hole):
+			_finish_arena(0)
+		else:
+			_end_run(false, "Time ran out on hole %d." % [score.hole_index + 1])
 
 
 func _physics_process(delta: float) -> void:
-	if phase != Phase.TRANSIT or cart_path == null or cart == null:
+	if phase != Phase.TRANSIT or cart_path == null:
 		return
-	cart_path.tick_crash(cart, delta)
+	var bodies: Array[Node3D] = []
+	if cart != null:
+		bodies.append(cart)
+	for player in _players:
+		if player != null and not player.is_riding():
+			bodies.append(player)
+	cart_path.tick_bodies(bodies, delta)
 
 
 ## Called once the HUDs are listening, so the first hole banner is not announced
@@ -109,6 +120,8 @@ func begin() -> void:
 	started = true
 	var index := clampi(starting_hole, 1, score.pars.size()) - 1
 	score.hole_index = index
+	if starting_money > 0:
+		score.credit(starting_money)
 	if start_on_cart_path:
 		_begin_on_cart_path(index)
 	elif start_in_clubhouse:
@@ -117,11 +130,19 @@ func begin() -> void:
 		start_hole(index)
 
 
+## A player-made hole is a card of one. Holing out ends the round rather than
+## sending you to the clubhouse for a hole that does not exist.
+func _pars() -> PackedInt32Array:
+	if GameSettings.is_custom():
+		return PackedInt32Array([GameSettings.custom_hole.par()])
+	return HoleStore.course_pars()
+
+
 func scorecard_text() -> String:
 	if phase == Phase.PREP:
-		return "Hole %d   Par %d   Warm up   step on the tee to start" % [
-			score.hole_index + 1, score.par()
-		]
+		if ArenaHole.applies(hole):
+			return "%s   Pick two guns   round starts when everyone has chosen" % _hole_tag()
+		return "%s   Warm up   step on the tee to start" % _hole_tag()
 	if phase == Phase.SHOP:
 		return "Clubhouse   next hole %d   %s" % [
 			score.hole_index + 1, GameState.format_money(score.money)
@@ -130,10 +151,20 @@ func scorecard_text() -> String:
 		return "Pick up your ball   then drive to hole %d" % [score.hole_index + 1]
 	if phase == Phase.TRANSIT:
 		return "Drive to hole %d   run them down" % [score.hole_index + 1]
-	return "Hole %d   Par %d   Strokes %d/%d   Total %s" % [
-		score.hole_index + 1, score.par(), score.strokes, score.max_strokes(),
+	return "%s   Strokes %d/%d   Total %s" % [
+		_hole_tag(), score.strokes, score.max_strokes(),
 		GameState.format_relative(score.relative_to_par()),
 	]
+
+
+func _hole_tag() -> String:
+	if hole != null and hole.has_soccer_goal():
+		return "Hole %d   Soccer Goal" % [score.hole_index + 1]
+	if hole != null and RaceHole.applies(hole):
+		return hole.banner_title()
+	if hole != null and ArenaHole.applies(hole):
+		return hole.banner_title()
+	return "Hole %d   Par %d" % [score.hole_index + 1, score.par()]
 
 
 func is_between_holes() -> bool:
@@ -281,6 +312,7 @@ func _begin_in_clubhouse(index: int) -> void:
 		})
 	_restore_in_clubhouse(snaps)
 	spawner.clear_zombies()
+	spawner.plant_mazes(_hole_node)
 	hole_time_left = GameSettings.hole_seconds() + score.take_bonus_seconds()
 	freeze_left = score.take_freeze_seconds()
 	scorecard_changed.emit()
@@ -310,29 +342,42 @@ func start_hole(index: int) -> void:
 	cart_path = null
 	_close_shop()
 	_rebuild_hole(index)
-	_aim_at_practice()
+	if not ArenaHole.applies(hole):
+		_aim_at_practice()
 	# Cart first: it drops any riders where it stood, and the players are then put
 	# back on the new tee regardless.
 	_place_cart()
-	_place_cart_girl()
+	if not ArenaHole.applies(hole):
+		_place_cart_girl()
 	_place_players()
-	if cpu_drives_at_start:
+	if RaceHole.applies(hole):
+		_board_tee_race_car()
+	elif cpu_drives_at_start and not ArenaHole.applies(hole):
 		_board_cpu_driver()
 	spawner.clear_zombies()
+	spawner.plant_mazes(_hole_node)
 	hole_time_left = GameSettings.hole_seconds() + score.take_bonus_seconds()
 	freeze_left = score.take_freeze_seconds()
 	scorecard_changed.emit()
-	_flash_message("Hole %d   Par %d" % [index + 1, hole.par], _warmup_copy(index))
+	_flash_message(hole.banner_title(), _warmup_copy(index))
 	Sfx.play("hole_start", self)
 	_Music.play_lounge()
 
 
 func _warmup_copy(index: int) -> String:
+	if hole != null and hole.custom != null:
+		return "Warm up on the practice green.\nStep onto the tee and interact when you are ready."
 	if index == 1:
 		return "The hill blocks the drive.\nTake the cart through the culvert."
 	if index == 2:
 		return "Climb the wall onto the fairway.\nThen jump the cart to the green."
-	return "Warm up on the practice green or the climb wall.\nStep onto the tee and interact when you are ready."
+	if SoccerHole.applies_index(index):
+		return "First ball in the soccer goal wins.\nHit it hard — the target is wide."
+	if RaceHole.applies_index(index):
+		return RaceHole.WARMUP
+	if ArenaHole.applies_index(index):
+		return ArenaHole.WARMUP
+	return "Warm up on the practice green.\nStep onto the tee and interact when you are ready."
 
 
 func _rebuild_hole(index: int) -> void:
@@ -342,10 +387,151 @@ func _rebuild_hole(index: int) -> void:
 		hole_root.remove_child(_hole_node)
 		_hole_node.queue_free()
 		_hole_node = null
-	hole = HoleGenerator.generate(index, course_seed)
+	# #region agent log
+	var _t_rebuild := Time.get_ticks_msec()
+	var _dbg8 := FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-8cf7b5.log", FileAccess.READ_WRITE)
+	if _dbg8 == null:
+		_dbg8 = FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-8cf7b5.log", FileAccess.WRITE)
+	else:
+		_dbg8.seek_end()
+	if _dbg8 != null:
+		_dbg8.store_line(JSON.stringify({
+			"sessionId": "8cf7b5",
+			"hypothesisId": "D",
+			"location": "match_flow.gd:_rebuild_hole",
+			"message": "rebuild start",
+			"data": {"index": index, "starting_hole": starting_hole},
+			"timestamp": _t_rebuild,
+		}))
+		_dbg8.close()
+	# #endregion
+	hole = (
+		CustomLayout.build(GameSettings.custom_hole, course_seed) if GameSettings.is_custom()
+		else HoleStore.layout(index, course_seed)
+	)
+	# #region agent log
+	_dbg8 = FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-8cf7b5.log", FileAccess.READ_WRITE)
+	if _dbg8 == null:
+		_dbg8 = FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-8cf7b5.log", FileAccess.WRITE)
+	else:
+		_dbg8.seek_end()
+	if _dbg8 != null:
+		_dbg8.store_line(JSON.stringify({
+			"sessionId": "8cf7b5",
+			"hypothesisId": "A",
+			"location": "match_flow.gd:_rebuild_hole",
+			"message": "after generate",
+			"data": {
+				"index": index,
+				"elapsed_ms": Time.get_ticks_msec() - _t_rebuild,
+				"centerline": hole.centerline.size(),
+				"bounds": [hole.bounds.size.x, hole.bounds.size.y],
+				"height_w": 0 if hole.height == null else hole.height.width,
+				"height_d": 0 if hole.height == null else hole.height.depth,
+				"boosts": hole.boosts.size(),
+				"jumps": hole.jumps.size(),
+			},
+			"timestamp": Time.get_ticks_msec(),
+		}))
+		_dbg8.close()
+	# #endregion
+	# #region agent log
+	var _dbg := FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-c47b79.log", FileAccess.READ_WRITE)
+	if _dbg == null:
+		_dbg = FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-c47b79.log", FileAccess.WRITE)
+	else:
+		_dbg.seek_end()
+	if _dbg != null:
+		_dbg.store_line(JSON.stringify({
+			"sessionId": "c47b79",
+			"hypothesisId": "B",
+			"location": "match_flow.gd:_rebuild_hole",
+			"message": "before HoleBuilder.build",
+			"data": {
+				"index": index,
+				"hole_root_in_tree": hole_root != null and hole_root.is_inside_tree(),
+			},
+			"timestamp": Time.get_ticks_msec(),
+		}))
+		_dbg.close()
+	# #endregion
 	_hole_node = HoleBuilder.build(hole)
+	# #region agent log
+	_dbg = FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-c47b79.log", FileAccess.READ_WRITE)
+	if _dbg == null:
+		_dbg = FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-c47b79.log", FileAccess.WRITE)
+	else:
+		_dbg.seek_end()
+	if _dbg != null:
+		_dbg.store_line(JSON.stringify({
+			"sessionId": "c47b79",
+			"hypothesisId": "B",
+			"location": "match_flow.gd:_rebuild_hole",
+			"message": "after build, before add_child",
+			"data": {
+				"hole_in_tree": _hole_node != null and _hole_node.is_inside_tree(),
+				"hole_has_parent": _hole_node != null and _hole_node.get_parent() != null,
+			},
+			"timestamp": Time.get_ticks_msec(),
+		}))
+		_dbg.close()
+	# #endregion
 	hole_root.add_child(_hole_node)
+	# #region agent log
+	_dbg8 = FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-8cf7b5.log", FileAccess.READ_WRITE)
+	if _dbg8 == null:
+		_dbg8 = FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-8cf7b5.log", FileAccess.WRITE)
+	else:
+		_dbg8.seek_end()
+	if _dbg8 != null:
+		_dbg8.store_line(JSON.stringify({
+			"sessionId": "8cf7b5",
+			"hypothesisId": "B",
+			"location": "match_flow.gd:_rebuild_hole",
+			"message": "after add_child build",
+			"data": {"elapsed_ms": Time.get_ticks_msec() - _t_rebuild},
+			"timestamp": Time.get_ticks_msec(),
+		}))
+		_dbg8.close()
+	# #endregion
+	# #region agent log
+	_dbg = FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-c47b79.log", FileAccess.READ_WRITE)
+	if _dbg == null:
+		_dbg = FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-c47b79.log", FileAccess.WRITE)
+	else:
+		_dbg.seek_end()
+	if _dbg != null:
+		_dbg.store_line(JSON.stringify({
+			"sessionId": "c47b79",
+			"hypothesisId": "C",
+			"location": "match_flow.gd:_rebuild_hole",
+			"message": "after hole_root.add_child",
+			"data": {
+				"hole_in_tree": _hole_node != null and _hole_node.is_inside_tree(),
+			},
+			"timestamp": Time.get_ticks_msec(),
+		}))
+		_dbg.close()
+	# #endregion
+	MechSuit.plant_on_hole(_hole_node, hole)
 	HoleBuilder.bake_navigation(_hole_node)
+	# #region agent log
+	_dbg8 = FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-8cf7b5.log", FileAccess.READ_WRITE)
+	if _dbg8 == null:
+		_dbg8 = FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-8cf7b5.log", FileAccess.WRITE)
+	else:
+		_dbg8.seek_end()
+	if _dbg8 != null:
+		_dbg8.store_line(JSON.stringify({
+			"sessionId": "8cf7b5",
+			"hypothesisId": "C",
+			"location": "match_flow.gd:_rebuild_hole",
+			"message": "after bake_navigation",
+			"data": {"elapsed_ms": Time.get_ticks_msec() - _t_rebuild},
+			"timestamp": Time.get_ticks_msec(),
+		}))
+		_dbg8.close()
+	# #endregion
 	ball.bounds = hole.bounds
 	golf.club_kit = score.club_kit()
 
@@ -353,31 +539,76 @@ func _rebuild_hole(index: int) -> void:
 func can_start_play(who: Node3D) -> bool:
 	if phase != Phase.PREP or finished or who == null or hole == null:
 		return false
+	if ArenaHole.applies(hole):
+		return false
 	var offset := who.global_position - hole.tee
 	offset.y = 0.0
 	return offset.length() <= TEE_READY_RANGE
 
 
-## Called from the tee: the ball leaves the practice green, the clock starts, and
-## the swarm begins arriving. Nothing before this point counts.
+## Called from the tee: the ball leaves the practice green and the clock starts.
+## Walkers start arriving from the hole's random spawn points. Nothing before
+## this point counts.
 func start_play() -> void:
 	if phase != Phase.PREP or finished:
 		return
 	phase = Phase.PLAYING
 	golf.release()
-	ball.place_at(hole.tee)
-	golf.setup(ball, hole.cup, hole.green_span())
-	spawner.begin_hole(score.hole_index, hole.spawn_points)
+	if not ArenaHole.applies(hole):
+		ball.place_at(hole.tee)
+		golf.setup(ball, hole.cup, hole.green_span())
+	spawner.begin_hole(score.hole_index, hole.spawn_points, ArenaHole.applies(hole))
 	spawner.place_snipers(hole.sniper_perches())
 	scorecard_changed.emit()
 	Sfx.play("start_play", self)
 	_Music.play_level()
-	_flash_message(
-		"Hole %d   Par %d" % [score.hole_index + 1, hole.par],
-		"%s   %d strokes allowed. Double bogey costs money. Par or better pays." % [
-			GameSettings.difficulty_label().to_upper(), score.max_strokes()
-		]
-	)
+	_flash_message(hole.banner_title(), _play_copy())
+
+
+func _play_copy() -> String:
+	if hole != null and hole.has_soccer_goal():
+		return "First ball in the net wins. Less accuracy, more speed."
+	if ArenaHole.applies(hole):
+		return ArenaHole.PLAY_BANNER
+	return "%s   %d strokes allowed. Double bogey costs money. Par or better pays." % [
+		GameSettings.difficulty_label().to_upper(), score.max_strokes()
+	]
+
+
+func note_loadout(_player: Player) -> void:
+	_try_start_arena()
+
+
+func _try_start_arena() -> void:
+	if not ArenaHole.applies(hole) or phase != Phase.PREP or finished:
+		return
+	if ArenaHole.all_armed(_players):
+		start_play()
+
+
+func _tee_race_car() -> GolfCart:
+	if _hole_node == null:
+		return null
+	return _hole_node.find_child("TrackRaceCar", true, false) as GolfCart
+
+
+func _board_tee_race_car() -> void:
+	var car := _tee_race_car()
+	if car == null:
+		return
+	var yaw := rad_to_deg(car.rotation.y)
+	var humans: Array[Player] = []
+	var cpus: Array[Player] = []
+	for player in _players:
+		if player == null:
+			continue
+		if player.brain != null:
+			cpus.append(player)
+		else:
+			humans.append(player)
+	for player in humans + cpus:
+		player.spawn_at(car.global_position + Vector3.UP * 1.0, yaw)
+		car.board(player)
 
 
 func _board_cpu_driver() -> void:
@@ -395,9 +626,10 @@ func _place_players() -> void:
 	var forward := _along_hole()
 	var lateral := forward.cross(Vector3.UP).normalized()
 	var yaw := rad_to_deg(atan2(-forward.x, -forward.z))
+	var origin := hole.cup if ArenaHole.applies(hole) else hole.practice_tee
 	for i in _players.size():
 		var side := -1.0 if i == 0 else 1.0
-		var spot := hole.practice_tee + forward * 1.8 + lateral * side * PLAYER_TEE_SPREAD
+		var spot := origin + forward * 1.8 + lateral * side * PLAYER_TEE_SPREAD
 		_players[i].spawn_at(hole.lift(spot) + Vector3.UP * 1.2, yaw)
 
 
@@ -430,6 +662,8 @@ func _summon_cart_girl() -> void:
 
 ## Horizontal, so a downhill hole does not spawn players in the air or underground.
 func _along_hole() -> Vector3:
+	if RaceHole.applies(hole):
+		return hole.along_tee()
 	var forward := hole.cup - hole.tee
 	forward.y = 0.0
 	return forward.normalized()
@@ -482,6 +716,7 @@ func _on_holed() -> void:
 func _complete_hole(from_cup: bool) -> void:
 	if finished or phase != Phase.PLAYING:
 		return
+	phase = Phase.RETRIEVE
 	score.cap_at_limit()
 	var strokes := score.strokes
 	var par := score.par()
@@ -497,11 +732,20 @@ func _complete_hole(from_cup: bool) -> void:
 	score.credit(bonus)
 	if relative <= 0:
 		_cheer_hole_out()
+	var arena := ArenaHole.applies(hole)
 	var pickup := (
-		"Pick your ball out of the hole." if from_cup else "Pick up your ball."
+		"Drive to the clubhouse." if arena
+		else ("Pick your ball out of the hole." if from_cup else "Pick up your ball.")
 	)
+	var title := "Double bogey"
+	if arena:
+		title = "Last standing" if relative <= -ArenaHole.WIN_UNDER else (
+			"Survived" if relative < 0 else "Wiped out"
+		)
+	elif from_cup:
+		title = "GOAL!" if hole.has_soccer_goal() else "Holed out in %d" % strokes
 	_flash_message(
-		("Holed out in %d" % strokes) if from_cup else "Double bogey",
+		title,
 		"%s on the par %d.\n%s\n%s" % [
 			_result_name(relative), par, _payout_text(score_pay, bonus), pickup
 		]
@@ -512,6 +756,13 @@ func _complete_hole(from_cup: bool) -> void:
 		_end_run(true, "Nine holes survived at %s." % GameState.format_relative(score.relative_to_par()))
 		return
 	Sfx.play("hole_complete", self)
+	if arena:
+		ArenaBuild.open_exit(_hole_node)
+		ball.stow()
+		_refresh_team()
+		_park_cart_for_transit()
+		_begin_transit()
+		return
 	phase = Phase.RETRIEVE
 	_park_cart_for_transit()
 
@@ -640,6 +891,8 @@ func _reveal_fade() -> void:
 
 
 func _close_shop() -> void:
+	if clubhouse != null and is_instance_valid(clubhouse):
+		PokerTable.stand_everyone(clubhouse.get_tree())
 	shop = null
 	if clubhouse != null and is_instance_valid(clubhouse):
 		clubhouse.queue_free()
@@ -688,7 +941,24 @@ func _check_team_wipe() -> void:
 	for player in _players:
 		if player.health.is_alive():
 			return
+	if ArenaHole.applies(hole) and (phase == Phase.PLAYING or phase == Phase.PREP):
+		_finish_arena(ArenaHole.WIN_UNDER)
+		return
+	if ArenaHole.applies(hole):
+		return
 	_end_run(false, "Both players are down. Nobody left to revive.")
+
+
+func _finish_arena(place: int) -> void:
+	if finished or score == null:
+		return
+	if phase != Phase.PLAYING and phase != Phase.PREP:
+		return
+	if phase == Phase.PREP:
+		phase = Phase.PLAYING
+	score.strokes = ArenaHole.strokes_for_place(score.par(), place)
+	score.strokes_changed.emit(score.strokes)
+	_complete_hole(false)
 
 
 func _end_run(won: bool, reason: String) -> void:

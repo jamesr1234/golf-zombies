@@ -54,6 +54,16 @@ func tick(player: Player, delta: float) -> void:
 		return
 	if player.is_climbing():
 		return
+	if player.is_ziplining():
+		var zip := Vector2.ZERO
+		if player.uses_mouse:
+			zip += mouse_delta * MOUSE_DEG_PER_PIXEL
+		if not player.uses_mouse or GameSettings.mode != GameSettings.Mode.COOP:
+			zip += player.input.stick_look() * STICK_DEG_PER_SEC * delta
+		mouse_delta = Vector2.ZERO
+		yaw = wrapf(yaw - zip.x, -180.0, 180.0)
+		pitch = clampf(pitch - zip.y, -PITCH_LIMIT, PITCH_LIMIT)
+		return
 	var look := Vector2.ZERO
 	if player.uses_mouse:
 		look += mouse_delta * MOUSE_DEG_PER_PIXEL
@@ -83,6 +93,8 @@ func tick(player: Player, delta: float) -> void:
 func view_transform(player: Player) -> Transform3D:
 	if player.is_climbing():
 		return player.climber.view_transform(player)
+	if player.is_ziplining():
+		return player.zipliner.view_transform(player)
 	if player.is_celebrating():
 		return cheer_view(player)
 	if player.state == Player.State.GOLFING and player.golf != null:
@@ -120,6 +132,8 @@ func view_fov(player: Player) -> float:
 	var bump := player.buzz.fov_bump() if player.wants_drunk_fx() else 0.0
 	if player.is_climbing():
 		return Climber.CAM_FOV
+	if player.is_ziplining():
+		return Zipliner.CAM_FOV
 	if player.is_grappling():
 		return Grappler.FOV
 	if player.is_celebrating():
@@ -150,9 +164,13 @@ func view_fov(player: Player) -> float:
 func celebrate(player: Player) -> void:
 	if player.is_cpu() or not player.health.is_alive():
 		return
-	if player.is_riding() or player.is_swimming() or player.is_golfing() or player.is_in_mech():
+	if (
+		player.is_riding() or player.is_swimming() or player.is_golfing()
+		or player.is_in_mech() or player.is_poker_seated()
+	):
 		return
 	player._drop_grapple()
+	player._drop_zipline()
 	player._cancel_place()
 	if player.state == Player.State.SHIELDING:
 		player.state = Player.State.NORMAL
@@ -160,6 +178,7 @@ func celebrate(player: Player) -> void:
 			player._shield.set_raised(false)
 	cheer_left = PlayerBody.CHEER_TIME
 	player.velocity = Vector3.ZERO
+	player.glide.cancel(player)
 
 
 func tick_cheer(delta: float) -> void:
@@ -187,6 +206,6 @@ func sit_driver(player: Player, sit_at: Vector3, facing_yaw: float) -> void:
 
 
 func hides_own_cabin(player: Player) -> bool:
-	if player.is_underwater() or player.is_in_mech():
+	if player.is_underwater() or player.is_in_mech() or player.shopping:
 		return true
 	return player.is_driving() and not cart_chase

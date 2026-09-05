@@ -7,8 +7,32 @@ const SEED := 20260816
 
 func test_nine_holes_with_a_mixed_par_template() -> void:
 	var pars := HoleGenerator.pars()
-	assert_eq(pars.size(), 9)
+	assert_eq(pars.size(), 12)
+	assert_eq(pars[9], 4, "hole 10 is a double-wide par 4")
+	assert_eq(pars[10], 5, "hole 11 is the four-thousand-yard circuit")
+	assert_eq(pars[11], 5, "hole 12 is the soccer-goal par 5")
 	assert_true(pars.has(3) and pars.has(4) and pars.has(5), "the course needs a mix of pars")
+
+
+func test_hole_twelve_skips_the_usual_length_band() -> void:
+	var hole := HoleGenerator.generate(SoccerHole.INDEX, SEED)
+	assert_true(hole.has_soccer_goal())
+	assert_almost_eq(hole.length(), SoccerHole.LENGTH, 0.01)
+	var band := HoleGenerator.length_range(hole.par)
+	assert_gt(hole.length(), band.y, "500 yards is past a normal par 5")
+
+
+func test_hole_ten_paints_a_double_wide_fairway() -> void:
+	var hole := HoleGenerator.generate(9, SEED)
+	var wide := HoleGenerator.fairway_width(hole.par, hole.index)
+	assert_almost_eq(wide, HoleGenerator.fairway_width(4) * 2.0, 0.01)
+	var strips := 0
+	for patch in hole.patches:
+		if patch["type"] != Surface.Type.FAIRWAY:
+			continue
+		assert_almost_eq(patch["size"].x, wide, 0.01)
+		strips += 1
+	assert_gt(strips, 0)
 
 
 func test_generation_is_deterministic() -> void:
@@ -28,8 +52,20 @@ func test_different_seeds_give_different_holes() -> void:
 
 
 func test_par_matches_the_length_of_every_hole() -> void:
-	for index in 9:
+	for index in HoleGenerator.pars().size():
 		var hole := HoleGenerator.generate(index, SEED)
+		if SoccerHole.applies(hole):
+			assert_almost_eq(hole.length(), SoccerHole.LENGTH, 0.01)
+			assert_eq(hole.par, SoccerHole.PAR)
+			continue
+		if RaceHole.applies(hole):
+			assert_almost_eq(hole.length(), RaceHole.LENGTH, 0.2)
+			assert_eq(hole.par, RaceHole.PAR)
+			continue
+		if ArenaHole.applies(hole):
+			assert_almost_eq(hole.length(), ArenaHole.floor_radius(), 0.05)
+			assert_eq(hole.par, ArenaHole.PAR)
+			continue
 		assert_eq(
 			HoleGenerator.par_for_length(hole.length()), hole.par,
 			"hole %d length does not match its par" % (index + 1)
@@ -163,7 +199,7 @@ func test_every_hole_has_a_green_and_some_sand() -> void:
 				bunkers += 1
 		assert_eq(greens, 2, "hole %d should have a green and a practice green" % (index + 1))
 		assert_eq(fringes, 2, "hole %d should have a collar around each" % (index + 1))
-		if hole.is_setpiece():
+		if hole.is_setpiece() or ArenaHole.applies(hole):
 			assert_eq(bunkers, 0, "a set-piece strip has no side sand")
 		else:
 			assert_gt(bunkers, 0, "hole %d should have sand" % (index + 1))
@@ -283,7 +319,7 @@ func test_trees_ring_the_hole() -> void:
 
 
 func test_props_keep_the_fairway_clear() -> void:
-	var hole := HoleGenerator.generate(4, SEED)
+	var hole := HoleGenerator.generate(5, SEED)
 	var clearance := HoleGenerator.fairway_width(hole.par) * 0.5
 	for prop in hole.props:
 		assert_gt(
@@ -293,7 +329,7 @@ func test_props_keep_the_fairway_clear() -> void:
 
 
 func test_spawn_points_stay_on_the_map() -> void:
-	for index in 9:
+	for index in 12:
 		var hole := HoleGenerator.generate(index, SEED)
 		assert_gt(hole.spawn_points.size(), 5, "hole %d needs somewhere to spawn" % (index + 1))
 		for point in hole.spawn_points:
@@ -301,17 +337,21 @@ func test_spawn_points_stay_on_the_map() -> void:
 
 
 func test_most_spawn_points_sit_on_the_fairway_away_from_the_tee() -> void:
-	for index in 9:
+	for index in 12:
+		if ArenaHole.applies_index(index):
+			continue
 		var hole := HoleGenerator.generate(index, SEED)
-		var half := HoleGenerator.fairway_width(hole.par) * 0.5
+		var half := hole.fairway_width() * 0.5
 		var on_fairway := 0
 		for point in hole.spawn_points:
 			if HoleGenerator.distance_to_centerline(hole, point) <= half:
 				on_fairway += 1
-			assert_gt(
-				point.distance_to(hole.tee), hole.length() * 0.2,
-				"hole %d spawned too close to the tee" % (index + 1)
-			)
+			# The race track folds back, so crow-flies can sit near the tee.
+			if not RaceHole.applies_index(index):
+				assert_gt(
+					point.distance_to(hole.tee), hole.length() * 0.2,
+					"hole %d spawned too close to the tee" % (index + 1)
+				)
 			assert_gt(
 				point.distance_to(hole.cup), hole.green_radius,
 				"hole %d spawned on the green" % (index + 1)
@@ -364,18 +404,58 @@ func test_the_rough_is_hillier_than_the_fairway() -> void:
 	)
 
 
+func test_the_fairway_stays_on_the_deck() -> void:
+	for index in 9:
+		var hole := HoleGenerator.generate(index, SEED)
+		if hole.is_setpiece():
+			continue
+		for i in range(1, hole.centerline.size()):
+			var a: Vector3 = hole.centerline[i - 1]
+			var b: Vector3 = hole.centerline[i]
+			for step in 8:
+				var p: Vector3 = a.lerp(b, float(step) / 7.0)
+				if _near_water(hole, p) or _near_jump(hole, p):
+					continue
+				assert_almost_eq(
+					hole.height.height_at(p.x, p.z),
+					HeightField.DECK,
+					0.05,
+					"hole %d: the fairway has to stay on the snap deck" % (index + 1)
+				)
+
+
+func test_the_fairway_lip_is_a_slope_not_a_shelf() -> void:
+	var hole := HoleGenerator.generate(0, SEED)
+	var half := HoleGenerator.fairway_width(hole.par) * 0.5
+	var along := hole.cup - hole.tee
+	along.y = 0.0
+	along = along.normalized()
+	var side := along.cross(Vector3.UP).normalized()
+	var mid: Vector3 = hole.tee.lerp(hole.cup, 0.5)
+	var inside := mid + side * (half - 0.5)
+	var outside := mid + side * (half + HeightField.CELL)
+	var step := absf(
+		hole.height.height_at(outside.x, outside.z)
+		- hole.height.height_at(inside.x, inside.z)
+	)
+	assert_lt(step, 2.0, "the rough has to rise off the deck, not drop off a cliff")
+
+
 func test_the_tee_and_green_stay_locally_flat() -> void:
 	var hole := HoleGenerator.generate(0, SEED)
 	var tee_a := hole.height.height_at(hole.tee.x + 2.0, hole.tee.z)
 	var tee_b := hole.height.height_at(hole.tee.x - 2.0, hole.tee.z)
-	assert_almost_eq(tee_a, tee_b, 0.4, "you should be able to stand on the tee")
+	assert_almost_eq(tee_a, HeightField.DECK, 0.05, "you should be able to stand on the tee")
+	assert_almost_eq(tee_b, HeightField.DECK, 0.05, "you should be able to stand on the tee")
 	var green_a := hole.height.height_at(hole.cup.x + 2.0, hole.cup.z)
 	var green_b := hole.height.height_at(hole.cup.x - 2.0, hole.cup.z)
-	assert_almost_eq(green_a, green_b, 0.45, "the green should not be a ski jump")
+	assert_almost_eq(green_a, HeightField.DECK, 0.05, "the green should not be a ski jump")
+	assert_almost_eq(green_b, HeightField.DECK, 0.05, "the green should not be a ski jump")
 	var collar := hole.green_radius + HoleGenerator.FRINGE_WIDTH * 0.5
 	var fringe_a := hole.height.height_at(hole.cup.x + collar, hole.cup.z)
 	var fringe_b := hole.height.height_at(hole.cup.x - collar, hole.cup.z)
-	assert_almost_eq(fringe_a, fringe_b, 0.45, "a collar putt should not sit on a slope")
+	assert_almost_eq(fringe_a, HeightField.DECK, 0.05, "a collar putt should not sit on a slope")
+	assert_almost_eq(fringe_b, HeightField.DECK, 0.05, "a collar putt should not sit on a slope")
 
 
 func test_the_clubhouse_pad_is_flat_and_level_with_the_tee() -> void:
@@ -591,6 +671,13 @@ func _distance_to_centerline(hole: HoleData, point: Vector3) -> float:
 		)
 		closest = minf(closest, point.distance_to(on_segment))
 	return closest
+
+
+func _near_jump(hole: HoleData, point: Vector3) -> bool:
+	for jump in hole.jumps:
+		if JumpRamp.contains(jump, point):
+			return true
+	return false
 
 
 ## A pond levels its own bank and drops its own floor, so samples in or beside one

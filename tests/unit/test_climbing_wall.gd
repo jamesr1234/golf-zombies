@@ -1,36 +1,23 @@
 extends GutTest
-## Hole 1 opens with a climb wall beside the practice tee. Hold L1 / R1 to
-## grip; one hand swings you, both hands lock you. Jump lets go.
+## Hold L1 / R1 to grip; one hand swings you, both hands lock you. Jump lets go.
 
 const SEED := 20260816
 const PLAYER := preload("res://scenes/players/player.tscn")
 const STEP := 1.0 / 60.0
 
 
-func test_hole_one_has_a_climb_wall_by_the_practice_tee() -> void:
+func test_hole_one_has_no_climb_wall() -> void:
 	var hole := HoleGenerator.generate(0, SEED)
-	var walls := _climb_props(hole)
-	assert_eq(walls.size(), 1, "hole 1 starts with a wall before the tee")
-	assert_lt(
-		(walls[0]["position"] as Vector3).distance_to(hole.practice_tee), 24.0,
-		"beside the practice green, not down the fairway"
-	)
-	assert_false(
-		ClubhouseBuild.covers_exit_ground(
-			hole.practice_tee, hole.cup - hole.tee, walls[0]["position"], 2.0
-		),
-		"the wall stays off the clubhouse pad"
-	)
+	assert_eq(_climb_props(hole).size(), 0, "hole 1 no longer opens with a wall")
 	var later := HoleGenerator.generate(3, SEED)
 	assert_eq(_climb_props(later).size(), 0, "later holes stay off the wall")
 
 
-func test_the_builder_puts_the_wall_on_hole_one() -> void:
+func test_the_builder_skips_the_wall_on_hole_one() -> void:
 	var root := HoleBuilder.build(HoleGenerator.generate(0, SEED))
 	add_child_autofree(root)
 	var built := root.find_children("*", "ClimbingWall", true, false)
-	assert_eq(built.size(), 1)
-	assert_true((built[0] as Node).is_in_group("climb_walls"))
+	assert_eq(built.size(), 0)
 
 
 func test_the_wall_is_a_full_face() -> void:
@@ -156,6 +143,25 @@ func test_one_hand_lets_you_swing() -> void:
 	)
 
 
+func test_stick_right_aims_the_free_hand_to_the_right() -> void:
+	var pair := await _latched()
+	var player: Player = pair[0]
+	var pad: CpuInput = pair[1]
+	_hold_for(player, pad, ["shield"], 25)
+	pad.begin_frame()
+	pad.hold("shield")
+	pad.move = Vector2(1.0, 0.0)
+	player.climber.tick(player, STEP)
+	var along := player.climber.left_aim - player.global_position
+	along.y = 0.0
+	var right := player.global_transform.basis.x
+	right.y = 0.0
+	assert_gt(
+		along.normalized().dot(right.normalized()), 0.35,
+		"left stick right reaches to your right"
+	)
+
+
 func test_a_free_hand_reaches_above_the_body() -> void:
 	var pair := await _latched()
 	var player: Player = pair[0]
@@ -191,6 +197,80 @@ func test_the_free_hand_can_grab_a_higher_hold() -> void:
 		player.climber.right.y, planted.y + 0.4,
 		"reach up, then R1 plants the higher hold"
 	)
+
+
+func test_the_pegs_are_blue() -> void:
+	var wall := ClimbingWall.create(_prop())
+	add_child_autofree(wall)
+	var seen := 0
+	for child in wall.get_children():
+		var mesh := child as MeshInstance3D
+		if mesh == null or not String(mesh.name).begins_with("Hold_"):
+			continue
+		seen += 1
+		assert_eq(mesh.material_override.albedo_color, Palette.CYAN)
+	assert_gt(seen, 80)
+
+
+func test_the_top_has_a_standable_deck() -> void:
+	var wall := ClimbingWall.create(_prop())
+	add_child_autofree(wall)
+	var deck := wall.get_node_or_null("Deck") as Node3D
+	assert_not_null(deck, "the wall finishes with a platform")
+	assert_gt(deck.position.y, wall._h * 0.45)
+	var stand := wall.ledge_stand()
+	assert_gt(stand.y, wall.top_y(), "the stand point is on top of the wall")
+	assert_gt(wall.to_local(stand).z, 0.0, "you land on the deck, not the climb face")
+
+
+func test_a_mid_wall_hold_does_not_mantle() -> void:
+	var pair := await _latched()
+	var player: Player = pair[0]
+	var pad: CpuInput = pair[1]
+	var wall: ClimbingWall = player.climber.wall
+	var holds: Array[Vector3] = wall.holds()
+	holds.sort_custom(func(a, b): return a.y > b.y)
+	var mid: Vector3 = holds[holds.size() / 2]
+	player.climber.left = mid
+	player.climber.right = mid
+	player.climber._snap_to_hang(player)
+	pad.begin_frame()
+	pad.hold("melee")
+	pad.hold("shield")
+	assert_true(player.climber.tick(player, STEP), "mid holds keep you on the wall")
+	assert_false(player.climber.is_mantling())
+
+
+func test_reaching_the_top_plays_a_third_person_mantle() -> void:
+	var pair := await _latched()
+	var player: Player = pair[0]
+	var pad: CpuInput = pair[1]
+	var wall: ClimbingWall = player.climber.wall
+	var top: Array[Vector3] = wall.holds()
+	top.sort_custom(func(a, b): return a.y > b.y)
+	player.climber.left = top[0]
+	player.climber.right = top[1]
+	player.climber._snap_to_hang(player)
+	pad.begin_frame()
+	pad.hold("melee")
+	pad.hold("shield")
+	assert_true(player.climber.tick(player, STEP), "a lip grab starts the pull-up")
+	assert_true(player.climber.is_mantling())
+	assert_gt(
+		player.get_view_transform().origin.distance_to(player.global_position), 2.5,
+		"the pull-up stays third person"
+	)
+	assert_lt(player.global_position.y, wall.ledge_stand(player).y - 0.2, "not snapped onto the deck yet")
+	for _frame in int(ceil(Climber.MANTLE_TIME / STEP)) + 2:
+		pad.begin_frame()
+		if not player.climber.tick(player, STEP):
+			break
+	player._drop_climb()
+	var local := wall.to_local(player.global_position)
+	assert_gt(player.global_position.y, wall.top_y(), "you stand on top of the wall")
+	assert_gt(local.z, 0.0, "you land on the deck, not hanging on the face")
+	assert_false(player.climber.is_active())
+	assert_false(player.climber.is_mantling(), "first person resumes on the deck")
 
 
 func test_jump_lets_go() -> void:

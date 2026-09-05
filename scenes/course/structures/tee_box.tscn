@@ -1,0 +1,34 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="PackedScene" uid="uid://bcjd3mt2o6imu" path="res://assets/obstacles/platform_large.glb" id="1_platform_large"]
+[ext_resource type="PackedScene" uid="uid://bj6b4xmphkxm5" path="res://assets/obstacles/steps_small.glb" id="2_steps_small"]
+[ext_resource type="PackedScene" uid="uid://buohnciv1ie58" path="res://assets/obstacles/wall_small.glb" id="3_wall_small"]
+[ext_resource type="PackedScene" uid="uid://bvywikjp6p81e" path="res://assets/obstacles/pillar_extra_small.glb" id="4_pillar_extra_small"]
+[ext_resource type="PackedScene" uid="uid://doccqy0gay68w" path="res://assets/obstacles/cube_extra_small.glb" id="5_cube_extra_small"]
+[ext_resource type="PackedScene" uid="uid://curknt1wmtk4h" path="res://assets/obstacles/ramp_extra_small.glb" id="6_ramp_extra_small"]
+
+[node name="TeeBox" type="Node3D"]
+
+[node name="platform_large" parent="." instance=ExtResource("1_platform_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.35, 0)
+
+[node name="steps_small" parent="." instance=ExtResource("2_steps_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.7, 0, -1.35)
+
+[node name="wall_small" parent="." instance=ExtResource("3_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.35, 0)
+
+[node name="wall_small2" parent="." instance=ExtResource("3_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.35, -5.4)
+
+[node name="pillar_extra_small" parent="." instance=ExtResource("4_pillar_extra_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.7, 0)
+
+[node name="pillar_extra_small2" parent="." instance=ExtResource("4_pillar_extra_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.4, 2.7, 0)
+
+[node name="cube_extra_small" parent="." instance=ExtResource("5_cube_extra_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.7, 2.7, -2.7)
+
+[node name="ramp_extra_small" parent="." instance=ExtResource("6_ramp_extra_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.75, 1.35, -2.7)

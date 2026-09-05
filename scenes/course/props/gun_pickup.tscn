@@ -1,0 +1,8 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/pickups/gun_pickup.gd" id="1_gun"]
+[ext_resource type="Resource" path="res://resources/weapons/rocket.tres" id="2_rocket"]
+
+[node name="GunPickup" type="Area3D"]
+script = ExtResource("1_gun")
+stats = ExtResource("2_rocket")

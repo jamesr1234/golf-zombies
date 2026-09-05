@@ -13,7 +13,7 @@ signal hole_completed(index: int, strokes: int)
 signal course_completed()
 signal money_changed(money: int)
 
-const HOLE_COUNT := 9
+const HOLE_COUNT := 12
 const MAX_OVER_PAR := 2
 const HOLE_SECONDS := 120.0
 ## Finishing with the full two minutes left pays this; each leftover second is
@@ -36,8 +36,12 @@ var strokes := 0
 var money := 0
 ## Shared deployable stock. Survives hole changes; placed forts do not.
 var barrier_charges := 0
+## Leaning ladders you drop on a wall. Charges keep; placed ladders do not.
+var ladder_charges := 0
 ## One mech per round. The placed suit lasts only the hole it was bought on.
 var mech_bought := false
+## Wings you jump off a drop with. One buy, then both players keep them.
+var glide_bought := false
 var club_id := ClubKit.STARTER_ID
 ## Added onto the next hole's clock, then cleared.
 var bonus_seconds := 0
@@ -156,6 +160,19 @@ func try_place_barrier() -> bool:
 	if barrier_charges <= 0:
 		return false
 	barrier_charges -= 1
+	return true
+
+
+func add_ladder_charges(amount: int) -> void:
+	if amount <= 0:
+		return
+	ladder_charges += amount
+
+
+func try_place_ladder() -> bool:
+	if ladder_charges <= 0:
+		return false
+	ladder_charges -= 1
 	return true
 
 

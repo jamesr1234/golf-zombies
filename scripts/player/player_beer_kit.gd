@@ -75,13 +75,19 @@ func is_holding(player: Player) -> bool:
 func cycle_held(player: Player, step := 1) -> void:
 	if step == 0:
 		return
+	if player.mine_kit.handle_cycle(player, step):
+		return
 	if is_holding(player):
 		player.holding_beer = false
 		Sfx.play("weapon_swap", player)
-		if step > 0:
+		if step > 0 and player.weapon.has_weapon():
 			player.weapon.index = 0
 		return
 	if player.buzz.held > 0:
+		if not player.weapon.has_weapon():
+			player.holding_beer = true
+			Sfx.play("weapon_swap", player)
+			return
 		if step > 0 and player.weapon.index == player.weapon.loadout.size() - 1:
 			player.holding_beer = true
 			Sfx.play("weapon_swap", player)

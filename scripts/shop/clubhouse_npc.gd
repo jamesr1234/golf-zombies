@@ -40,6 +40,8 @@ func can_use(who: Node3D) -> bool:
 	if who == null or not is_inside_tree():
 		return false
 	var offset := who.global_position - global_position
+	if not ClubhouseBuild.same_story(who.global_position, global_position):
+		return false
 	offset.y = 0.0
 	return offset.length() <= USE_RANGE
 

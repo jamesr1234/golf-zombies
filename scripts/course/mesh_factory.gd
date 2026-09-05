@@ -128,16 +128,22 @@ static func box_body(
 static func cylinder_body(
 	radius: float, height: float, color: Color, layer: int, emission := 0.0
 ) -> StaticBody3D:
+	return taper_body(radius, radius, height, color, layer, emission)
+
+
+static func taper_body(
+	bottom: float, top: float, height: float, color: Color, layer: int, emission := 0.0
+) -> StaticBody3D:
 	var body := StaticBody3D.new()
 	body.collision_layer = layer
 	body.collision_mask = 0
 	var shape := CollisionShape3D.new()
 	var cylinder_shape := CylinderShape3D.new()
-	cylinder_shape.radius = radius
+	cylinder_shape.radius = maxf(bottom, top)
 	cylinder_shape.height = height
 	shape.shape = cylinder_shape
 	body.add_child(shape)
-	body.add_child(cylinder(radius, height, color, emission))
+	body.add_child(taper(bottom, top, height, color, emission))
 	return body
 
 

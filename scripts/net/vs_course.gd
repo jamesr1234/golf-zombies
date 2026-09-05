@@ -33,7 +33,7 @@ func rebuild(index: int, seed: int) -> HoleData:
 		hole_root.remove_child(hole_node)
 		hole_node.queue_free()
 		hole_node = null
-	hole = HoleGenerator.generate(index, seed)
+	hole = HoleStore.layout(index, seed)
 	hole_node = HoleBuilder.build(hole)
 	hole_root.add_child(hole_node)
 	HoleBuilder.bake_navigation(hole_node)
@@ -69,7 +69,8 @@ func player_pose(seat: int, count: int) -> Dictionary:
 	var forward := along_hole()
 	var lateral := forward.cross(Vector3.UP).normalized()
 	var yaw := rad_to_deg(atan2(-forward.x, -forward.z))
-	var spot := hole.practice_tee + forward * 1.8 + lateral * tee_offset(seat, n)
+	var origin := hole.cup if ArenaHole.applies(hole) else hole.practice_tee
+	var spot := origin + forward * 1.8 + lateral * tee_offset(seat, n)
 	return {"at": hole.lift(spot) + Vector3.UP * 0.2, "yaw": yaw}
 
 
@@ -132,6 +133,9 @@ func place_carts(carts: Array[GolfCart]) -> void:
 		var slot := cart_slot(carts[i], i)
 		var spot := cart_spot(origin, forward, lateral, slot, CART_BACK)
 		carts[i].place_at(hole.lift(spot) + Vector3.UP * 0.4, yaw)
+	var lot := get_parent().get_node_or_null("VehicleLot") as VehicleLot
+	if lot != null and not carts.is_empty():
+		lot.park_with(carts[0])
 
 
 ## Two left and two right per row. Inner pair sits at CART_SIDE so nothing
@@ -323,6 +327,7 @@ static func cart_index_for_seat(seat: int) -> int:
 func _discard_clubhouse() -> void:
 	_clubhouse_wait = -1.0
 	if clubhouse != null and is_instance_valid(clubhouse):
+		PokerTable.stand_everyone(clubhouse.get_tree())
 		clubhouse.queue_free()
 	clubhouse = null
 	shop = null
@@ -400,6 +405,7 @@ func close_shop(players: Array[Player]) -> void:
 
 func leave_to_prep(players: Array[Player]) -> void:
 	if clubhouse != null and is_instance_valid(clubhouse):
+		PokerTable.stand_everyone(clubhouse.get_tree())
 		clubhouse.open_exit()
 	shop = null
 	for player in players:

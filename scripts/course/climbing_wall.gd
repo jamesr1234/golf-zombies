@@ -1,20 +1,22 @@
 @tool
 class_name ClimbingWall
 extends StaticBody3D
-## Warm-up wall beside hole 1's practice tee. Holds sit on the front face;
-## L1 and R1 plant a hand on the nearest one to the aimed spot.
+## Climbable face. Holds sit on the front; L1 and R1 plant a hand on the
+## nearest one to the aimed spot.
 
 const WIDTH := 18.0
 const HEIGHT := 24.0
 const THICK := 0.7
-const TEE_SIDE := 14.0
-const TEE_ALONG := 13.0
 const COLS := 10
 const ROWS := 18
 const REACH := 2.25
 const LATCH_DEPTH := 1.7
 const HOLD_R := 0.13
 const FIND := 18.0
+const HOLD_COLOR := Palette.CYAN
+const DECK_DEPTH := 3.8
+const DECK_THICK := 0.42
+const DECK_Z := 0.85
 
 var _w := WIDTH
 var _h := HEIGHT
@@ -49,24 +51,12 @@ func to_prop() -> Dictionary:
 	}
 
 
-static func at_practice(practice_tee: Vector3, heading_deg: float) -> Dictionary:
-	var forward := Vector3.FORWARD.rotated(Vector3.UP, deg_to_rad(heading_deg))
-	var right := forward.cross(Vector3.UP).normalized()
-	var at := practice_tee + right * TEE_SIDE + forward * TEE_ALONG
-	var toward := -right
-	return {
-		"kind": "climb_wall",
-		"position": at,
-		"size": Vector3(WIDTH, HEIGHT, THICK),
-		"yaw": rad_to_deg(atan2(-toward.x, -toward.z)),
-	}
-
-
 static func nearest(who: Node3D) -> ClimbingWall:
 	var best: ClimbingWall
 	var best_d := INF
 	if who == null or not who.is_inside_tree():
 		return null
+	ClimbLadder.adopt(who.get_tree())
 	for node in who.get_tree().get_nodes_in_group("climb_walls"):
 		var wall := node as ClimbingWall
 		if wall == null:
@@ -94,22 +84,26 @@ func _build() -> void:
 	)
 	MeshFactory.apply_grid(slab, Surface.LOOK[Surface.Type.ROUGH])
 	add_child(slab)
-	var ledge := MeshFactory.box_body(
-		Vector3(_w + 0.8, 0.32, 1.8), Palette.CYAN, Layers.WORLD, true, Palette.GLOW_SOFT
+	var deck := MeshFactory.box_body(
+		Vector3(_w + 1.2, DECK_THICK, DECK_DEPTH), Palette.CYAN, Layers.WORLD, true, Palette.GLOW_SOFT
 	)
-	ledge.position = Vector3(0.0, _h * 0.5 + 0.12, -0.4)
-	add_child(ledge)
+	deck.name = "Deck"
+	deck.position = Vector3(0.0, _h * 0.5 + DECK_THICK * 0.5, DECK_Z)
+	add_child(deck)
+	var hold_i := 0
 	for hold in hold_locals():
-		var jug := MeshFactory.box(Vector3(0.22, 0.16, 0.18), Palette.MAGENTA, Palette.GLOW_MEDIUM)
+		var jug := MeshFactory.box(Vector3(0.22, 0.16, 0.18), HOLD_COLOR, Palette.GLOW_MEDIUM)
+		jug.name = "Hold_%d" % hold_i
 		jug.position = hold
 		add_child(jug)
+		hold_i += 1
 	var sign := Label3D.new()
 	sign.text = "CLIMB"
 	sign.font_size = 72
-	sign.modulate = Palette.MAGENTA
+	sign.modulate = HOLD_COLOR
 	sign.outline_size = 12
 	sign.outline_modulate = Palette.NIGHT
-	sign.position = Vector3(0.0, _h * 0.5 + 1.0, -0.5)
+	sign.position = Vector3(0.0, _h * 0.5 + DECK_THICK + 0.7, DECK_Z)
 	add_child(sign)
 
 
@@ -123,7 +117,7 @@ func hold_locals() -> Array[Vector3]:
 			var x := lerpf(-span_x, span_x, float(col) / float(_cols - 1))
 			if row % 2 == 1:
 				x = clampf(x + gap * 0.4, -span_x, span_x)
-			var y := lerpf(-_h * 0.47, _h * 0.47, float(row) / float(_rows - 1))
+			var y := lerpf(-_h * 0.47, _h * 0.5 - 0.04, float(row) / float(_rows - 1))
 			spots.append(Vector3(x, y, face_z))
 	return spots
 
@@ -175,7 +169,7 @@ func aim_from(shoulder: Vector3, stick: Vector2, reach := REACH) -> Vector3:
 		-_t * 0.5 - 0.1
 	)
 	dest.x = clampf(dest.x, -_w * 0.48, _w * 0.48)
-	dest.y = clampf(dest.y, -_h * 0.48, _h * 0.48)
+	dest.y = clampf(dest.y, -_h * 0.48, _h * 0.5)
 	var offset := Vector3(dest.x - local.x, dest.y - local.y, 0.0)
 	if offset.length() > reach:
 		offset = offset.limit_length(reach)
@@ -203,5 +197,12 @@ func top_y() -> float:
 	return global_position.y + _h * 0.5
 
 
-func ledge_stand() -> Vector3:
-	return to_global(Vector3(0.0, _h * 0.5 + 0.35, -0.2))
+func at_lip(point: Vector3) -> bool:
+	return point != Vector3.INF and to_local(point).y >= _h * 0.5 - 0.08
+
+
+func ledge_stand(who: Node3D = null) -> Vector3:
+	var x := 0.0
+	if who != null:
+		x = clampf(to_local(who.global_position).x, -_w * 0.42, _w * 0.42)
+	return to_global(Vector3(x, _h * 0.5 + DECK_THICK + 0.08, DECK_Z))

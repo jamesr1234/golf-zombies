@@ -1,0 +1,11 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/course/zipline.gd" id="1_zip"]
+
+[node name="Zipline" type="Node3D"]
+script = ExtResource("1_zip")
+
+[node name="Start" type="Marker3D" parent="."]
+
+[node name="End" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.1, -4.05, 0)

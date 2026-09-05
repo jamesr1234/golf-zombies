@@ -101,7 +101,7 @@ func tier() -> int:
 
 
 func scaled_carry() -> float:
-	return Shot.max_carry() * speed_scale
+	return Shot.max_carry() * Shot.DISTANCE_SCALE * speed_scale
 
 
 ## A copy with extra swing speed, used for a drunk drive without mutating the kit.

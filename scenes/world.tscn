@@ -85,4 +85,7 @@ script = ExtResource("4_spawn")
 
 [node name="MatchFlow" type="Node" parent="." unique_id=1269270891]
 script = ExtResource("5_flow")
+starting_hole = 1
+start_in_clubhouse = true
+starting_money = 500
 cpu_drives_at_start = true

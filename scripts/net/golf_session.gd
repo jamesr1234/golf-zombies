@@ -91,6 +91,8 @@ func _publish_aim() -> void:
 
 
 func _finish_local_swing() -> void:
+	if meter.sweet:
+		_celebrate_sweet()
 	_lock_lie()
 	meter.reset()
 	_arrow.visible = false

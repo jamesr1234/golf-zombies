@@ -3,9 +3,14 @@ extends Object
 ## Layout of the walk-in clubhouse. Shell, decor, counters and regulars are
 ## assembled here so the Clubhouse node only has to own the result.
 
+const _Upper := preload("res://scripts/shop/clubhouse_upper.gd")
+const _Elevator := preload("res://scripts/shop/clubhouse_elevator.gd")
+
 const WIDTH := 36.0
 const DEPTH := 32.0
 const WALL := 5.4
+const STORY_H := 5.4
+const SLAB := 0.28
 const THICK := 0.34
 const DOOR := 3.4
 const OPEN := 3.2
@@ -37,10 +42,26 @@ static func assemble(host: Clubhouse) -> void:
 	_lights(host)
 	_stations(host)
 	_lounge(host)
+	_Upper.build(host)
+	host.elevator = _Elevator.create()
+	host.add_child(host.elevator)
 
 
 static func floor_y(raised: bool) -> float:
 	return PLAZA_TOP + (RAISE if raised else 0.0)
+
+
+## Walkable Y of story `n`. Story 0 is the raised hall; later stories sit on the
+## wall tops so a third floor is `story_floor_y(2)`.
+static func story_floor_y(story: int) -> float:
+	if story <= 0:
+		return floor_y(true)
+	return STORY_H * float(story)
+
+
+## Counters and regulars only answer on their own floor.
+static func same_story(a: Vector3, b: Vector3) -> bool:
+	return absf(a.y - b.y) < STORY_H * 0.5
 
 
 static func heading_xz(forward: Vector3) -> Vector3:
@@ -126,7 +147,7 @@ static func _lights(host: Clubhouse) -> void:
 	for at in [
 		Vector3(0.0, 3.6, 9.0), Vector3(-12.0, 3.2, 9.0), Vector3(12.0, 3.2, 9.0),
 		Vector3(0.0, 4.2, -1.0), Vector3(-12.0, 4.0, -1.0), Vector3(12.0, 4.0, -1.0),
-		Vector3(0.0, 3.8, -11.0), Vector3(-12.0, 4.0, -11.0)
+		Vector3(0.0, 3.8, -11.0), Vector3(-12.0, 4.0, -11.0), Vector3(12.0, 4.0, -11.0)
 	]:
 		var lamp := OmniLight3D.new()
 		lamp.light_color = Color(1.0, 0.62, 0.28)

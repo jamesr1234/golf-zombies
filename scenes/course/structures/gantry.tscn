@@ -1,0 +1,35 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="PackedScene" uid="uid://bqv1kqkcvufhw" path="res://assets/obstacles/pillar_extra_large.glb" id="1_pillar_extra_large"]
+[ext_resource type="PackedScene" uid="uid://codfdqqkmltet" path="res://assets/obstacles/platform_extra_large.glb" id="2_platform_extra_large"]
+[ext_resource type="PackedScene" uid="uid://bcjd3mt2o6imu" path="res://assets/obstacles/platform_large.glb" id="3_platform_large"]
+[ext_resource type="PackedScene" uid="uid://buohnciv1ie58" path="res://assets/obstacles/wall_small.glb" id="4_wall_small"]
+[ext_resource type="PackedScene" uid="uid://bj7y0ltyoxlo3" path="res://assets/obstacles/ladder_extra_large.glb" id="5_ladder_extra_large"]
+[ext_resource type="PackedScene" uid="uid://cbbs48ffxgq1a" path="res://assets/obstacles/cube_small.glb" id="6_cube_small"]
+[ext_resource type="PackedScene" uid="uid://bgujfxi41idh4" path="res://assets/obstacles/ramp_small.glb" id="7_ramp_small"]
+
+[node name="Gantry" type="Node3D"]
+
+[node name="pillar_extra_large" parent="." instance=ExtResource("1_pillar_extra_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="pillar_extra_large2" parent="." instance=ExtResource("1_pillar_extra_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.8, 0, 0)
+
+[node name="platform_extra_large" parent="." instance=ExtResource("2_platform_extra_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.35, 9.45, 0)
+
+[node name="platform_large" parent="." instance=ExtResource("3_platform_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.35, 9.45, -9.45)
+
+[node name="wall_small" parent="." instance=ExtResource("4_wall_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.35, 10.8, 0)
+
+[node name="ladder_extra_large" parent="." instance=ExtResource("5_ladder_extra_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.15, 0, -4.05)
+
+[node name="cube_small" parent="." instance=ExtResource("6_cube_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.4, 10.8, -4.05)
+
+[node name="ramp_small" parent="." instance=ExtResource("7_ramp_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.8, 9.45, -10.8)

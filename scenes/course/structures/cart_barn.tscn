@@ -1,0 +1,30 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="PackedScene" uid="uid://bifjp6glqcw13" path="res://assets/obstacles/arch_extra_large.glb" id="1_arch_extra_large"]
+[ext_resource type="PackedScene" uid="uid://d1e3ipu2gfvvi" path="res://assets/obstacles/wall_extra_large.glb" id="2_wall_extra_large"]
+[ext_resource type="PackedScene" uid="uid://codfdqqkmltet" path="res://assets/obstacles/platform_extra_large.glb" id="3_platform_extra_large"]
+[ext_resource type="PackedScene" uid="uid://c372486rn6jcn" path="res://assets/obstacles/cube_medium.glb" id="4_cube_medium"]
+[ext_resource type="PackedScene" uid="uid://c5ug3qe6erff8" path="res://assets/obstacles/ladder_large.glb" id="5_ladder_large"]
+
+[node name="CartBarn" type="Node3D"]
+
+[node name="arch_extra_large" parent="." instance=ExtResource("1_arch_extra_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.35, 0, 0)
+
+[node name="arch_extra_large2" parent="." instance=ExtResource("1_arch_extra_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.35, 0, -10.8)
+
+[node name="wall_extra_large" parent="." instance=ExtResource("2_wall_extra_large")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 0, 0, 0)
+
+[node name="wall_extra_large2" parent="." instance=ExtResource("2_wall_extra_large")]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 13.5, 0, 0)
+
+[node name="platform_extra_large" parent="." instance=ExtResource("3_platform_extra_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.35, 10.8, 0)
+
+[node name="cube_medium" parent="." instance=ExtResource("4_cube_medium")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 12.15, -4.05)
+
+[node name="ladder_large" parent="." instance=ExtResource("5_ladder_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14.85, 0, -5.4)

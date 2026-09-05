@@ -1,0 +1,31 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="PackedScene" uid="uid://cp185o3uqir2p" path="res://assets/obstacles/arch_large.glb" id="1_arch_large"]
+[ext_resource type="PackedScene" uid="uid://pitdo3yy0w2j" path="res://assets/obstacles/pillar_large.glb" id="2_pillar_large"]
+[ext_resource type="PackedScene" uid="uid://doccqy0gay68w" path="res://assets/obstacles/cube_extra_small.glb" id="3_cube_extra_small"]
+
+[node name="Arcade" type="Node3D"]
+
+[node name="arch_large" parent="." instance=ExtResource("1_arch_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="arch_large2" parent="." instance=ExtResource("1_arch_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.45, 0, 0)
+
+[node name="arch_large3" parent="." instance=ExtResource("1_arch_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18.9, 0, 0)
+
+[node name="pillar_large" parent="." instance=ExtResource("2_pillar_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="pillar_large2" parent="." instance=ExtResource("2_pillar_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.45, 0, 0)
+
+[node name="pillar_large3" parent="." instance=ExtResource("2_pillar_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18.9, 0, 0)
+
+[node name="pillar_large4" parent="." instance=ExtResource("2_pillar_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28.35, 0, 0)
+
+[node name="cube_extra_small" parent="." instance=ExtResource("3_cube_extra_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.5, 8.1, 0)

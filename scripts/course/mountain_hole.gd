@@ -14,7 +14,7 @@ const RAMP_ANGLE := 22.0
 
 
 static func applies(data: HoleData) -> bool:
-	return data != null and data.index == 2
+	return data != null and data.custom == null and data.index == 2
 
 
 static func layout(data: HoleData, _headings: Array[float], width: float) -> void:
@@ -114,7 +114,7 @@ static func covers(data: HoleData, spot: Vector3, extra := 4.0) -> bool:
 
 
 static func _strip_half(data: HoleData) -> float:
-	return HoleGenerator.fairway_width(data.par) * 0.5
+	return HoleGenerator.fairway_width(data.par, data.index) * 0.5
 
 
 static func _wall_t(data: HoleData) -> float:

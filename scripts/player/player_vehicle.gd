@@ -5,8 +5,11 @@ extends RefCounted
 
 
 func enter_ride(player: Player) -> void:
+	player.slide.cancel(player)
+	player.glide.cancel(player)
 	player._drop_climb()
 	player._drop_grapple()
+	player._drop_zipline()
 	player._cancel_place()
 	player.state = Player.State.RIDING
 	player.velocity = Vector3.ZERO
@@ -23,8 +26,11 @@ func exit_ride(player: Player) -> void:
 
 
 func enter_mech(player: Player, suit: MechSuit) -> void:
+	player.slide.cancel(player)
+	player.glide.cancel(player)
 	player._drop_climb()
 	player._drop_grapple()
+	player._drop_zipline()
 	player._cancel_place()
 	player.mech = suit
 	player.state = Player.State.MECH
@@ -72,8 +78,11 @@ func sit_as_passenger(player: Player, sit_at: Vector3) -> void:
 
 
 func enter_golf(player: Player) -> void:
+	player.slide.cancel(player)
+	player.glide.cancel(player)
 	player._drop_climb()
 	player._drop_grapple()
+	player._drop_zipline()
 	player._cancel_place()
 	player.state = Player.State.GOLFING
 	player.velocity = Vector3.ZERO
@@ -94,7 +103,26 @@ func exit_golf(player: Player) -> void:
 func active_cart(player: Player) -> GolfCart:
 	if player.flow != null and player.flow.has_method("cart_for"):
 		return player.flow.cart_for(player)
-	return player.cart
+	if player.cart != null and player.cart.is_riding(player):
+		return player.cart
+	var near := _nearest_cart(player)
+	return near if near != null else player.cart
+
+
+func _nearest_cart(player: Player) -> GolfCart:
+	if player.get_tree() == null:
+		return null
+	var best: GolfCart
+	var best_d := INF
+	for node in player.get_tree().get_nodes_in_group("golf_carts"):
+		var cart := node as GolfCart
+		if cart == null:
+			continue
+		var d := player.global_position.distance_to(cart.global_position)
+		if d < best_d:
+			best_d = d
+			best = cart
+	return best
 
 
 func ready_mech(player: Player) -> MechSuit:
@@ -130,10 +158,11 @@ func spawn_at(player: Player, position: Vector3, facing_yaw: float) -> void:
 	player.swim.underwater = false
 	if (
 		player.state == Player.State.SWIMMING or player.state == Player.State.CLIMBING
-		or player.state == Player.State.GRAPPLING
+		or player.state == Player.State.GRAPPLING or player.state == Player.State.ZIPLINING
 	):
 		player._drop_climb()
 		player._drop_grapple()
+		player._drop_zipline()
 		player.state = Player.State.NORMAL
 	if player.is_milling():
 		player.mill_desk.release(player)

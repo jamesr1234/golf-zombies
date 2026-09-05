@@ -26,7 +26,9 @@ func before_each() -> void:
 	players.append(world.get_node("Players/Player2") as Player)
 	flow.starting_hole = 1
 	flow.start_in_clubhouse = false
+	flow.starting_money = 0
 	flow.start_on_cart_path = false
+	flow.cpu_drives_at_start = false
 	flow.begin()
 	# Most tests are about a hole in progress, so warm-up is called on straight
 	# away. The tests below that cover warm-up put the hole back into it.
@@ -46,6 +48,15 @@ func test_first_hole_is_built_with_navigation() -> void:
 		if child is NavigationRegion3D:
 			has_region = true
 	assert_true(has_region, "zombies need a navigation region")
+	var mechs := world.get_tree().get_nodes_in_group("mechs")
+	assert_eq(mechs.size(), 1, "hole 1 plants the parked suit on the mill pad")
+	assert_false((mechs[0] as MechSuit).closed)
+
+
+func test_later_holes_do_not_keep_the_suit() -> void:
+	flow.start_hole(2)
+	await wait_physics_frames(2)
+	assert_eq(world.get_tree().get_nodes_in_group("mechs").size(), 0)
 
 
 func test_the_pin_throws_a_beam_into_the_sky() -> void:
@@ -94,7 +105,9 @@ func test_play_opens_on_hole_one() -> void:
 	add_child_autofree(extra)
 	var other := extra.get_node("MatchFlow") as MatchFlow
 	assert_eq(other.starting_hole, 1)
+	other.starting_hole = 1
 	other.start_in_clubhouse = false
+	other.starting_money = 0
 	other.start_on_cart_path = false
 	other.begin()
 	await wait_physics_frames(6)
@@ -111,6 +124,7 @@ func test_play_can_open_on_hole_nine() -> void:
 	assert_eq(other.starting_hole, 1)
 	other.starting_hole = 9
 	other.start_in_clubhouse = false
+	other.starting_money = 0
 	other.start_on_cart_path = false
 	other.begin()
 	await wait_physics_frames(6)
@@ -126,6 +140,7 @@ func test_playtest_can_open_inside_the_clubhouse() -> void:
 	var who := extra.get_node("Players/Player1") as Player
 	other.starting_hole = 1
 	other.start_in_clubhouse = true
+	other.starting_money = 0
 	other.start_on_cart_path = false
 	other.begin()
 	await wait_physics_frames(6)
@@ -145,6 +160,20 @@ func test_playtest_can_open_inside_the_clubhouse() -> void:
 	assert_true(other.clubhouse.exit_open)
 
 
+func test_playtest_can_start_with_money() -> void:
+	var extra := WORLD.instantiate()
+	add_child_autofree(extra)
+	var other := extra.get_node("MatchFlow") as MatchFlow
+	other.start_in_clubhouse = true
+	other.starting_hole = 1
+	other.starting_money = 500
+	other.start_on_cart_path = false
+	other.begin()
+	await wait_physics_frames(6)
+	assert_eq(other.score.money, 500, "the wallet is funded before you shop")
+	assert_true(other.in_clubhouse())
+
+
 func test_playtest_can_open_on_the_cart_path() -> void:
 	var extra := WORLD.instantiate()
 	add_child_autofree(extra)
@@ -153,6 +182,8 @@ func test_playtest_can_open_on_the_cart_path() -> void:
 	var who := extra.get_node("Players/Player1") as Player
 	var buddy := extra.get_node("Players/Player2") as Player
 	other.start_on_cart_path = true
+	other.starting_hole = 1
+	other.starting_money = 0
 	other.begin()
 	await wait_physics_frames(6)
 	assert_eq(other.phase, MatchFlow.Phase.TRANSIT)
@@ -182,18 +213,17 @@ func test_playtest_cpu_drives_at_start_on_hole_one() -> void:
 	var ride := extra.get_node("GolfCart") as GolfCart
 	cpu.possess_cpu()
 	other.cpu_drives_at_start = true
+	other.starting_hole = 1
 	other.start_in_clubhouse = false
+	other.starting_money = 0
 	other.start_on_cart_path = false
 	other.begin()
 	await wait_physics_frames(6)
 	assert_eq(other.phase, MatchFlow.Phase.PREP)
 	assert_eq(other.score.hole_index, 0)
-	assert_eq(ride.driver, cpu, "the buddy drives so you can grapple on")
+	assert_eq(ride.passenger, cpu, "the buddy rides shotgun")
+	assert_neq(ride.driver, cpu, "the buddy never takes the wheel")
 	assert_false(ride.is_riding(human), "you stay on foot to test the hook")
-	assert_gt(
-		Vector2(ride.velocity.x, ride.velocity.z).length(), 0.5,
-		"the cart should already be rolling"
-	)
 
 
 func test_flying_into_the_trees_puts_the_cart_back_on_the_path() -> void:
@@ -202,6 +232,8 @@ func test_flying_into_the_trees_puts_the_cart_back_on_the_path() -> void:
 	var other := extra.get_node("MatchFlow") as MatchFlow
 	var ride := extra.get_node("GolfCart") as GolfCart
 	other.start_on_cart_path = true
+	other.starting_hole = 1
+	other.starting_money = 0
 	other.begin()
 	await wait_physics_frames(6)
 	var path := other.cart_path
@@ -213,7 +245,7 @@ func test_flying_into_the_trees_puts_the_cart_back_on_the_path() -> void:
 	var crash_at := mid + right * (CartPath.PATH_WIDTH * 0.5 + 8.0)
 	var crash_along := CartPathTrack.along(path.centerline, crash_at)
 	ride.recover_at(crash_at, 0.0)
-	await wait_physics_frames(3)
+	path.tick_crash(ride, 0.05)
 	assert_eq(ride.drive_speed, 0.0, "you start again from a stop")
 	assert_lt(
 		Vector2(ride.velocity.x, ride.velocity.z).length(), 1.5,
@@ -225,7 +257,7 @@ func test_flying_into_the_trees_puts_the_cart_back_on_the_path() -> void:
 	)
 	assert_almost_eq(
 		CartPathTrack.along(path.centerline, ride.global_position),
-		crash_along - CartPath.CRASH_BACK,
+		crash_along,
 		5.0
 	)
 
@@ -298,8 +330,7 @@ func test_stepping_onto_the_tee_starts_the_hole() -> void:
 	assert_eq(flow.phase, MatchFlow.Phase.PLAYING)
 	assert_false(flow.can_start_play(players[0]), "the hole is already on")
 	assert_eq(ball.current_surface(), Surface.Type.TEE)
-	await wait_seconds(SpawnDirector.FIRST_SPAWN_DELAY + 1.5)
-	assert_gt(flow.spawner.live_count(), 0, "readying up is what lets them in")
+	assert_eq(flow.spawner.live_count(), 0, "the swarm waits for overlay spawn markers")
 
 
 func test_the_hole_clock_counts_down() -> void:
@@ -679,14 +710,14 @@ func test_both_players_down_ends_the_run() -> void:
 
 
 func test_zombies_arrive_while_the_hole_is_being_played() -> void:
-	flow.spawner.begin_hole(0, flow.hole.spawn_points)
+	_begin_hole_swarm()
 	assert_gt(flow.spawner.cap(), 0)
 	await wait_seconds(SpawnDirector.FIRST_SPAWN_DELAY + 1.5)
-	assert_gt(flow.spawner.live_count(), 0, "the hole should be under attack")
+	assert_gt(flow.spawner.live_count(), 0, "authored spawn points still feed the hole")
 
 
 func test_a_shot_zombie_blinks_white_and_gets_knocked_back() -> void:
-	flow.spawner.begin_hole(0, flow.hole.spawn_points)
+	_begin_hole_swarm()
 	await wait_seconds(SpawnDirector.FIRST_SPAWN_DELAY + 1.5)
 	var zombie := get_tree().get_first_node_in_group("zombies") as Zombie
 	assert_not_null(zombie, "need something to shoot at")
@@ -712,8 +743,10 @@ func test_a_shot_zombie_blinks_white_and_gets_knocked_back() -> void:
 	assert_false(zombie.is_flashing(), "the flash is a blink, not a paint job")
 
 
-func test_both_players_carry_a_raygun_until_they_pick_up_the_club() -> void:
+func test_both_players_start_with_the_full_stash() -> void:
 	for player in players:
+		assert_eq(player.weapon.loadout.size(), Weapon.STARTER_GUNS.size())
+		assert_true(player.weapon.has_weapon())
 		assert_true(player.raygun.visible)
 		assert_gt(player.raygun.get_child_count(), 0, "the gun should have a model")
 	_stand_by_ball(players[0])
@@ -849,6 +882,7 @@ func test_the_driver_can_pull_the_camera_out_behind_the_cart() -> void:
 
 
 func test_the_passenger_can_still_look_around() -> void:
+	assert_true(players[0].weapon.has_weapon())
 	_stand_by_cart(players[0])
 	_stand_by_cart(players[1])
 	cart.board(players[1])
@@ -964,7 +998,7 @@ func test_a_new_hole_turns_the_riders_out() -> void:
 
 
 func test_driving_into_a_zombie_runs_it_over() -> void:
-	flow.spawner.begin_hole(0, flow.hole.spawn_points)
+	_begin_hole_swarm()
 	await wait_seconds(SpawnDirector.FIRST_SPAWN_DELAY + 1.5)
 	var zombie := get_tree().get_first_node_in_group("zombies") as Zombie
 	assert_not_null(zombie, "need something to run over")
@@ -990,7 +1024,7 @@ func test_the_live_hole_has_hills() -> void:
 
 
 func test_killing_a_zombie_pays_its_bounty() -> void:
-	flow.spawner.begin_hole(0, flow.hole.spawn_points)
+	_begin_hole_swarm()
 	await wait_seconds(SpawnDirector.FIRST_SPAWN_DELAY + 1.5)
 	var zombie := get_tree().get_first_node_in_group("zombies") as Zombie
 	assert_not_null(zombie)
@@ -1002,7 +1036,7 @@ func test_killing_a_zombie_pays_its_bounty() -> void:
 
 
 func test_shooting_a_zombie_dead_explodes() -> void:
-	flow.spawner.begin_hole(0, flow.hole.spawn_points)
+	_begin_hole_swarm()
 	await wait_seconds(SpawnDirector.FIRST_SPAWN_DELAY + 1.5)
 	var zombie := get_tree().get_first_node_in_group("zombies") as Zombie
 	assert_not_null(zombie)
@@ -1015,7 +1049,7 @@ func test_shooting_a_zombie_dead_explodes() -> void:
 
 
 func test_a_melee_kill_throws_them_then_explodes_in_the_sky() -> void:
-	flow.spawner.begin_hole(0, flow.hole.spawn_points)
+	_begin_hole_swarm()
 	await wait_seconds(SpawnDirector.FIRST_SPAWN_DELAY + 1.5)
 	var zombie := get_tree().get_first_node_in_group("zombies") as Zombie
 	assert_not_null(zombie)
@@ -1047,10 +1081,17 @@ func _stand_by_cart(player: Player) -> void:
 	player.global_position = cart.global_position + Vector3(0.0, 0.9, 2.0)
 
 
+func _begin_hole_swarm() -> void:
+	var along := flow.hole.cup - flow.hole.tee
+	along.y = 0.0
+	along = along.normalized()
+	var far := flow.hole.lift(flow.hole.tee + along * 80.0) + Vector3.UP * 0.2
+	flow.spawner.begin_hole(0, [far])
+
+
 func _steering_wheel() -> SteeringWheel:
-	for child in cart.get_children():
-		if child is SteeringWheel:
-			return child
+	for node in cart.find_children("*", "SteeringWheel", true, false):
+		return node as SteeringWheel
 	return null
 
 

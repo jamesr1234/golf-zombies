@@ -7,7 +7,6 @@ const FLARE_DRIVER: WeaponStats = preload("res://resources/weapons/flare_driver.
 const CART_NAILER: WeaponStats = preload("res://resources/weapons/cart_nailer.tres")
 const WARP_DOOR: WeaponStats = preload("res://resources/weapons/warp_door.tres")
 
-
 static func wear_by_id(item_id: String) -> Dictionary:
 	for item in apparel():
 		if String(item["id"]) == item_id:
@@ -77,7 +76,6 @@ static func weapons() -> Array[Dictionary]:
 		},
 	]
 
-
 static func items() -> Array[Dictionary]:
 	return [
 		{
@@ -89,20 +87,8 @@ static func items() -> Array[Dictionary]:
 			"info": "Two hex forts you drop with gear. Charges stack across holes.",
 		},
 		{
-			"id": "medkit", "name": "Medkit", "price": 50, "kind": "medkit",
-			"info": "Heals you to full. Does nothing if you are already there.",
-		},
-		{
-			"id": "revive", "name": "Revive Kit", "price": 90, "kind": "revive",
-			"info": "Next time you drop, you stand up on your own. If your partner is down here, it gets them up now.",
-		},
-		{
-			"id": "time_bonus", "name": "+30 Seconds", "price": 70, "kind": "time_bonus",
-			"info": "Adds thirty seconds to the next hole's clock.",
-		},
-		{
-			"id": "time_freeze", "name": "Clock Freeze", "price": 80, "kind": "time_freeze",
-			"info": "Freezes the next hole's clock for fifteen seconds.",
+			"id": "ladder", "name": "Lean Ladder", "price": Shop.LADDER_PRICE, "kind": "ladder",
+			"info": "One ladder you lean on a wall with gear. Walk in to climb instead of hopping blocks.",
 		},
 		{
 			"id": "mech", "name": "Mech Suit", "price": Shop.MECH_PRICE, "kind": "mech",

@@ -2,13 +2,17 @@ class_name HoleOverlay
 extends Object
 ## Authored props for one hole. Trees are not placed here; CourseTrees still
 ## plants those in code. Origin is the tee. Y is overwritten from the heightmap.
+## Marker3D nodes named ZombieSpawn (and ZombieSpawn2, …) add extra walker arrivals.
 
 const HOLE_DIR := "res://scenes/course/holes/"
 const PROP_DIR := "res://scenes/course/props/"
 const PREVIEW_NAME := "Preview"
 const PAD_NAME := "MechPad"
+const SPAWN_NAME := "ZombieSpawn"
 const _Box := preload("res://scripts/course/box_prop.gd")
 const _MillDesk := preload("res://scripts/course/windmill_control.gd")
+const _Escalator := preload("res://scripts/course/escalator.gd")
+const _GunPickup := preload("res://scripts/pickups/gun_pickup.gd")
 
 ## Skip attach while the editor is building a preview of this overlay.
 static var _suspend_attach := 0
@@ -46,6 +50,9 @@ static func harvest(data: HoleData) -> void:
 static func attach(host: Node3D, data: HoleData) -> void:
 	if _suspend_attach > 0:
 		return
+	if data.custom != null:
+		CustomOverlay.attach(host, data)
+		return
 	var packed := packed_for(data.index)
 	if packed == null:
 		return
@@ -58,7 +65,44 @@ static func attach(host: Node3D, data: HoleData) -> void:
 	apply_lifted(overlay, data)
 	strip_suits(overlay)
 	_strip_pads(overlay)
+	strip_spawns(overlay)
 	host.add_child(overlay)
+	# #region agent log
+	var _host_parent := host.get_parent()
+	var _ladder_n := 0
+	for _n in overlay.find_children("*", "Node3D", true, false):
+		if ClimbLadder.is_ladder(_n):
+			_ladder_n += 1
+	var _dbg := FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-c47b79.log", FileAccess.READ_WRITE)
+	if _dbg == null:
+		_dbg = FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-c47b79.log", FileAccess.WRITE)
+	else:
+		_dbg.seek_end()
+	if _dbg != null:
+		_dbg.store_line(JSON.stringify({
+			"sessionId": "c47b79",
+			"hypothesisId": "A",
+			"location": "hole_overlay.gd:attach",
+			"message": "overlay attached, before get_tree",
+			"data": {
+				"host": host.name,
+				"host_in_tree": host.is_inside_tree(),
+				"host_has_parent": _host_parent != null,
+				"parent_name": "" if _host_parent == null else _host_parent.name,
+				"parent_in_tree": _host_parent != null and _host_parent.is_inside_tree(),
+				"overlay_in_tree": overlay.is_inside_tree(),
+				"overlay_parent": "" if overlay.get_parent() == null else overlay.get_parent().name,
+				"ladder_count": _ladder_n,
+				"hole_index": data.index,
+			},
+			"timestamp": Time.get_ticks_msec(),
+		}))
+		_dbg.close()
+	# #endregion
+	if host.is_inside_tree():
+		ClimbLadder.adopt(host.get_tree())
+	_Escalator.adopt(overlay)
+	ObstacleLeds.adopt(overlay)
 
 
 ## Generated hole for the overlay editor. Does not nest the overlay scene inside
@@ -102,8 +146,9 @@ static func strip_suits(root: Node) -> int:
 		return 0
 	var stripped := 0
 	for node in root.find_children("*", "MechSuit", true, false):
-		node.free()
-		stripped += 1
+		if is_instance_valid(node):
+			node.free()
+			stripped += 1
 	return stripped
 
 
@@ -111,7 +156,19 @@ static func _strip_pads(root: Node) -> void:
 	if root == null:
 		return
 	for node in root.find_children(PAD_NAME, "", true, false):
-		node.free()
+		if is_instance_valid(node):
+			node.free()
+
+
+static func strip_spawns(root: Node) -> int:
+	if root == null:
+		return 0
+	var stripped := 0
+	for node in root.find_children("*", "Marker3D", true, false):
+		if _is_spawn_marker(node) and is_instance_valid(node):
+			node.free()
+			stripped += 1
+	return stripped
 
 
 static func _collect_pad(data: HoleData, node: Node3D) -> void:
@@ -121,11 +178,29 @@ static func _collect_pad(data: HoleData, node: Node3D) -> void:
 	data.mech_yaw = rad_to_deg(node.rotation.y)
 
 
+static func _is_spawn_marker(node: Node) -> bool:
+	return node is Marker3D and String(node.name).begins_with(SPAWN_NAME)
+
+
+static func _collect_spawn(data: HoleData, root: Node, node: Node3D) -> void:
+	if node == null:
+		return
+	if root is Node3D:
+		data.spawn_points.append((root as Node3D).to_local(node.global_position))
+	else:
+		data.spawn_points.append(node.position)
+
+
 static func _collect_node(data: HoleData, root: Node, node: Node) -> void:
 	if _is_preview(node):
 		return
 	if node is MechSuit or (node is Node3D and String(node.name) == PAD_NAME):
 		_collect_pad(data, node as Node3D)
+		return
+	if node is Maze or node.get_script() == _GunPickup:
+		return
+	if _is_spawn_marker(node):
+		_collect_spawn(data, root, node as Node3D)
 		return
 	if node is TreeProp:
 		return

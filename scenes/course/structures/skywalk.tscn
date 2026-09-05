@@ -1,0 +1,24 @@
+[gd_scene format=3 uid="uid://0qngkf6j2vlu"]
+
+[ext_resource type="PackedScene" uid="uid://bqv1kqkcvufhw" path="res://assets/obstacles/pillar_extra_large.glb" id="1_pillar_extra_large"]
+[ext_resource type="PackedScene" uid="uid://codfdqqkmltet" path="res://assets/obstacles/platform_extra_large.glb" id="2_platform_extra_large"]
+[ext_resource type="PackedScene" uid="uid://bj7y0ltyoxlo3" path="res://assets/obstacles/ladder_extra_large.glb" id="3_ladder_extra_large"]
+
+[node name="Skywalk" type="Node3D" unique_id=982061856]
+
+[node name="pillar_extra_large" parent="." unique_id=1995652633 instance=ExtResource("1_pillar_extra_large")]
+
+[node name="pillar_extra_large2" parent="." unique_id=490015864 instance=ExtResource("1_pillar_extra_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.1, 0, 0)
+
+[node name="pillar_extra_large3" parent="." unique_id=2052508264 instance=ExtResource("1_pillar_extra_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -8.1)
+
+[node name="pillar_extra_large4" parent="." unique_id=1421901849 instance=ExtResource("1_pillar_extra_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.1, 0, -8.1)
+
+[node name="platform_extra_large" parent="." unique_id=1247845778 instance=ExtResource("2_platform_extra_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 9.45, 0)
+
+[node name="ladder_extra_large" parent="." unique_id=1820178865 instance=ExtResource("3_ladder_extra_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.35, 0, -4.05)

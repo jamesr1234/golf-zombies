@@ -84,10 +84,11 @@ func test_full_power_matches_the_old_full_swing() -> void:
 	assert_almost_eq(Shot.swing_speed(1.0), Shot.MAX_SPEED, 0.001)
 	var expected := Shot.MAX_SPEED * Shot.MAX_SPEED * sin(2.0 * deg_to_rad(Shot.LAUNCH_DEG)) / Shot.GRAVITY
 	assert_almost_eq(Shot.max_carry(), expected, 0.001)
-	var vy := Shot.MAX_SPEED * sin(deg_to_rad(Shot.LAUNCH_DEG))
+	var play := Shot.MAX_SPEED * sqrt(Shot.DISTANCE_SCALE)
+	var vy := play * sin(deg_to_rad(Shot.LAUNCH_DEG))
 	assert_almost_eq(Shot.apex_height(), vy * vy / (2.0 * Shot.GRAVITY), 0.001)
-	assert_almost_eq(Shot.carry_to_height(0.0), Shot.max_carry(), 0.001)
-	assert_lt(Shot.carry_to_height(Shot.apex_height() * 0.5), Shot.max_carry())
+	assert_almost_eq(Shot.carry_to_height(0.0), Shot.max_carry() * Shot.DISTANCE_SCALE, 0.001)
+	assert_lt(Shot.carry_to_height(Shot.apex_height() * 0.5), Shot.max_carry() * Shot.DISTANCE_SCALE)
 	assert_eq(Shot.carry_to_height(Shot.apex_height() + 1.0), 0.0)
 
 
@@ -124,6 +125,15 @@ func test_loft_bias_raises_and_lowers_launch() -> void:
 	assert_almost_eq(Shot.launch_deg(1.0, 100.0), Shot.MAX_LAUNCH_DEG, 0.001)
 
 
+func test_swings_carry_three_times_farther_and_putts_do_not() -> void:
+	assert_almost_eq(Shot.DISTANCE_SCALE, 3.0, 0.001)
+	assert_almost_eq(Shot.carry_to_height(0.0), Shot.max_carry() * 3.0, 0.001)
+	var putt := Shot.velocity(0.0, 0.0, 1.0, Surface.Type.GREEN, true)
+	assert_almost_eq(putt.length(), Shot.putt_max_speed(), 0.001)
+	var swing := Shot.velocity(0.0, 0.0, 1.0, Surface.Type.FAIRWAY, false)
+	assert_almost_eq(swing.length(), Shot.MAX_SPEED * sqrt(Shot.DISTANCE_SCALE), 0.001)
+
+
 func test_max_carry_ignores_the_stick_so_holes_stay_put() -> void:
 	var expected := Shot.MAX_SPEED * Shot.MAX_SPEED * sin(2.0 * deg_to_rad(Shot.LAUNCH_DEG)) / Shot.GRAVITY
 	assert_almost_eq(Shot.max_carry(), expected, 0.001)
@@ -157,6 +167,51 @@ func test_a_putt_preview_stays_on_the_ground() -> void:
 	for point in points:
 		assert_almost_eq(point.y, origin.y, 0.001)
 		assert_almost_eq(point.z, origin.z, 0.001, "yaw 90 is a roll along +X")
+
+
+func test_a_putt_preview_without_a_lie_still_uses_green_speed() -> void:
+	var implied := Shot.flight_points(Vector3.ZERO, 0.0, 1.0, 0.0, true)
+	var green := Shot.flight_points(
+		Vector3.ZERO, 0.0, 1.0, 0.0, true, null, 0.0, Surface.Type.GREEN
+	)
+	assert_almost_eq(_carry_xz(implied), _carry_xz(green), 0.01)
+
+
+func test_a_fringe_putt_preview_dies_shorter_than_a_green_putt() -> void:
+	var green := Shot.flight_points(
+		Vector3.ZERO, 0.0, 1.0, 0.0, true, null, 0.0, Surface.Type.GREEN
+	)
+	var fringe := Shot.flight_points(
+		Vector3.ZERO, 0.0, 1.0, 0.0, true, null, 0.0, Surface.Type.FRINGE
+	)
+	assert_lt(
+		_carry_xz(fringe), _carry_xz(green) * 0.8,
+		"collar grass has to kill the roll the preview shows"
+	)
+
+
+func test_a_full_swing_loses_speed_in_the_rough_and_sand() -> void:
+	var fairway := Shot.velocity(0.0, 0.0, 1.0, Surface.Type.FAIRWAY, false)
+	var rough := Shot.velocity(0.0, 0.0, 1.0, Surface.Type.ROUGH, false)
+	var bunker := Shot.velocity(0.0, 0.0, 1.0, Surface.Type.BUNKER, false)
+	assert_lt(rough.length(), fairway.length())
+	assert_lt(bunker.length(), rough.length())
+	assert_almost_eq(
+		rough.length(), fairway.length() * Surface.POWER_MULT[Surface.Type.ROUGH], 0.001
+	)
+	assert_almost_eq(
+		bunker.length(), fairway.length() * Surface.POWER_MULT[Surface.Type.BUNKER], 0.001
+	)
+	assert_lt(
+		_carry_xz(Shot.flight_points(
+			Vector3.ZERO, 0.0, 1.0, 0.0, false, null, 0.0, Surface.Type.ROUGH
+		)),
+		_carry_xz(Shot.flight_points(Vector3.ZERO, 0.0, 1.0)) * 0.75
+	)
+
+
+func test_no_patch_is_the_rough() -> void:
+	assert_eq(Surface.dominant([]), Surface.Type.ROUGH)
 
 
 func _peak_y(points: PackedVector3Array) -> float:

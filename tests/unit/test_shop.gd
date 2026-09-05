@@ -1,9 +1,9 @@
 extends GutTest
 ## Shared wallet purchases across clubhouse departments.
 
-const ROCKET: WeaponStats = preload("res://resources/weapons/rocket.tres")
 const PLAYER := preload("res://scenes/players/player.tscn")
 const InspectScript := preload("res://scripts/shop/shop_inspect.gd")
+const ROCKET: WeaponStats = preload("res://resources/weapons/rocket.tres")
 
 var shop: Shop
 var score: GameState
@@ -17,6 +17,7 @@ func before_each() -> void:
 	score = GameState.new(PackedInt32Array([4, 3, 5]))
 	gun = Weapon.new()
 	add_child_autofree(gun)
+	gun.fill_stash()
 	buyer = PLAYER.instantiate()
 	add_child_autofree(buyer)
 	cart = GolfCart.new()
@@ -108,10 +109,11 @@ func test_no_department_lists_next_hole() -> void:
 	assert_false(shop.buy("next", score, _loadout()))
 
 
-func test_the_listing_marks_the_cursor_and_owned_guns() -> void:
+func test_the_armory_listing_is_just_the_bank() -> void:
 	var text := shop.listing(0, 0, _loadout(), Shop.Dept.WEAPONS, score)
-	assert_string_contains(text, "> Rocket Launcher")
-	assert_string_contains(text, "owned")
+	assert_string_contains(text, "Bank")
+	assert_false(text.contains("Rocket"))
+	assert_false(text.contains("owned"))
 
 
 func test_the_barrier_is_on_the_item_shelf() -> void:
@@ -130,6 +132,39 @@ func test_buying_a_barrier_adds_charges_and_can_stack() -> void:
 	assert_true(shop.buy("barrier", score, _loadout()))
 	assert_eq(score.barrier_charges, Shop.BARRIER_AMOUNT * 2)
 	assert_eq(score.money, 0)
+
+
+func test_the_ladder_is_on_the_item_shelf() -> void:
+	var item := _find("ladder")
+	assert_eq(String(item["kind"]), "ladder")
+	assert_eq(int(item["price"]), Shop.LADDER_PRICE)
+	assert_eq(Shop.LADDER_AMOUNT, 1)
+	assert_string_contains(shop.info(item), "wall")
+
+
+func test_buying_a_ladder_adds_charges_and_can_stack() -> void:
+	score.credit(Shop.LADDER_PRICE * 2)
+	assert_eq(score.ladder_charges, 0)
+	assert_true(shop.buy("ladder", score, _loadout()))
+	assert_eq(score.ladder_charges, Shop.LADDER_AMOUNT)
+	assert_eq(score.money, Shop.LADDER_PRICE)
+	assert_true(shop.buy("ladder", score, _loadout()))
+	assert_eq(score.ladder_charges, Shop.LADDER_AMOUNT * 2)
+	assert_eq(score.money, 0)
+
+
+func test_the_ladder_listing_is_not_owned_and_shows_stock() -> void:
+	var index := _index("ladder", Shop.Dept.ITEMS)
+	var text := shop.listing(index, 0, _loadout(), Shop.Dept.ITEMS, score)
+	assert_string_contains(text, "> Lean Ladder")
+	assert_string_contains(text, "$80")
+	assert_false(text.contains("owned"))
+	score.credit(Shop.LADDER_PRICE)
+	shop.buy("ladder", score, _loadout())
+	text = shop.listing(index, score.money, _loadout(), Shop.Dept.ITEMS, score)
+	assert_string_contains(text, "$80")
+	assert_string_contains(text, "1 held")
+	assert_false(text.contains("owned"))
 
 
 func test_the_barrier_listing_is_not_owned_and_shows_stock() -> void:
@@ -192,7 +227,7 @@ func test_walking_off_the_rack_puts_your_clothes_back() -> void:
 	assert_false(buyer.body.is_trying_on("shirt_violet"))
 
 
-func test_scrolling_the_apparel_shelf_tries_it_on() -> void:
+func test_scrolling_the_apparel_shelf_shows_the_garment() -> void:
 	var stub := _FakeShopFlow.new()
 	stub.shop = shop
 	stub.score = score
@@ -202,19 +237,20 @@ func test_scrolling_the_apparel_shelf_tries_it_on() -> void:
 	var station := ShopStation.create(Shop.Dept.APPAREL, "Apparel", Vector3.ZERO, 0.0)
 	add_child_autofree(station)
 	buyer.open_station(station)
-	assert_true(buyer.trying_on_apparel())
 	var first := shop.item_at(0, Shop.Dept.APPAREL)
-	assert_true(buyer.body.is_trying_on(String(first["id"])))
+	assert_eq(buyer._inspect.item_id, String(first["id"]))
+	assert_true(buyer._inspect.visible)
+	assert_false(buyer.body.is_trying_on(String(first["id"])), "the rack spins the garment, not the robot")
 	buyer._cycle_shop(1)
 	var second := shop.item_at(1, Shop.Dept.APPAREL)
-	assert_true(buyer.body.is_trying_on(String(second["id"])))
-	assert_false(buyer.body.is_trying_on(String(first["id"])))
+	assert_eq(buyer._inspect.item_id, String(second["id"]))
+	assert_false(buyer.body.is_trying_on(String(second["id"])))
 
 
 func test_the_right_stick_spins_hovered_stock_a_full_turn() -> void:
 	var inspect = InspectScript.new()
 	add_child_autofree(inspect)
-	inspect.show_item(_find("rocket"))
+	inspect.show_item(_find("ammo"))
 	assert_true(inspect.visible)
 	assert_gt(inspect.get_child_count(), 0)
 	inspect.spin(Vector2(90.0, 0.0))
@@ -225,7 +261,7 @@ func test_the_right_stick_spins_hovered_stock_a_full_turn() -> void:
 	assert_almost_eq(inspect._pose.rotation_degrees.y, inspect.yaw, 0.01)
 
 
-func test_scrolling_the_armory_shows_the_gun_you_can_spin() -> void:
+func test_the_empty_armory_has_no_gun_to_spin() -> void:
 	var stub := _FakeShopFlow.new()
 	stub.shop = shop
 	stub.score = score
@@ -236,16 +272,14 @@ func test_scrolling_the_armory_shows_the_gun_you_can_spin() -> void:
 	add_child_autofree(station)
 	buyer.open_station(station)
 	assert_true(buyer.shopping)
-	assert_eq(buyer._inspect.item_id, "rocket")
-	assert_true(buyer._inspect.visible)
-	buyer._turn_shop(Vector2(120.0, 0.0), 0.0)
-	assert_almost_eq(buyer._inspect.yaw, -120.0, 0.01)
+	assert_eq(buyer._inspect.item_id, "")
+	assert_false(buyer._inspect.visible)
 	buyer.close_shop()
 	assert_eq(buyer._inspect.item_id, "")
 	assert_false(buyer._inspect.visible)
 
 
-func test_the_right_stick_spins_a_try_on_without_pitching_the_robot() -> void:
+func test_the_right_stick_spins_apparel_without_turning_the_robot() -> void:
 	var stub := _FakeShopFlow.new()
 	stub.shop = shop
 	stub.score = score
@@ -256,25 +290,43 @@ func test_the_right_stick_spins_a_try_on_without_pitching_the_robot() -> void:
 	add_child_autofree(station)
 	buyer.open_station(station)
 	buyer._turn_shop(Vector2(90.0, 40.0), 0.0)
-	assert_almost_eq(buyer.body.rotation.y, deg_to_rad(-90.0), 0.01)
+	assert_almost_eq(buyer.body.rotation.y, 0.0, 0.01)
 	assert_almost_eq(buyer.body.rotation.x, 0.0, 0.01)
-	assert_almost_eq(buyer._inspect.pitch, 0.0, 0.01)
+	assert_almost_eq(buyer._inspect.yaw, -90.0, 0.01)
+	assert_almost_eq(buyer._inspect.pitch, 40.0, 0.01)
 
 
-func test_a_medkit_heals_the_buyer() -> void:
-	buyer.health.hp = 40.0
-	score.credit(100)
-	assert_true(shop.buy("medkit", score, _loadout(), buyer, cart))
-	assert_almost_eq(buyer.health.hp, buyer.health.max_hp, 0.001)
-	assert_eq(score.money, 50)
-	assert_false(shop.buy("medkit", score, _loadout(), buyer, cart), "full health cannot restock")
-	assert_eq(score.money, 50)
+func test_walking_off_the_counter_does_not_close_the_shop() -> void:
+	var stub := _FakeShopFlow.new()
+	stub.shop = shop
+	stub.score = score
+	stub.guns = _loadout()
+	stub.cart = cart
+	buyer.flow = stub
+	var station := ShopStation.create(Shop.Dept.WEAPONS, "Armory", Vector3.ZERO, 0.0)
+	add_child_autofree(station)
+	buyer.velocity = Vector3(8.0, 0.0, 0.0)
+	buyer.open_station(station)
+	assert_almost_eq(buyer.velocity.x, 0.0, 0.001, "opening the listing plants you")
+	buyer.global_position = Vector3(20.0, 0.0, 20.0)
+	buyer.interact.tick(buyer, 0.016)
+	assert_true(buyer.shopping, "range must not dump you out of the listing")
+	buyer.input = CpuInput.new(buyer.input_prefix, false)
+	(buyer.input as CpuInput).tap("swap_gear")
+	buyer.interact.tick(buyer, 0.016)
+	assert_false(buyer.shopping)
 
 
-func test_a_revive_kit_charges_the_buyer() -> void:
-	score.credit(90)
-	assert_true(shop.buy("revive", score, _loadout(), buyer, cart))
-	assert_eq(buyer.health.auto_revives, 1)
+func test_kits_and_clock_items_are_not_for_sale() -> void:
+	score.credit(400)
+	for item_id in ["medkit", "revive", "time_bonus", "time_freeze", "glide"]:
+		assert_true(_find(item_id).is_empty(), "%s left the item shelf" % item_id)
+		assert_false(shop.buy(item_id, score, _loadout(), buyer, cart))
+	assert_eq(score.money, 400)
+	assert_eq(buyer.health.auto_revives, 0)
+	assert_eq(score.bonus_seconds, 0)
+	assert_eq(score.freeze_seconds, 0.0)
+	assert_false(score.glide_bought)
 
 
 func test_cart_upgrades_stick_and_cannot_be_bought_twice() -> void:
@@ -300,14 +352,6 @@ func test_cart_upgrades_live_in_the_garage() -> void:
 		assert_false(String(item["id"]).begins_with("cart_"), "the items counter no longer sells cart parts")
 
 
-func test_time_items_wait_for_the_next_hole() -> void:
-	score.credit(200)
-	assert_true(shop.buy("time_bonus", score, _loadout()))
-	assert_eq(score.bonus_seconds, Shop.TIME_BONUS_SECONDS)
-	assert_true(shop.buy("time_freeze", score, _loadout()))
-	assert_almost_eq(score.freeze_seconds, Shop.FREEZE_SECONDS, 0.001)
-
-
 func test_the_mech_is_one_per_round() -> void:
 	score.credit(Shop.MECH_PRICE * 2)
 	var item := _find("mech")
@@ -327,14 +371,12 @@ func test_every_shelf_item_has_a_blurb() -> void:
 			assert_gt(shop.info(item).length(), 12, "%s needs a sentence of info" % item["id"])
 
 
-func test_the_hovered_item_details_explain_the_rocket() -> void:
+func test_the_empty_armory_details_are_blank() -> void:
 	var text := shop.details(0, 0, _loadout(), Shop.Dept.WEAPONS, score)
-	assert_string_contains(text, "Rocket Launcher")
-	assert_string_contains(text, "blast")
-	assert_string_contains(text, "owned")
-	assert_string_contains(text, "Bank")
+	assert_eq(text, "")
 	var listing := shop.listing(0, 0, _loadout(), Shop.Dept.WEAPONS, score)
-	assert_false(listing.contains("blast"), "the shelf stays a list; info is a hold")
+	assert_string_contains(listing, "Bank")
+	assert_false(listing.contains("Rocket"))
 
 
 func test_club_and_kit_blurbs_say_what_they_do() -> void:
@@ -353,15 +395,32 @@ func test_the_shop_prompt_offers_info_on_the_hovered_item() -> void:
 	stub.cart = cart
 	buyer.flow = stub
 	buyer.shopping = true
-	buyer.shop_dept = Shop.Dept.WEAPONS
+	buyer.shop_dept = Shop.Dept.ITEMS
 	buyer.shop_choice = 0
 	var prompt := buyer.get_prompt()
 	assert_string_contains(prompt, "info")
 	assert_string_contains(prompt, buyer.input.hint("map"))
 	assert_string_contains(prompt, "browse")
 	assert_string_contains(prompt, "turn")
+	assert_string_contains(prompt, "leave")
+	assert_string_contains(prompt, buyer.input.hint("swap_gear"))
 	assert_false(buyer.wants_shop_info(), "info is hold, not a leftover toggle")
 	assert_false(buyer.wants_map(), "the hole map waits until you leave the counter")
+
+
+func test_the_empty_armory_prompt_has_no_buy_line() -> void:
+	var stub := _FakeShopFlow.new()
+	stub.shop = shop
+	stub.score = score
+	stub.guns = _loadout()
+	stub.cart = cart
+	buyer.flow = stub
+	buyer.shopping = true
+	buyer.shop_dept = Shop.Dept.WEAPONS
+	buyer.shop_choice = 0
+	var prompt := buyer.get_prompt()
+	assert_false(prompt.contains("buy"))
+	assert_string_contains(prompt, "leave")
 
 
 func _loadout() -> Array[Weapon]:

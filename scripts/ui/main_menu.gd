@@ -4,13 +4,19 @@ extends Control
 
 const GAMEPLAY := "res://scenes/main.tscn"
 const LOBBY := "res://scenes/net/lobby.tscn"
+const BROWSER := "res://scenes/creator/hole_browser.tscn"
 const _Music := preload("res://scripts/fx/music.gd")
-const MODE_COPY := ["1 Player", "2 Player", "Online VS", "Coop VS"]
+## Modes past Coop VS skip the difficulty step and go straight to their own
+## screen, the way the online modes go straight to the lobby.
+const FIRST_ONLINE := 2
+const FIRST_CREATOR := 4
+const MODE_COPY := ["1 Player", "2 Player", "Online VS", "Coop VS", "Course Creator"]
 const MODE_BLURB := [
-	"You and a CPU partner. One screen. Hold Circle / E for the CPU to take a shot.",
+	"You and a CPU partner. One screen.",
 	"Local co-op. Player 1 uses the controller. Player 2 uses the keyboard.",
 	"Eight players. Own ball. Melee only. Host or join by IP.",
 	"Eight teams of two. One shared ball, alternate shot. Empty seats fill with CPU.",
+	"Build your own hole, then play it. Lay the fairway, then fill it with obstacles.",
 ]
 const DIFF_BLURB := [
 	"More time, fewer zombies, gunners wait until hole 3.",
@@ -45,6 +51,16 @@ func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_build()
 	_refresh()
+	# #region agent log
+	if SteamLobby.has_method("_agent_dbg"):
+		SteamLobby._agent_dbg("B", "main_menu.gd:_ready", "title reached", {
+			"arch": Engine.get_architecture_name() if Engine.has_method("get_architecture_name") else "?",
+			"renderer": RenderingServer.get_current_rendering_method() if RenderingServer.has_method("get_current_rendering_method") else "?",
+			"adapter": RenderingServer.get_video_adapter_name(),
+			"window": DisplayServer.window_get_size(),
+			"steam_ok": SteamLobby.is_available(),
+		})
+	# #endregion
 	_Music.play_lounge()
 
 
@@ -61,9 +77,13 @@ func move(delta: int) -> void:
 func confirm() -> void:
 	Sfx.play("ui_confirm", self)
 	if step == Step.MODE:
-		if mode_index >= 2:
+		if mode_index >= FIRST_CREATOR:
+			GameSettings.reset()
+			start_browser()
+			return
+		if mode_index >= FIRST_ONLINE:
 			GameSettings.mode = (
-				GameSettings.Mode.ONLINE_VS if mode_index == 2
+				GameSettings.Mode.ONLINE_VS if mode_index == FIRST_ONLINE
 				else GameSettings.Mode.ONLINE_COOP_VS
 			)
 			start_lobby()
@@ -87,7 +107,7 @@ func apply_settings() -> void:
 		GameSettings.mode = GameSettings.Mode.SOLO
 	elif mode_index == 1:
 		GameSettings.mode = GameSettings.Mode.COOP
-	elif mode_index == 2:
+	elif mode_index == FIRST_ONLINE:
 		GameSettings.mode = GameSettings.Mode.ONLINE_VS
 	else:
 		GameSettings.mode = GameSettings.Mode.ONLINE_COOP_VS
@@ -106,6 +126,15 @@ func start_lobby() -> void:
 		return
 	started = true
 	get_tree().change_scene_to_file(LOBBY)
+
+
+func start_browser() -> void:
+	if started:
+		return
+	started = true
+	# Wait out the click that opened this, or the hole list's New hole button
+	# lands under the same press and skips straight into a blank creator.
+	get_tree().change_scene_to_file.call_deferred(BROWSER)
 
 
 func _unhandled_input(event: InputEvent) -> void:
