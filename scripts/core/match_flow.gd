@@ -294,6 +294,16 @@ func weapons() -> Array[Weapon]:
 	return guns
 
 
+func _sync_loadouts() -> void:
+	for player in _players:
+		if player == null or player.weapon == null:
+			continue
+		if ArenaHole.applies(hole):
+			player.weapon.clear_stash()
+		else:
+			player.weapon.fill_stash()
+
+
 func _begin_in_clubhouse(index: int) -> void:
 	phase = Phase.SHOP
 	shop = Shop.new()
@@ -313,6 +323,7 @@ func _begin_in_clubhouse(index: int) -> void:
 	_restore_in_clubhouse(snaps)
 	spawner.clear_zombies()
 	spawner.plant_mazes(_hole_node)
+	_sync_loadouts()
 	hole_time_left = GameSettings.hole_seconds() + score.take_bonus_seconds()
 	freeze_left = score.take_freeze_seconds()
 	scorecard_changed.emit()
@@ -356,6 +367,7 @@ func start_hole(index: int) -> void:
 		_board_cpu_driver()
 	spawner.clear_zombies()
 	spawner.plant_mazes(_hole_node)
+	_sync_loadouts()
 	hole_time_left = GameSettings.hole_seconds() + score.take_bonus_seconds()
 	freeze_left = score.take_freeze_seconds()
 	scorecard_changed.emit()
@@ -547,8 +559,8 @@ func can_start_play(who: Node3D) -> bool:
 
 
 ## Called from the tee: the ball leaves the practice green and the clock starts.
-## Walkers start arriving from the hole's random spawn points. Nothing before
-## this point counts.
+## Authored packs step on here. The arena is the only hole that then feeds more.
+## Nothing before this point counts.
 func start_play() -> void:
 	if phase != Phase.PREP or finished:
 		return
@@ -559,6 +571,7 @@ func start_play() -> void:
 		golf.setup(ball, hole.cup, hole.green_span())
 	spawner.begin_hole(score.hole_index, hole.spawn_points, ArenaHole.applies(hole))
 	spawner.place_snipers(hole.sniper_perches())
+	spawner.plant_packs(hole.spawn_packs, hole.height)
 	scorecard_changed.emit()
 	Sfx.play("start_play", self)
 	_Music.play_level()

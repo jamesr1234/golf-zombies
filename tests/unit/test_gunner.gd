@@ -59,12 +59,12 @@ func test_gunners_wait_until_after_the_first_hole() -> void:
 	assert_true(director._type_allowed(GUNNER))
 
 
-func test_the_cart_path_keeps_gunners_off_the_tarmac() -> void:
+func test_the_cart_path_does_not_feed() -> void:
 	var director := SpawnDirector.new()
 	add_child_autofree(director)
 	director.begin_transit(4, [Vector3(20.0, 0.0, 0.0)])
-	assert_false(director._type_allowed(GUNNER))
-	assert_true(director._type_allowed(WALKER))
+	assert_false(director._running)
+	assert_eq(director.live_count(), 0)
 
 
 func test_a_gunner_holds_range_instead_of_walking_into_melee() -> void:

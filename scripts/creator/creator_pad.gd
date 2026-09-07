@@ -18,7 +18,7 @@ const BUTTONS: PackedStringArray = [
 
 const HINT := (
 	"1 2 3 TOOL   Q/E LIST   TAB SHELF   R TURN   F DO   T SNAP"
-	+ "   Y ROTATE SNAP   BKSP UNDO   ESC MENU"
+	+ "   Y ROTATE SNAP   BKSP UNDO   CTRL+Y REDO   ESC MENU"
 )
 const PAD_HINT := (
 	"R2 PLACE   L2 UNDO   D-PAD LIST / TURN   L1/R1 TOOL   SQUARE SHELF"
@@ -48,7 +48,7 @@ func _init(for_host: CreatorMode) -> void:
 		KEY_BACKSPACE: func(_k: InputEventKey) -> void: _host.cancel(),
 		KEY_G: func(_k: InputEventKey) -> void: _host.ask_group(),
 		KEY_T: func(_k: InputEventKey) -> void: _host.snap_surface(),
-		KEY_Y: func(_k: InputEventKey) -> void: _host.toggle_yaw_snap(),
+		KEY_Y: _on_y,
 		KEY_S: _ask_save,
 		KEY_P: func(_k: InputEventKey) -> void: _host.playtest(),
 		KEY_ESCAPE: func(_k: InputEventKey) -> void: _host.toggle_menu(),
@@ -133,3 +133,11 @@ func _drive_menu(fired: Dictionary, delta: float) -> void:
 func _ask_save(key: InputEventKey) -> void:
 	if key.ctrl_pressed or key.meta_pressed:
 		_host.ask_save()
+
+
+## Y by itself flips rotation snap. The chord is redo, same idea as save.
+func _on_y(key: InputEventKey) -> void:
+	if key.ctrl_pressed or key.meta_pressed:
+		_host.redo_change()
+		return
+	_host.toggle_yaw_snap()

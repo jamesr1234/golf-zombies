@@ -139,6 +139,7 @@ static func generate(index: int, base_seed: int) -> HoleData:
 	else:
 		_add_hazards(data, rng, width, headings)
 	data.bounds = _bounds(data)
+	add_exit_fairway(data)
 	_Overlay.harvest(data)
 	if not _setpiece(data) and not arena:
 		if not race:
@@ -451,6 +452,46 @@ static func surface_patch(
 
 static func add_practice_green(data: HoleData, heading: float) -> void:
 	_add_practice_green(data, heading)
+
+
+## Parkland holes keep a strip past the cup so you cannot drive around the
+## green into the rough. The cup and the playing length stay where they are.
+static func extends_past_cup(data: HoleData) -> bool:
+	return (
+		data != null
+		and not ArenaHole.applies(data)
+		and not RaceHole.applies(data)
+		and not data.is_setpiece()
+	)
+
+
+## Just past the fence along the last fairway, so a painted strip and the lip
+## walls can run to the edge of the map.
+static func exit_end(data: HoleData) -> Vector3:
+	var along := data.along_cup()
+	var point := Vector3(data.cup.x, data.cup.y, data.cup.z)
+	var travelled := 0.0
+	while data.bounds.has_point(Vector2(point.x, point.z)) and travelled < 240.0:
+		point += along * 2.0
+		travelled += 2.0
+	return point
+
+
+static func add_exit_fairway(data: HoleData) -> void:
+	if not extends_past_cup(data):
+		return
+	var end := exit_end(data)
+	var span := Vector2(end.x - data.cup.x, end.z - data.cup.z).length()
+	if span < 8.0:
+		return
+	var along := data.along_cup()
+	var yaw := rad_to_deg(Vector3.FORWARD.signed_angle_to(along, Vector3.UP))
+	data.patches.append(_patch(
+		Surface.Type.FAIRWAY,
+		data.cup.lerp(end, 0.5),
+		Vector2(data.fairway_width(), span + 4.0),
+		yaw
+	))
 
 
 static func bounds_of(data: HoleData) -> Rect2:

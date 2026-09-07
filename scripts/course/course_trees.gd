@@ -100,16 +100,13 @@ static func _try_tree(
 
 
 static func in_exit_corridor(data: HoleData, spot: Vector3) -> bool:
-	var along := data.cup - data.tee
-	along.y = 0.0
-	if along.length_squared() < 0.0001:
-		return false
-	along = along.normalized()
+	var along := data.along_cup()
 	var local := spot - data.cup
 	local.y = 0.0
 	if local.dot(along) < data.green_radius:
 		return false
-	return (local - along * local.dot(along)).length() < EXIT_HALF
+	var half := maxf(EXIT_HALF, data.fairway_width() * 0.5)
+	return (local - along * local.dot(along)).length() < half
 
 
 static func _too_close(data: HoleData, spot: Vector3) -> bool:

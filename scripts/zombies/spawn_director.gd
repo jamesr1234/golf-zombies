@@ -1,7 +1,6 @@
 class_name SpawnDirector
 extends Node
-## Feeds zombies from hole spawn points, packs a maze once, or packs the cart
-## path between holes. A hole with no points stays empty.
+## Only the arena feeds zombies. Fairways, mazes, and the cart path stay empty.
 
 signal zombie_killed(bounty: int, killer: Player)
 
@@ -53,7 +52,7 @@ func begin_hole(
 	_hole_index = hole_index
 	_points = spawn_points
 	_timer = ArenaHole.FIRST_SPAWN if _arena else FIRST_SPAWN_DELAY
-	_running = true
+	_running = _arena
 
 
 func place_snipers(perches: Array[Vector3]) -> void:
@@ -63,38 +62,21 @@ func place_snipers(perches: Array[Vector3]) -> void:
 		_spawn_at(perch, SNIPER)
 
 
-func plant_mazes(root: Node) -> void:
-	if root == null or container == null:
-		return
-	for node in root.find_children("*", "Maze", true, false):
-		var maze := node as Maze
-		if maze == null:
-			continue
-		maze.seal_gates()
-		var roam := maze.roam_aabb()
-		for entry in maze.pack_plan():
-			var zombie := _spawn_at(
-				maze.to_global(entry["position"]),
-				entry["stats"] as ZombieStats,
-				roam
-			)
-			if zombie == null:
-				continue
-			zombie.patrol_a = maze.to_global(entry["patrol_a"])
-			zombie.patrol_b = maze.to_global(entry["patrol_b"])
-			zombie.aggro_range = Maze.AGGRO
-			zombie.maze_ref = weakref(maze)
+func plant_mazes(_root: Node) -> void:
+	pass
 
 
-## Pack the cart path with walkers so the drive to the next tee is a gauntlet.
-func begin_transit(hole_index: int, spawn_points: Array[Vector3]) -> void:
-	_transit = true
+func plant_packs(packs: Array[Dictionary], height: HeightField = null) -> void:
+	for pack in packs:
+		_plant_pack(pack, height)
+
+
+## The cart path used to be a gauntlet. Only the arena feeds zombies now.
+func begin_transit(_hole_index_next: int, _spawn_points: Array[Vector3]) -> void:
+	stop()
+	_transit = false
 	_arena = false
-	_hole_index = hole_index
-	_points = spawn_points
-	_timer = TRANSIT_INTERVAL
-	_running = true
-	_burst_left = TRANSIT_BURST
+	_points.clear()
 
 
 func stop() -> void:
@@ -159,6 +141,31 @@ func _spawn_burst() -> void:
 		n += 1
 
 
+func _plant_pack(pack: Dictionary, height: HeightField = null) -> void:
+	var at: Vector3 = pack.get("position", Vector3.ZERO)
+	at = _on_ground(at, height)
+	var radius := float(pack.get("radius", SpawnPack.DEFAULT_RADIUS))
+	var roam: AABB = SpawnPack.roam_at(at, radius)
+	var aggro := SpawnPack.clamp_aggro(float(pack.get("aggro", SpawnPack.DEFAULT_AGGRO)))
+	var counts: Dictionary = pack.get("counts", {})
+	for key in SpawnPack.KEYS:
+		var stats := SpawnPack.stats_for(key)
+		for _i in int(counts.get(key, 0)):
+			_spawn_at(_scatter(at, radius, height), stats, roam, aggro)
+
+
+func _scatter(center: Vector3, radius: float, height: HeightField = null) -> Vector3:
+	var angle := randf() * TAU
+	var dist := sqrt(randf()) * SpawnPack.clamp_radius(radius) * 0.85
+	var spot := center + Vector3(cos(angle), 0.0, sin(angle)) * dist
+	return _on_ground(spot, height) + Vector3.UP * 0.2
+
+
+func _on_ground(at: Vector3, height: HeightField) -> Vector3:
+	var ground := height.height_at(at.x, at.z) if height != null else 0.0
+	return Vector3(at.x, ground, at.z)
+
+
 func _spawn() -> void:
 	if container == null:
 		return
@@ -175,7 +182,7 @@ func _anyone_golfing() -> bool:
 	return golf != null and golf.golfer != null
 
 
-func _spawn_at(at: Vector3, stats: ZombieStats, roam := AABB()) -> Zombie:
+func _spawn_at(at: Vector3, stats: ZombieStats, roam := AABB(), aggro := 0.0) -> Zombie:
 	if container == null or stats == null:
 		return null
 	var zombie: Zombie
@@ -190,6 +197,8 @@ func _spawn_at(at: Vector3, stats: ZombieStats, roam := AABB()) -> Zombie:
 		return null
 	if roam.size.x > 0.5:
 		zombie.roam = roam
+	if aggro > 0.0:
+		zombie.aggro_range = aggro
 	if not zombie.died.is_connected(_on_zombie_died):
 		zombie.died.connect(_on_zombie_died)
 	return zombie

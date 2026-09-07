@@ -12,6 +12,9 @@ signal overview_requested
 signal name_requested
 signal width_picked(size: FairwayPiece.Width)
 signal width_cancelled
+signal spawn_picked(counts: Dictionary)
+signal spawn_cancelled
+signal redo_requested
 
 const FLASH_SECONDS := 2.6
 const PALETTE_HEIGHT := 340.0
@@ -28,6 +31,7 @@ var _scroll: ScrollContainer
 var _palette: VBoxContainer
 var _keypad: CreatorKeypad
 var _width: CreatorWidth
+var _spawn: CreatorSpawn
 var _menu: PanelContainer
 ## Menu rows are held as data so the stick can walk them, not just the mouse.
 var _menu_rows: Array[Button] = []
@@ -68,8 +72,16 @@ func picking_width() -> bool:
 	return _width != null and _width.is_open()
 
 
+func picking_spawn() -> bool:
+	return _spawn != null and _spawn.is_open()
+
+
 func ask_width() -> void:
 	_width.open()
+
+
+func ask_spawn() -> void:
+	_spawn.open()
 
 
 func _mark_handled() -> void:
@@ -226,18 +238,23 @@ func _build() -> void:
 	_width.picked.connect(width_picked.emit)
 	_width.cancelled.connect(width_cancelled.emit)
 	root.add_child(_width)
+	_spawn = CreatorSpawn.create()
+	_spawn.picked.connect(spawn_picked.emit)
+	_spawn.cancelled.connect(spawn_cancelled.emit)
+	root.add_child(_spawn)
 	_build_menu(root)
 
 
 ## Saving, playtesting and the overview live here as well as on keys, because a
 ## pad has no spare button left once the building loop has its own.
 func _build_menu(root: Control) -> void:
-	var column := CreatorChrome.panel(root, Vector2(180.0, 140.0))
+	var column := CreatorChrome.panel(root, Vector2(180.0, 160.0))
 	_menu = column.get_parent() as PanelContainer
 	var heading := CreatorChrome.centered(Palette.AMBER, 20)
 	heading.text = HudStyle.chrome("Paused")
 	column.add_child(heading)
 	_add_menu_row(column, "Keep building", toggle_menu)
+	_add_menu_row(column, "Redo last change", _close_then.bind(redo_requested))
 	_add_menu_row(column, "Name and save", _close_then.bind(name_requested))
 	_add_menu_row(column, "Merge group", _close_then.bind(merge_requested))
 	_add_menu_row(column, "Playtest", _close_then.bind(playtest_requested))

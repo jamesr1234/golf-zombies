@@ -149,6 +149,16 @@ func test_the_practice_green_and_cart_exit_stay_open() -> void:
 	var exit_ray := PhysicsRayQueryParameters3D.create(exit_at, exit_at + along * 12.0)
 	exit_ray.collision_mask = Layers.FORCEFIELD
 	assert_true(space.intersect_ray(exit_ray).is_empty(), "the cart still leaves past the cup")
+	var past := data.cup + along * (data.green_radius + 10.0) + Vector3.UP * 2.0
+	var half := HoleGenerator.fairway_width(data.par, data.index) * 0.5
+	var around := PhysicsRayQueryParameters3D.create(
+		past, past + along.cross(Vector3.UP) * (half + 4.0)
+	)
+	around.collision_mask = Layers.FORCEFIELD
+	assert_false(
+		space.intersect_ray(around).is_empty(),
+		"driving past the pin cannot turn out into the rough"
+	)
 
 
 func test_the_practice_green_has_side_walls() -> void:

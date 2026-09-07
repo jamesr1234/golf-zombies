@@ -224,6 +224,7 @@ func _physics_process(delta: float) -> void:
 		velocity.x = horizontal.x
 		velocity.z = horizontal.z
 	move_and_slide()
+	ai.bounce_off_wall(self)
 	if not swinging and not _bash_fort() and _target != null:
 		_try_attack()
 	if visual.is_limp():
@@ -418,6 +419,18 @@ static func hunts(self_allied: bool, target_is_player: bool, target_allied: bool
 
 func has_roam() -> bool:
 	return roam.size.x > 0.5
+
+
+## Maze residents and yard-only roamers only notice someone inside the yard.
+func hunts_in_yard() -> bool:
+	return has_roam() and (home_maze() != null or aggro_range <= 0.0)
+
+
+## Authored packs wander the yard, then leave it once they have someone to chase.
+func stays_in_yard() -> bool:
+	if hunts_in_yard():
+		return true
+	return has_roam() and ai.target == null
 
 
 func has_patrol() -> bool:

@@ -42,6 +42,7 @@ func draw(data: HoleData) -> void:
 		CreatorMode.Tool.PLACE:
 			_draw_gates(data, hole)
 			_draw_zip()
+			_draw_spawns(hole)
 	_marks.finish()
 
 
@@ -52,7 +53,7 @@ func refresh() -> void:
 		CreatorMode.Tool.FAIRWAY:
 			_ui.show_palette(fairway_labels(), _fairway.picked, _fairway.allowed())
 		CreatorMode.Tool.PLACE:
-			if _place.is_gating() or _place.is_zipping():
+			if _place.is_gating() or _place.is_zipping() or _place.is_roaming():
 				_ui.show_palette(PackedStringArray(), -1, [])
 			else:
 				_ui.show_palette(
@@ -79,6 +80,10 @@ func picked_label() -> String:
 				return "WEAPON LINE"
 			if _place.is_zipping():
 				return "ZIPLINE END"
+			if _place.is_hunting():
+				return "CHASE RANGE"
+			if _place.is_roaming():
+				return "SPAWN YARD"
 			return _place.picked_label()
 		CreatorMode.Tool.GROUP:
 			return "READY TO MERGE" if _group.can_save() else "RING TWO OR MORE PIECES"
@@ -114,3 +119,24 @@ func _draw_zip() -> void:
 	_marks.marker(_place.zip_from, Palette.LIME)
 	_marks.marker(_place.aim_at(), Palette.CYAN)
 	_marks.line(_place.zip_from, _place.aim_at(), Palette.LIME)
+
+
+func _draw_spawns(hole: CustomHole) -> void:
+	for i in hole.placements.size():
+		if not CustomHole.is_spawn(String(hole.placements[i][CustomHole.PATH])):
+			continue
+		var at: Vector3 = hole.placements[i][CustomHole.POSITION]
+		var editing := i == _place.roaming
+		var yard := _place.roam_radius if editing and not _place.is_hunting() else SpawnPack.clamp_radius(
+			float(hole.placements[i].get(CustomHole.RADIUS, SpawnPack.DEFAULT_RADIUS))
+		)
+		var chase := _place.aggro_radius if editing and _place.is_hunting() else SpawnPack.clamp_aggro(
+			float(hole.placements[i].get(CustomHole.AGGRO, SpawnPack.DEFAULT_AGGRO))
+		)
+		var yard_color := Palette.LIME if editing and not _place.is_hunting() else Palette.HOT_PINK
+		var chase_color := Palette.LIME if editing and _place.is_hunting() else Palette.CYAN
+		_marks.marker(at, yard_color if editing else Palette.HOT_PINK)
+		_marks.ring(at, yard, yard_color)
+		_marks.ring(at, chase, chase_color)
+	if CustomHole.is_spawn(_place.picked_path()) and not _place.is_roaming():
+		_marks.marker(_place.aim_at(), Palette.CYAN)

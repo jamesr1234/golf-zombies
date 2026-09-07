@@ -93,6 +93,9 @@ func test_the_starter_stash_holds_every_gun() -> void:
 		assert_true(gun.has_gun(stats), stats.display_name)
 	gun.fill_stash()
 	assert_eq(gun.loadout.size(), Weapon.STARTER_GUNS.size(), "filling twice does not duplicate")
+	gun.clear_stash()
+	assert_false(gun.has_weapon())
+	assert_eq(gun.loadout.size(), 0)
 
 
 func test_the_bag_starts_empty() -> void:
@@ -169,6 +172,7 @@ func test_the_shape_remote_is_a_gun_you_can_add() -> void:
 
 func test_the_warp_door_starts_in_the_bag() -> void:
 	var gun := _gun()
+	gun.fill_stash()
 	assert_true(gun.has_gun(DOOR))
 	assert_true(DOOR.is_door())
 	assert_false(DOOR.is_net())

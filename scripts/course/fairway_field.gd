@@ -91,6 +91,10 @@ func _ribbon(data: HoleData) -> Array[Vector3]:
 	if data.practice_tee.distance_squared_to(data.tee) > 0.25:
 		points.append(data.practice_tee)
 	points.append_array(data.centerline)
+	if HoleGenerator.extends_past_cup(data):
+		var end := HoleGenerator.exit_end(data)
+		if points.is_empty() or points[points.size() - 1].distance_to(end) > 2.0:
+			points.append(end)
 	return points
 
 
@@ -112,6 +116,8 @@ func _half_at(data: HoleData, at: Vector3) -> float:
 
 
 func _skip(data: HoleData, spot: Vector3) -> bool:
+	if HoleGenerator.extends_past_cup(data):
+		return false
 	return _Trees.in_exit_corridor(data, spot)
 
 

@@ -247,6 +247,21 @@ func test_opening_the_exit_clears_the_leave_bays() -> void:
 			assert_false(wall.is_queued_for_deletion())
 
 
+func test_the_arena_clears_the_starter_stash() -> void:
+	var world: Node3D = load("res://scenes/world.tscn").instantiate()
+	add_child_autofree(world)
+	var flow := world.get_node("MatchFlow") as MatchFlow
+	var human := world.get_node("Players/Player2") as Player
+	flow.starting_hole = 5
+	flow.start_in_clubhouse = false
+	flow.cpu_drives_at_start = false
+	flow.begin()
+	await wait_physics_frames(6)
+	assert_true(ArenaHole.applies(flow.hole))
+	assert_eq(human.weapon.loadout.size(), 0, "pick from the floor, do not walk in armed")
+	assert_eq(world.find_children("*", "GunPickup", true, false).size(), ArenaHole.WEAPONS.size())
+
+
 func test_the_round_waits_until_everyone_has_two_guns() -> void:
 	assert_false(ArenaHole.all_armed([]))
 	var player: Player = load("res://scenes/players/player.tscn").instantiate()

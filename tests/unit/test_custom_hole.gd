@@ -63,6 +63,80 @@ func test_a_hole_survives_a_trip_through_json() -> void:
 			)
 
 
+func test_a_spawn_pack_survives_a_trip_through_json() -> void:
+	var hole := CustomHole.create("Packed")
+	hole.add_placement(CustomHole.SPAWN, Vector3(0.0, 0.0, -24.0))
+	hole.placements[0][CustomHole.RADIUS] = 8.1
+	hole.placements[0][CustomHole.AGGRO] = 21.6
+	hole.placements[0][CustomHole.COUNTS] = {"walker": 3, "runner": 1, "brute": 0, "gunner": 2}
+	var back := CustomHole.from_dict(JSON.parse_string(JSON.stringify(hole.to_dict())))
+	assert_true(CustomHole.is_spawn(String(back.placements[0][CustomHole.PATH])))
+	assert_almost_eq(float(back.placements[0][CustomHole.RADIUS]), 8.1, 0.001)
+	assert_almost_eq(float(back.placements[0][CustomHole.AGGRO]), 21.6, 0.001)
+	var counts: Dictionary = back.placements[0][CustomHole.COUNTS]
+	assert_eq(int(counts["walker"]), 3)
+	assert_eq(int(counts["runner"]), 1)
+	assert_eq(int(counts["gunner"]), 2)
+	assert_eq(int(counts["brute"]), 0)
+
+
+func test_every_spawn_pack_keeps_its_own_yard() -> void:
+	var hole := CustomHole.create("Three Yards")
+	for i in 3:
+		var at := Vector3(0.0, 12.0 + float(i), -20.0 - float(i) * 12.0)
+		hole.add_placement(CustomHole.SPAWN, at)
+		hole.placements[i][CustomHole.RADIUS] = SpawnPack.DEFAULT_RADIUS
+		hole.placements[i][CustomHole.COUNTS] = {"walker": 1, "runner": 0, "brute": 0, "gunner": 0}
+	var data := CustomLayout.build(hole)
+	assert_eq(data.spawn_packs.size(), 3)
+	var seen: Array[float] = []
+	for pack in data.spawn_packs:
+		var at: Vector3 = pack["position"]
+		assert_false(seen.has(at.z), "each pack stays where it was dropped")
+		seen.append(at.z)
+		assert_almost_eq(at.y, data.height.height_at(at.x, at.z), 0.05, "they stand on the grass")
+
+
+func test_the_layout_copies_authored_spawn_packs() -> void:
+	var hole := CustomHole.create("Yard")
+	hole.add_placement(CustomHole.SPAWN, Vector3(0.0, 0.0, -24.0))
+	hole.placements[0][CustomHole.RADIUS] = SpawnPack.DEFAULT_RADIUS
+	hole.placements[0][CustomHole.COUNTS] = {"walker": 2, "runner": 0, "brute": 1, "gunner": 0}
+	var data := CustomLayout.build(hole)
+	assert_eq(data.spawn_packs.size(), 1)
+	assert_eq(int(data.spawn_packs[0]["counts"]["walker"]), 2)
+	assert_eq(int(data.spawn_packs[0]["counts"]["brute"]), 1)
+	assert_almost_eq(float(data.spawn_packs[0]["radius"]), SpawnPack.DEFAULT_RADIUS, 0.001)
+	assert_almost_eq(float(data.spawn_packs[0]["aggro"]), SpawnPack.DEFAULT_AGGRO, 0.001)
+	var at: Vector3 = data.spawn_packs[0]["position"]
+	assert_almost_eq(at.x, 0.0, 0.01)
+	assert_almost_eq(at.z, -24.0, 0.01)
+
+
+func test_a_spawn_saved_without_a_chase_range_gets_the_default() -> void:
+	var legacy := {
+		"version": 1, "id": "old_swarm", "title": "Old Swarm", "created_at": 0,
+		"pieces": [0, 0],
+		"placements": [{
+			"path": CustomHole.SPAWN, "position": [0.0, 0.0, -20.0], "yaw": 0.0,
+			"radius": 8.1,
+			"counts": {"walker": 2, "runner": 0, "brute": 0, "gunner": 0},
+		}],
+	}
+	var hole := CustomHole.from_dict(legacy)
+	assert_almost_eq(float(hole.placements[0][CustomHole.AGGRO]), CustomHole.DEFAULT_AGGRO, 0.001)
+	var packs := SpawnPack.from_hole(hole)
+	assert_almost_eq(float(packs[0]["aggro"]), SpawnPack.DEFAULT_AGGRO, 0.001)
+
+
+func test_a_spawn_does_not_stand_on_the_played_hole() -> void:
+	var hole := CustomHole.create("Invisible")
+	hole.add_placement(CustomHole.SPAWN, Vector3(0.0, 0.0, -20.0))
+	var overlay := CustomOverlay.build(hole)
+	autofree(overlay)
+	assert_eq(overlay.get_child_count(), 0)
+
+
 ## A hole saved before weapons existed has no gate written down, and every piece
 ## in it has to keep working.
 func test_a_hole_saved_without_lines_still_loads() -> void:
@@ -141,10 +215,19 @@ func test_the_layout_paints_a_fairway_a_tee_and_a_green() -> void:
 	var kinds := {}
 	for patch in data.patches:
 		kinds[patch["type"]] = int(kinds.get(patch["type"], 0)) + 1
-	assert_eq(int(kinds.get(Surface.Type.FAIRWAY, 0)), hole.pieces.size())
+	assert_eq(int(kinds.get(Surface.Type.FAIRWAY, 0)), hole.pieces.size() + 1)
 	assert_gte(int(kinds.get(Surface.Type.TEE, 0)), 1)
 	assert_gte(int(kinds.get(Surface.Type.GREEN, 0)), 1)
 	assert_gte(int(kinds.get(Surface.Type.FRINGE, 0)), 1)
+	var along := data.along_cup()
+	var end := HoleGenerator.exit_end(data)
+	var past := data.cup + along * (data.cup.distance_to(end) * 0.6)
+	var covered := false
+	for patch in data.patches:
+		if patch["type"] == Surface.Type.FAIRWAY and HoleGenerator.patch_covers(patch, past):
+			covered = true
+			break
+	assert_true(covered, "the strip has to keep going past the pin to the fence")
 
 
 func test_a_wide_custom_hole_paints_a_wider_strip() -> void:

@@ -79,4 +79,4 @@ func test_hard_lets_gunners_onto_the_first_tee() -> void:
 	GameSettings.difficulty = GameSettings.Kind.HARD
 	assert_true(director._type_allowed(GUNNER))
 	director.begin_transit(0, [Vector3(20.0, 0.0, 0.0)])
-	assert_false(director._type_allowed(GUNNER), "the cart path stays melee")
+	assert_false(director._running, "the cart path no longer feeds")

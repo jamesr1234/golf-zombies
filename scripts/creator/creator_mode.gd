@@ -25,6 +25,7 @@ var _leaving := false
 var _view: CreatorView
 ## Keys and pad buttons both live here, kept off the camera's flight controls.
 var _pad: CreatorPad
+var _history := CreatorHistory.new()
 
 
 func _enter_tree() -> void:
@@ -63,6 +64,9 @@ func _ready() -> void:
 	_ui.merge_requested.connect(ask_group)
 	_ui.width_picked.connect(_on_width_picked)
 	_ui.width_cancelled.connect(_back_to_browser)
+	_ui.spawn_picked.connect(_on_spawn_picked)
+	_ui.spawn_cancelled.connect(_on_spawn_cancelled)
+	_ui.redo_requested.connect(redo_change)
 	_view = CreatorView.new(self, _marks, _ui, _fairway, _place, _group)
 	_pad = CreatorPad.new(self)
 
@@ -85,7 +89,7 @@ func _exit_tree() -> void:
 func _process(delta: float) -> void:
 	if _leaving:
 		return
-	if _ui.picking_width():
+	if _ui.picking_width() or _ui.picking_spawn():
 		_camera.frozen = true
 		_pad.poll(false, delta)
 		return
@@ -133,7 +137,7 @@ func _refresh_ui() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if _leaving or _ui.is_typing() or _ui.picking_width():
+	if _leaving or _ui.is_typing() or _ui.picking_width() or _ui.picking_spawn():
 		return
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		_camera.take_mouse((event as InputEventMouseMotion).relative)
@@ -169,27 +173,122 @@ func _scroll(steps: float) -> void:
 func confirm() -> void:
 	match tool:
 		Tool.PLACE:
-			if _place.set_gate() if _place.is_gating() else _place.place():
+			if _place.is_gating():
+				if _place.set_gate():
+					_history.clear()
+					Sfx.play("ui_confirm", self)
+			elif _place.is_hunting():
+				if _place.set_aggro():
+					Sfx.play("ui_confirm", self)
+					_ask_spawn()
+			elif _place.is_roaming():
+				if _place.set_roam():
+					Sfx.play("ui_confirm", self)
+			elif _place.place():
+				_history.clear()
 				Sfx.play("ui_confirm", self)
 		Tool.GROUP:
 			_group.toggle()
 		_:
 			if _fairway.place():
+				_history.clear()
 				Sfx.play("ui_confirm", self)
 
 
 func cancel() -> void:
 	match tool:
 		Tool.PLACE:
-			if _place.clear_gate() if _place.is_gating() else (
-				_place.clear_zip() if _place.is_zipping() else _place.erase(_camera.aim_point())
-			):
-				Sfx.play("ui_back", self)
+			if _place.is_gating():
+				if _place.clear_gate():
+					Sfx.play("ui_back", self)
+			elif _place.is_zipping():
+				if _place.clear_zip():
+					Sfx.play("ui_back", self)
+			elif _place.is_roaming():
+				if _place.abort_spawn():
+					Sfx.play("ui_back", self)
+			else:
+				var hover := _hover_point()
+				# #region agent log
+				var _aim := _camera.aim_point()
+				var _ghost := _place.aim_at()
+				var _from := _camera.global_position
+				var _hit := _hover_hit()
+				var _f := FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-2b6f56.log", FileAccess.READ_WRITE)
+				if _f == null:
+					_f = FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-2b6f56.log", FileAccess.WRITE)
+				if _f != null:
+					var _hp := _hit.get("position", Vector3.ZERO) as Vector3
+					var _col = _hit.get("collider")
+					_f.seek_end()
+					_f.store_line(JSON.stringify({
+						"sessionId": "2b6f56", "runId": "post-fix", "hypothesisId": "B",
+						"location": "creator_mode.gd:cancel",
+						"message": "erase aim vs ray", "timestamp": Time.get_ticks_msec(),
+						"data": {
+							"aim": [snappedf(_aim.x, 0.01), snappedf(_aim.y, 0.01), snappedf(_aim.z, 0.01)],
+							"ghost": [snappedf(_ghost.x, 0.01), snappedf(_ghost.y, 0.01), snappedf(_ghost.z, 0.01)],
+							"hover": [snappedf(hover.x, 0.01), snappedf(hover.y, 0.01), snappedf(hover.z, 0.01)],
+							"cam": [snappedf(_from.x, 0.01), snappedf(_from.y, 0.01), snappedf(_from.z, 0.01)],
+							"reach": snappedf(_camera.reach, 0.01),
+							"cam_to_aim": snappedf(_from.distance_to(_aim), 0.01),
+							"aim_vs_ghost": snappedf(_aim.distance_to(_ghost), 0.01),
+							"used_ray": not _hit.is_empty(),
+							"ray_hit": not _hit.is_empty(),
+							"ray_pos": [snappedf(_hp.x, 0.01), snappedf(_hp.y, 0.01), snappedf(_hp.z, 0.01)],
+							"ray_name": String(_col.name) if _col is Node else "",
+							"ray_path": String(_col.scene_file_path) if _col is Node else "",
+							"cam_to_ray": snappedf(_from.distance_to(_hp), 0.01) if not _hit.is_empty() else -1.0,
+							"aim_vs_ray": snappedf(_aim.distance_to(_hp), 0.01) if not _hit.is_empty() else -1.0,
+							"hover_vs_aim": snappedf(hover.distance_to(_aim), 0.01),
+						},
+					}))
+					_f.close()
+				# #endregion
+				_take_back(_place.erase.bind(hover))
 		Tool.GROUP:
 			_group.clear()
 		_:
-			if _fairway.undo():
-				Sfx.play("ui_back", self)
+			_take_back(_fairway.undo)
+
+
+func redo_change() -> void:
+	if not _history.redo(hole):
+		_on_refused("NOTHING TO REDO")
+		return
+	_rebuild()
+	Sfx.play("ui_confirm", self)
+
+
+func _take_back(action: Callable) -> void:
+	var before := hole.to_dict()
+	if not action.call():
+		return
+	_history.stash(before)
+	Sfx.play("ui_back", self)
+	_rebuild()
+
+
+## The piece under the crosshair, not the point hanging at camera reach. Reach
+## often punches through the grass when looking down, so erase used to miss or
+## grab a neighbour past the thing being looked at.
+func _hover_point() -> Vector3:
+	var hit := _hover_hit()
+	if hit.is_empty():
+		return _camera.aim_point()
+	return hit["position"] as Vector3
+
+
+func _hover_hit() -> Dictionary:
+	var world := get_world_3d()
+	if world == null or _camera == null:
+		return {}
+	var from := _camera.global_position
+	var dir := -_camera.global_transform.basis.z
+	var query := PhysicsRayQueryParameters3D.create(
+		from, from + dir * 80.0, Layers.WORLD | Layers.PROP | Layers.SURFACE
+	)
+	return world.direct_space_state.intersect_ray(query)
 
 
 func step_piece(delta: int) -> void:
@@ -274,6 +373,24 @@ func ask_save() -> void:
 	_ui.ask_save(hole.title)
 
 
+func _ask_spawn() -> void:
+	_ui.ask_spawn()
+
+
+func _on_spawn_picked(counts: Dictionary) -> void:
+	if _place.finish_spawn(counts):
+		_history.clear()
+		_refresh_props()
+	else:
+		_place.abort_spawn()
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
+func _on_spawn_cancelled() -> void:
+	_place.abort_spawn()
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
 func toggle_menu() -> void:
 	_ui.toggle_menu()
 
@@ -331,6 +448,7 @@ func playtest() -> void:
 func _on_width_picked(size: FairwayPiece.Width) -> void:
 	hole.fairway_size = size
 	hole.needs_width = false
+	_history.clear()
 	_rebuild()
 	_camera.frame(_world.data)
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
@@ -357,6 +475,7 @@ func _go(path: String) -> void:
 ## The merge swapped loose pieces for one structure, so the props have to be
 ## rebuilt before the change shows.
 func _on_group_saved(path: String) -> void:
+	_history.clear()
 	_refresh_props()
 	_ui.flash("MERGED INTO %s" % HoleStore.structure_title(path))
 

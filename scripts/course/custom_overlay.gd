@@ -72,6 +72,8 @@ static func _add(
 	for flat in expand(entry, depth):
 		if skip_pads and String(flat[CustomHole.PATH]) == SPEED_PAD:
 			continue
+		if CustomHole.is_spawn(String(flat[CustomHole.PATH])):
+			continue
 		var node := instantiate(
 			String(flat[CustomHole.PATH]),
 			float(flat.get(CustomHole.GATE, CustomHole.NO_GATE))

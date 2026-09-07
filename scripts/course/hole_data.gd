@@ -25,6 +25,8 @@ var jumps: Array[Dictionary] = []
 var boosts: Array[Dictionary] = []
 ## Random fairway and rough arrivals, plus any overlay ZombieSpawn markers.
 var spawn_points: Array[Vector3] = []
+## Authored packs from the hole creator. Each entry: {position, radius, aggro, roam, counts}.
+var spawn_packs: Array[Dictionary] = []
 ## Mesa on hole 3. INF means this hole has no mountain.
 var mountain := Vector3.INF
 ## Culvert mouth on hole 2. INF means this hole has no pipe.

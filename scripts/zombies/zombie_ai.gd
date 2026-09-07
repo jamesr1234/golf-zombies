@@ -5,6 +5,7 @@ extends RefCounted
 
 const _ZombieShot := preload("res://scripts/zombies/zombie_shot.gd")
 const TURN_SPEED := 8.0
+const WALL_BOUNCE := 8.0
 
 var target: Node3D
 var attack_timer := 0.0
@@ -15,7 +16,7 @@ var melee_pending := false
 func steer(zombie: Zombie) -> Vector3:
 	if zombie.stats.stationary:
 		return Vector3.ZERO
-	if zombie.has_roam() and not zombie.roam_contains(zombie.global_position):
+	if zombie.stays_in_yard() and not zombie.roam_contains(zombie.global_position):
 		return _aisle(zombie, zombie.patrol_a if zombie.has_patrol() else zombie.roam_home())
 	if target == null:
 		if zombie.has_patrol():
@@ -69,6 +70,48 @@ func face(zombie: Zombie, direction: Vector3, delta: float) -> void:
 		return
 	var wanted := atan2(-direction.x, -direction.z)
 	zombie.visual.rotation.y = lerp_angle(zombie.visual.rotation.y, wanted, TURN_SPEED * delta)
+
+
+## A roam walker that walks into scenery picks a new yard point on the open
+## side instead of grinding the wall. Chase and breakable forts stay put.
+func bounce_off_wall(zombie: Zombie) -> bool:
+	if not zombie.has_roam() or target != null:
+		return false
+	for i in zombie.get_slide_collision_count():
+		var col := zombie.get_slide_collision(i)
+		if not _is_bounce_wall(col):
+			continue
+		var normal := col.get_normal()
+		normal.y = 0.0
+		turn_from_wall(zombie, normal.normalized())
+		return true
+	return false
+
+
+func turn_from_wall(zombie: Zombie, normal: Vector3) -> void:
+	var away := zombie.global_position + normal * WALL_BOUNCE
+	away.y = zombie.global_position.y
+	if zombie.roam_contains(away):
+		zombie.wander_at = away
+	else:
+		zombie.wander_at = zombie.roam_sample()
+	if zombie.agent != null:
+		zombie.agent.target_position = zombie.wander_at
+
+
+func _is_bounce_wall(col: KinematicCollision3D) -> bool:
+	var normal := col.get_normal()
+	if absf(normal.y) > 0.55:
+		return false
+	normal.y = 0.0
+	if normal.length_squared() < 0.25:
+		return false
+	var body := col.get_collider()
+	if body == null or body is Zombie:
+		return false
+	if body.has_method("take_hit"):
+		return false
+	return true
 
 
 func bash_fort(zombie: Zombie) -> bool:
@@ -218,7 +261,7 @@ func pick_target(zombie: Zombie) -> Node3D:
 			var player := node as Player
 			if player == null or not player.health.is_alive():
 				continue
-			if zombie.has_roam() and not zombie.roam_contains(player.global_position):
+			if zombie.hunts_in_yard() and not zombie.roam_contains(player.global_position):
 				continue
 			var maze := zombie.home_maze()
 			if maze != null and not maze.contains_world(player.global_position):
@@ -235,7 +278,7 @@ func pick_target(zombie: Zombie) -> Node3D:
 			continue
 		if not Zombie.hunts(zombie.allied, false, other.is_allied()):
 			continue
-		if zombie.has_roam() and not zombie.roam_contains(other.global_position):
+		if zombie.hunts_in_yard() and not zombie.roam_contains(other.global_position):
 			continue
 		var dist := zombie.global_position.distance_to(other.global_position)
 		if zombie.aggro_range > 0.0 and dist > zombie.aggro_range:
@@ -297,7 +340,7 @@ func _wander(zombie: Zombie) -> Vector3:
 
 
 func _clamp_roam(zombie: Zombie, direction: Vector3) -> Vector3:
-	if not zombie.has_roam() or direction.length_squared() < 0.0001:
+	if not zombie.stays_in_yard() or direction.length_squared() < 0.0001:
 		return direction
 	var next := zombie.global_position + direction.normalized() * 1.2
 	if zombie.roam_contains(next):

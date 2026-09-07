@@ -229,6 +229,18 @@ func fill_stash() -> void:
 	ammo_changed.emit()
 
 
+## Arena warmup starts empty so you pick two from the floor.
+func clear_stash() -> void:
+	loadout.clear()
+	mags.clear()
+	reserves.clear()
+	gates.clear()
+	index = 0
+	_firing = false
+	_reset_hold()
+	ammo_changed.emit()
+
+
 func add_gun(stats: WeaponStats, gun_gate := CustomHole.NO_GATE) -> bool:
 	if stats == null or has_gun(stats):
 		return false

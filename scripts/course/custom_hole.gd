@@ -26,6 +26,14 @@ const NO_END := Vector3.INF
 ## a placement would otherwise drag a @tool script into its own parse.
 const WEAPON_DIR := "res://resources/weapons"
 const ZIPLINE := "res://scenes/course/props/zipline.tscn"
+## Token path, not a scene. The creator draws the yard; play plants the pack.
+const SPAWN := "spawn"
+const RADIUS := "radius"
+const AGGRO := "aggro"
+const COUNTS := "counts"
+const DEFAULT_RADIUS := 10.8
+const DEFAULT_AGGRO := 16.2
+const MAX_EACH := 12
 
 var id := ""
 var title := UNTITLED
@@ -62,6 +70,10 @@ static func is_weapon(path: String) -> bool:
 
 static func is_zipline(path: String) -> bool:
 	return path == ZIPLINE
+
+
+static func is_spawn(path: String) -> bool:
+	return path == SPAWN
 
 
 static func has_end(entry: Dictionary) -> bool:
@@ -159,6 +171,21 @@ func copy() -> CustomHole:
 	return from_dict(to_dict())
 
 
+## Restore this record in place so the tools that already hold it keep working.
+func take_from(other: CustomHole) -> void:
+	if other == null:
+		return
+	id = other.id
+	title = other.title
+	created_at = other.created_at
+	fairway_size = other.fairway_size
+	needs_width = other.needs_width
+	pieces = other.pieces.duplicate()
+	placements = []
+	for entry in other.placements:
+		placements.append(entry.duplicate(true))
+
+
 func to_dict() -> Dictionary:
 	var listed: Array = []
 	for entry in placements:
@@ -170,6 +197,10 @@ func to_dict() -> Dictionary:
 		}
 		if has_end(entry):
 			row[END] = to_array(entry[END])
+		if is_spawn(String(entry[PATH])):
+			row[RADIUS] = float(entry.get(RADIUS, DEFAULT_RADIUS))
+			row[AGGRO] = float(entry.get(AGGRO, DEFAULT_AGGRO))
+			row[COUNTS] = spawn_counts(entry.get(COUNTS, {}))
 		listed.append(row)
 	return {
 		"version": VERSION,
@@ -196,13 +227,18 @@ static func from_dict(body: Dictionary) -> CustomHole:
 	for entry in body.get("placements", []):
 		if typeof(entry) != TYPE_DICTIONARY:
 			continue
-		hole.placements.append(placement(
+		var row := placement(
 			String(entry.get(PATH, "")),
 			to_vector(entry.get(POSITION, [])),
 			float(entry.get(YAW, 0.0)),
 			float(entry.get(GATE, NO_GATE)),
 			to_vector(entry[END]) if entry.has(END) else NO_END
-		))
+		)
+		if is_spawn(String(row[PATH])) or entry.has(RADIUS) or entry.has(COUNTS) or entry.has(AGGRO):
+			row[RADIUS] = float(entry.get(RADIUS, DEFAULT_RADIUS))
+			row[AGGRO] = float(entry.get(AGGRO, DEFAULT_AGGRO))
+			row[COUNTS] = spawn_counts(entry.get(COUNTS, {}))
+		hole.placements.append(row)
 	return hole
 
 
@@ -215,6 +251,15 @@ static func to_vector(listed) -> Vector3:
 	if typeof(listed) != TYPE_ARRAY or (listed as Array).size() < 3:
 		return Vector3.ZERO
 	return Vector3(float(listed[0]), float(listed[1]), float(listed[2]))
+
+
+static func spawn_counts(raw) -> Dictionary:
+	var out := {"walker": 0, "runner": 0, "brute": 0, "gunner": 0}
+	if typeof(raw) != TYPE_DICTIONARY:
+		return out
+	for key in out.keys():
+		out[key] = clampi(int(raw.get(key, 0)), 0, MAX_EACH)
+	return out
 
 
 static func _new_id() -> String:

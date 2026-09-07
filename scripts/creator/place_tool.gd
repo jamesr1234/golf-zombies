@@ -8,6 +8,7 @@ signal changed
 signal refused(reason: String)
 
 const NAME := "PLACE"
+const SPAWNS := "spawns"
 const TURN := 45.0
 const TURN_FREE := 5.0
 const TURN_SPEED := 270.0
@@ -22,6 +23,12 @@ var yaw := 0.0
 var gating := -1
 ## World pose of a zipline start waiting for its lower end, or INF for none.
 var zip_from := Vector3.INF
+## Which spawn is having its yard drawn, or -1 for none.
+var roaming := -1
+var roam_radius := SpawnPack.DEFAULT_RADIUS
+## True while the chase ring is being drawn after the yard is set.
+var hunting := false
+var aggro_radius := SpawnPack.DEFAULT_AGGRO
 ## Where down the hole the crosshair currently is, filled in by the creator
 ## because it is the only side that holds the built HoleData.
 var aim_gate := 0.0
@@ -50,6 +57,7 @@ func label() -> String:
 ## Catalog pieces first, then anything the player grouped themselves.
 func shelves() -> PackedStringArray:
 	var out := PieceCatalog.categories()
+	out.append(SPAWNS)
 	out.append("groups")
 	return out
 
@@ -61,6 +69,8 @@ func shelf() -> String:
 func pieces() -> PackedStringArray:
 	if shelf() == "groups":
 		return HoleStore.list_structures()
+	if shelf() == SPAWNS:
+		return PackedStringArray([CustomHole.SPAWN])
 	return PieceCatalog.entries(shelf())
 
 
@@ -75,6 +85,8 @@ func picked_label() -> String:
 	var path := picked_path()
 	if path.is_empty():
 		return "NOTHING TO PLACE"
+	if CustomHole.is_spawn(path):
+		return "ZOMBIE SPAWN"
 	return HoleStore.structure_title(path) if HoleStore.is_structure(path) else PieceCatalog.label_for(path)
 
 
@@ -82,10 +94,12 @@ func picked_label() -> String:
 func labels() -> PackedStringArray:
 	var out: PackedStringArray = []
 	for path in pieces():
-		out.append(
-			HoleStore.structure_title(path) if HoleStore.is_structure(path)
-			else PieceCatalog.label_for(path)
-		)
+		if CustomHole.is_spawn(path):
+			out.append("ZOMBIE SPAWN")
+		elif HoleStore.is_structure(path):
+			out.append(HoleStore.structure_title(path))
+		else:
+			out.append(PieceCatalog.label_for(path))
 	return out
 
 
@@ -97,7 +111,7 @@ func picked_index() -> int:
 
 
 func step_shelf(delta: int) -> void:
-	if is_zipping():
+	if is_zipping() or is_roaming():
 		return
 	category = posmod(category + delta, shelves().size())
 	picked = 0
@@ -105,7 +119,7 @@ func step_shelf(delta: int) -> void:
 
 
 func step_piece(delta: int) -> void:
-	if is_zipping():
+	if is_zipping() or is_roaming():
 		return
 	var listed := pieces()
 	if listed.is_empty():
@@ -149,9 +163,19 @@ func aim(holder: Node3D, neighbors: Node, at: Vector3) -> void:
 	if is_zipping():
 		_aim_zip_end(holder, neighbors, at)
 		return
+	if is_hunting():
+		_aim_aggro(at)
+		return
+	if is_roaming():
+		_aim_roam(at)
+		return
 	var path := picked_path()
 	if is_gating() or path.is_empty():
 		_clear_ghost()
+		return
+	if CustomHole.is_spawn(path):
+		_clear_ghost()
+		_at = _grounded(at)
 		return
 	if path != _ghost_path:
 		_build_ghost(holder, path)
@@ -170,6 +194,8 @@ func aim(holder: Node3D, neighbors: Node, at: Vector3) -> void:
 func place() -> bool:
 	if is_zipping():
 		return _set_zip_end()
+	if is_roaming():
+		return false
 	var path := picked_path()
 	if path.is_empty():
 		return false
@@ -184,6 +210,8 @@ func place() -> bool:
 	# whole hole, which is the sane default.
 	if CustomHole.is_weapon(path):
 		gating = hole.placements.size() - 1
+	elif CustomHole.is_spawn(path):
+		_begin_roam(hole.placements.size() - 1)
 	changed.emit()
 	return true
 
@@ -205,6 +233,57 @@ func aim_at() -> Vector3:
 
 func is_gating() -> bool:
 	return gating >= 0 and gating < hole.placements.size()
+
+
+func is_roaming() -> bool:
+	return roaming >= 0 and roaming < hole.placements.size()
+
+
+func is_hunting() -> bool:
+	return hunting and is_roaming()
+
+
+func set_roam() -> bool:
+	if not is_roaming() or is_hunting():
+		return false
+	hole.placements[roaming][CustomHole.RADIUS] = roam_radius
+	hunting = true
+	aggro_radius = SpawnPack.DEFAULT_AGGRO
+	hole.placements[roaming][CustomHole.AGGRO] = aggro_radius
+	return true
+
+
+func set_aggro() -> bool:
+	if not is_hunting():
+		return false
+	hole.placements[roaming][CustomHole.AGGRO] = aggro_radius
+	return true
+
+
+func finish_spawn(counts: Dictionary) -> bool:
+	if not is_roaming():
+		return false
+	var clamped := SpawnPack.clamp_counts(counts)
+	if SpawnPack.total(clamped) <= 0:
+		return false
+	hole.placements[roaming][CustomHole.COUNTS] = clamped
+	hole.placements[roaming][CustomHole.AGGRO] = aggro_radius
+	roaming = -1
+	hunting = false
+	changed.emit()
+	return true
+
+
+func abort_spawn() -> bool:
+	if not is_roaming():
+		return false
+	var index := roaming
+	roaming = -1
+	hunting = false
+	if index >= 0 and index < hole.placements.size():
+		hole.remove_placement(index)
+	changed.emit()
+	return true
 
 
 ## Aim at a gun already on the hole to redraw its line.
@@ -255,6 +334,45 @@ func nearest_weapon(at: Vector3, within := 8.0) -> int:
 ## undo without hunting for a handle.
 func erase(at: Vector3) -> bool:
 	var index := nearest(at)
+	# #region agent log
+	var _cands: Array = []
+	for i in hole.placements.size():
+		var _p: Vector3 = hole.placements[i][CustomHole.POSITION]
+		var _lifted := _p
+		if height != null:
+			_lifted = Vector3(_p.x, height.height_at(_p.x, _p.z) + _p.y, _p.z)
+		_cands.append({
+			"i": i,
+			"path": String(hole.placements[i][CustomHole.PATH]).get_file(),
+			"stored": [snappedf(_p.x, 0.01), snappedf(_p.y, 0.01), snappedf(_p.z, 0.01)],
+			"lifted": [snappedf(_lifted.x, 0.01), snappedf(_lifted.y, 0.01), snappedf(_lifted.z, 0.01)],
+			"d_stored": snappedf(_p.distance_to(at), 0.01),
+			"d_lifted": snappedf(_lifted.distance_to(at), 0.01),
+			"dxz": snappedf(Vector2(_p.x - at.x, _p.z - at.z).length(), 0.01),
+		})
+		_cands.sort_custom(func(a, b): return float(a["d_lifted"]) < float(b["d_lifted"]))
+	if _cands.size() > 8:
+		_cands.resize(8)
+	var _f := FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-2b6f56.log", FileAccess.READ_WRITE)
+	if _f == null:
+		_f = FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-2b6f56.log", FileAccess.WRITE)
+	if _f != null:
+		_f.seek_end()
+		_f.store_line(JSON.stringify({
+			"sessionId": "2b6f56", "runId": "post-fix", "hypothesisId": "B",
+			"location": "place_tool.gd:erase",
+			"message": "erase nearest scan", "timestamp": Time.get_ticks_msec(),
+			"data": {
+				"aim": [snappedf(at.x, 0.01), snappedf(at.y, 0.01), snappedf(at.z, 0.01)],
+				"ghost_at": [snappedf(_at.x, 0.01), snappedf(_at.y, 0.01), snappedf(_at.z, 0.01)],
+				"picked": index,
+				"count": hole.placements.size(),
+				"within": 6.0,
+				"closest": _cands,
+			},
+		}))
+		_f.close()
+	# #endregion
 	if index < 0:
 		refused.emit("NOTHING CLOSE ENOUGH TO REMOVE")
 		return false
@@ -268,17 +386,25 @@ func nearest(at: Vector3, within := 6.0) -> int:
 	var closest := within
 	for i in hole.placements.size():
 		var entry: Dictionary = hole.placements[i]
-		var distance: float = (entry[CustomHole.POSITION] as Vector3).distance_to(at)
+		var distance := _world_pos(entry[CustomHole.POSITION]).distance_to(at)
 		if CustomHole.has_end(entry):
-			distance = minf(distance, (entry[CustomHole.END] as Vector3).distance_to(at))
+			distance = minf(distance, _world_pos(entry[CustomHole.END]).distance_to(at))
 		if distance < closest:
 			closest = distance
 			best = i
 	return best
 
 
+func _world_pos(stored: Vector3) -> Vector3:
+	if height == null:
+		return stored
+	return Vector3(stored.x, height.height_at(stored.x, stored.z) + stored.y, stored.z)
+
+
 ## Leaving the tool abandons a half-drawn line without changing what is stored.
 func release() -> void:
+	if is_roaming():
+		abort_spawn()
 	gating = -1
 	zip_from = Vector3.INF
 	_clear_ghost()
@@ -289,6 +415,10 @@ func summary() -> String:
 		return "DRAW THE LINE   CLICK TO SET   RIGHT CLICK FOR NO LINE"
 	if is_zipping():
 		return "PLACE THE LOWER END   CLICK TO SET   RIGHT CLICK TO CANCEL"
+	if is_hunting():
+		return "SET THE CHASE   %d M   CLICK TO SET   RIGHT CLICK TO CANCEL" % roundi(aggro_radius)
+	if is_roaming():
+		return "SET THE YARD   %d M   CLICK TO SET   RIGHT CLICK TO CANCEL" % roundi(roam_radius)
 	var lock := ""
 	if surface_snap:
 		lock += "   SURFACE SNAP"
@@ -296,6 +426,40 @@ func summary() -> String:
 	return "%s   %d PLACED   YAW %d%s" % [
 		shelf().to_upper(), hole.placements.size(), roundi(yaw), lock
 	]
+
+
+func _begin_roam(index: int) -> void:
+	roaming = index
+	hunting = false
+	roam_radius = SpawnPack.DEFAULT_RADIUS
+	aggro_radius = SpawnPack.DEFAULT_AGGRO
+	var entry: Dictionary = hole.placements[index]
+	entry[CustomHole.RADIUS] = roam_radius
+	entry[CustomHole.AGGRO] = aggro_radius
+	entry[CustomHole.COUNTS] = SpawnPack.empty_counts()
+
+
+func _grounded(at: Vector3) -> Vector3:
+	var snapped := GridSnap.to_grid(at)
+	snapped.y = height.height_at(snapped.x, snapped.z) if height != null else 0.0
+	return snapped
+
+
+func _aim_span(at: Vector3) -> float:
+	_clear_ghost()
+	_at = _grounded(at)
+	if not is_roaming():
+		return 0.0
+	var origin: Vector3 = hole.placements[roaming][CustomHole.POSITION]
+	return Vector2(_at.x - origin.x, _at.z - origin.z).length()
+
+
+func _aim_roam(at: Vector3) -> void:
+	roam_radius = SpawnPack.clamp_radius(_aim_span(at))
+
+
+func _aim_aggro(at: Vector3) -> void:
+	aggro_radius = SpawnPack.clamp_aggro(_aim_span(at))
 
 
 func _set_zip_end() -> bool:

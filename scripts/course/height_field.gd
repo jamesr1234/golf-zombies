@@ -251,18 +251,15 @@ func _raise_jumps(data: HoleData) -> void:
 ## Flat cart lane from just past the green to the fence, so the drive off the
 ## hole is not a climb through the rough.
 func _pave_exit(data: HoleData) -> void:
-	var along := data.along_cup() if RaceHole.applies(data) else data.cup - data.tee
+	var along := data.along_cup()
 	along.y = 0.0
 	if along.length_squared() < 0.0001:
 		return
 	along = along.normalized()
-	var half := 16.0
+	var half := maxf(data.fairway_width() * 0.5, CourseTrees.EXIT_HALF)
 	var deck := height_at(data.cup.x, data.cup.z)
-	var end := Vector3(data.cup.x, 0.0, data.cup.z)
-	var span := 0.0
-	while data.bounds.has_point(Vector2(end.x, end.z)) and span < 240.0:
-		end += along * cell
-		span += cell
+	var end := HoleGenerator.exit_end(data)
+	var span := Vector2(end.x - data.cup.x, end.z - data.cup.z).length()
 	var pad := maxf(half, span) + cell
 	var x0 := maxi(0, int(floor((data.cup.x - pad - origin.x) / cell)))
 	var z0 := maxi(0, int(floor((data.cup.z - pad - origin.y) / cell)))

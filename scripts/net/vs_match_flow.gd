@@ -114,6 +114,7 @@ func start_hole(index: int) -> void:
 	_reset_clock()
 	spawner_ai.clear_zombies()
 	spawner_ai.plant_mazes(course.hole_node)
+	_sync_loadouts()
 	scorecard_changed.emit()
 	_broadcast_scores()
 	_flash_message(
@@ -561,9 +562,6 @@ func _wire_players() -> void:
 		player.cart = cart_for(player)
 		if player.golf != null:
 			player.golf.club_kit = player.score.club_kit()
-		player.weapon.fill_stash()
-		if NetSession.is_active() and multiplayer.is_server():
-			_broadcast_loadout(player)
 		if GameSettings.is_coop_vs():
 			_team_card(CoopVs.team_of(player.seat_index()))
 		if not GameSettings.is_coop_vs():
@@ -577,6 +575,10 @@ func _wire_players() -> void:
 		CoopVs.bind_partners(_players)
 		_wire_team_golf()
 	_sync_local_score()
+	_sync_loadouts()
+	if NetSession.is_active() and multiplayer.is_server():
+		for player in _players:
+			_broadcast_loadout(player)
 
 
 func _connect_player_golf(player: Player) -> void:
@@ -602,6 +604,16 @@ func _wire_team_golf() -> void:
 			continue
 		seen[team] = true
 		_connect_player_golf(player)
+
+
+func _sync_loadouts() -> void:
+	for player in _players:
+		if player == null or player.weapon == null:
+			continue
+		if ArenaHole.applies(hole):
+			player.weapon.clear_stash()
+		else:
+			player.weapon.fill_stash()
 
 
 func _sync_local_score() -> void:
@@ -669,6 +681,7 @@ func _do_start_play() -> void:
 		score.hole_index if score else 0, hole.spawn_points, ArenaHole.applies(hole)
 	)
 	spawner_ai.place_snipers(hole.sniper_perches())
+	spawner_ai.plant_packs(hole.spawn_packs, hole.height)
 	scorecard_changed.emit()
 	Sfx.play("start_play", self)
 	_Music.play_level()
@@ -1134,6 +1147,7 @@ func _do_arrive() -> void:
 	shop = course.shop
 	_reset_clock()
 	spawner_ai.plant_mazes(course.hole_node)
+	_sync_loadouts()
 	get_tree().call_group("hud", "reveal")
 	scorecard_changed.emit()
 	_replicate_event.rpc("shop")
@@ -1148,6 +1162,7 @@ func _do_leave() -> void:
 	course.leave_to_prep(_players)
 	shop = course.shop
 	hole = course.hole
+	_sync_loadouts()
 	course.aim_practice(_sessions())
 	scorecard_changed.emit()
 	_replicate_event.rpc("prep")

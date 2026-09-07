@@ -51,6 +51,34 @@ func test_the_tee_sign_reads_the_hole_name() -> void:
 	assert_true(data.banner_title().begins_with("Neon Alley"), data.banner_title())
 
 
+func test_redo_puts_the_last_take_back() -> void:
+	var hole := CustomHole.create("Redo")
+	var history := CreatorHistory.new()
+	var tool := FairwayTool.new(hole)
+	tool.pick(FairwayPiece.index_of("straight"))
+	assert_true(tool.place())
+	var with_piece := hole.pieces.size()
+	var before := hole.to_dict()
+	assert_true(tool.undo())
+	assert_lt(hole.pieces.size(), with_piece)
+	history.stash(before)
+	assert_true(history.redo(hole))
+	assert_eq(hole.pieces.size(), with_piece)
+	assert_false(history.can_redo(), "one take-back, one redo")
+
+
+func test_redo_puts_an_erased_piece_back() -> void:
+	var hole := CustomHole.create("Erase Redo")
+	hole.add_placement(CUBE, Vector3(0.0, 0.0, -20.0))
+	var history := CreatorHistory.new()
+	history.stash(hole.to_dict())
+	hole.remove_placement(0)
+	assert_eq(hole.placements.size(), 0)
+	assert_true(history.redo(hole))
+	assert_eq(hole.placements.size(), 1)
+	assert_eq(String(hole.placements[0][CustomHole.PATH]), CUBE)
+
+
 func test_the_fairway_tool_lays_pieces_and_takes_them_back() -> void:
 	var hole := CustomHole.create("Shaping")
 	var tool := FairwayTool.new(hole)
@@ -195,6 +223,81 @@ func test_a_zipline_end_has_to_sit_lower() -> void:
 	tool.release()
 
 
+func test_a_spawn_sits_on_the_grass_even_from_a_high_aim() -> void:
+	var hole := CustomHole.create("High Aim")
+	var tool := PlaceTool.new(hole)
+	var host := Node3D.new()
+	add_child_autofree(host)
+	_pick_spawn(tool)
+	tool.aim(host, host, Vector3(0.0, 18.0, -20.0))
+	assert_true(tool.place())
+	var at: Vector3 = hole.placements[0][CustomHole.POSITION]
+	assert_almost_eq(at.y, 0.0, 0.01, "camera height must not lift the pack")
+	tool.abort_spawn()
+
+
+func test_dropping_a_spawn_asks_for_its_yard() -> void:
+	var hole := CustomHole.create("Swarm")
+	var tool := PlaceTool.new(hole)
+	var host := Node3D.new()
+	add_child_autofree(host)
+	_pick_spawn(tool)
+	tool.aim(host, host, Vector3(0.0, 0.0, -20.0))
+	assert_true(tool.place())
+	assert_true(tool.is_roaming(), "the yard comes next")
+	assert_eq(hole.placements.size(), 1)
+	tool.aim(host, host, Vector3(10.8, 0.0, -20.0))
+	assert_true(tool.set_roam())
+	assert_almost_eq(float(hole.placements[0][CustomHole.RADIUS]), 10.8, 0.01)
+	assert_true(tool.is_hunting(), "the chase ring comes after the yard")
+	tool.aim(host, host, Vector3(16.2, 0.0, -20.0))
+	assert_true(tool.set_aggro())
+	assert_almost_eq(float(hole.placements[0][CustomHole.AGGRO]), 16.2, 0.01)
+	assert_true(tool.finish_spawn({"walker": 4, "runner": 1, "brute": 0, "gunner": 0}))
+	assert_false(tool.is_roaming())
+	assert_false(tool.is_hunting())
+	assert_eq(int(hole.placements[0][CustomHole.COUNTS]["walker"]), 4)
+	assert_eq(int(hole.placements[0][CustomHole.COUNTS]["runner"]), 1)
+	tool.release()
+
+
+func test_a_spawn_needs_at_least_one_enemy() -> void:
+	var hole := CustomHole.create("Empty Yard")
+	var tool := PlaceTool.new(hole)
+	var host := Node3D.new()
+	add_child_autofree(host)
+	_pick_spawn(tool)
+	tool.aim(host, host, Vector3(0.0, 0.0, -20.0))
+	assert_true(tool.place())
+	assert_true(tool.set_roam())
+	assert_false(tool.finish_spawn(SpawnPack.empty_counts()))
+	assert_true(tool.is_roaming())
+	assert_true(tool.abort_spawn())
+	assert_eq(hole.placements.size(), 0)
+
+
+func test_backing_out_of_a_spawn_drops_the_point() -> void:
+	var hole := CustomHole.create("Spawn Cancel")
+	var tool := PlaceTool.new(hole)
+	var host := Node3D.new()
+	add_child_autofree(host)
+	_pick_spawn(tool)
+	tool.aim(host, host, Vector3(0.0, 0.0, -20.0))
+	assert_true(tool.place())
+	assert_true(tool.abort_spawn())
+	assert_false(tool.is_roaming())
+	assert_eq(hole.placements.size(), 0)
+	tool.release()
+
+
+func test_the_place_tool_lists_a_zombie_spawn() -> void:
+	var tool := PlaceTool.new(CustomHole.create("Spawns"))
+	_pick_spawn(tool)
+	assert_eq(tool.shelf(), PlaceTool.SPAWNS)
+	assert_eq(tool.picked_path(), CustomHole.SPAWN)
+	assert_eq(tool.picked_label(), "ZOMBIE SPAWN")
+
+
 func test_backing_out_of_a_zipline_drops_the_start() -> void:
 	var hole := CustomHole.create("Zip Cancel")
 	var tool := PlaceTool.new(hole)
@@ -302,6 +405,16 @@ func test_the_nearest_piece_is_the_one_removed() -> void:
 	assert_false(tool.erase(Vector3(0.0, 0.0, -300.0)), "nothing near means nothing goes")
 
 
+## Looking down, camera reach often lands under the grass. Erase has to use the
+## surface under the crosshair or it misses a piece that is right there.
+func test_erase_uses_the_surface_under_the_crosshair() -> void:
+	var hole := CustomHole.create("Hover Erase")
+	hole.add_placement(CUBE, Vector3(0.0, 0.0, -31.0))
+	var tool := PlaceTool.new(hole)
+	assert_false(tool.erase(Vector3(0.0, -8.2, -34.5)), "an underground aim is not close enough")
+	assert_true(tool.erase(Vector3(0.0, 0.0, -31.2)), "the grass hit under the lens is")
+
+
 func test_the_group_tool_gathers_a_ring_and_saves_it() -> void:
 	var hole := CustomHole.create("Grouping")
 	hole.add_placement(CUBE, Vector3(0.0, 0.0, -20.0))
@@ -339,6 +452,20 @@ func test_merging_swaps_the_loose_pieces_for_the_structure() -> void:
 	var overlay := CustomOverlay.build(hole)
 	add_child_autofree(overlay)
 	assert_eq(overlay.get_child_count(), 3, "the merged group still puts three pieces down")
+
+
+func test_a_spawn_cannot_be_merged_into_a_structure() -> void:
+	var hole := CustomHole.create("Spawn Group")
+	hole.add_placement(CUBE, Vector3(0.0, 0.0, -20.0))
+	hole.add_placement(CustomHole.SPAWN, Vector3(GridSnap.CELL, 0.0, -20.0))
+	var tool := GroupTool.new(hole)
+	var reasons: Array[String] = []
+	tool.refused.connect(func(reason: String) -> void: reasons.append(reason))
+	tool.aim(Vector3(0.0, 0.0, -20.0))
+	tool.toggle()
+	assert_false(tool.save("Swarm"))
+	assert_eq(reasons.size(), 1)
+	assert_eq(hole.placements.size(), 2, "a refused merge leaves the hole alone")
 
 
 func test_a_weapon_cannot_be_merged_into_a_structure() -> void:
@@ -507,7 +634,7 @@ func test_the_pad_reaches_every_command() -> void:
 	await wait_frames(1)
 	for command in ["confirm", "cancel", "step_piece", "step_shelf", "side", "cycle_tool",
 			"draw_weapon_line", "ask_group", "ask_save", "playtest", "overview",
-			"toggle_menu", "toggle_yaw_snap", "context", "snap_surface"]:
+			"toggle_menu", "toggle_yaw_snap", "context", "snap_surface", "redo_change"]:
 		assert_true(creator.has_method(command), command)
 	creator.toggle_menu()
 	assert_true(creator.menu_is_open())
@@ -679,6 +806,15 @@ func test_the_browser_lists_what_was_saved() -> void:
 	assert_eq(browser.rows.size(), 1)
 	assert_false(browser.picking_new())
 	assert_eq(String(browser.rows[browser.picked - 1]["title"]), "Alpha")
+
+
+func _pick_spawn(tool: PlaceTool) -> void:
+	var seen: PackedStringArray = []
+	while tool.shelf() != PlaceTool.SPAWNS:
+		var shelf := tool.shelf()
+		assert_false(seen.has(shelf), "the shelves have to include a spawn")
+		seen.append(shelf)
+		tool.step_shelf(1)
 
 
 func _pick_zip(tool: PlaceTool) -> void:

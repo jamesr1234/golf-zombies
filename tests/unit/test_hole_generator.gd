@@ -184,6 +184,33 @@ func test_tee_and_cup_sit_inside_the_bounds() -> void:
 		assert_true(hole.bounds.has_point(Vector2(hole.cup.x, hole.cup.z)))
 
 
+func test_the_fairway_runs_past_the_cup_to_the_map_edge() -> void:
+	for index in 9:
+		var hole := HoleGenerator.generate(index, SEED)
+		if hole.is_setpiece() or ArenaHole.applies(hole):
+			continue
+		var along := hole.along_cup()
+		var end := HoleGenerator.exit_end(hole)
+		var span := Vector2(end.x - hole.cup.x, end.z - hole.cup.z).length()
+		assert_gt(span, hole.green_radius + 8.0, "hole %d needs room past the pin" % (index + 1))
+		var mid := hole.cup + along * (span * 0.6)
+		var covered := false
+		for patch in hole.patches:
+			if patch["type"] == Surface.Type.FAIRWAY and HoleGenerator.patch_covers(patch, mid):
+				covered = true
+				break
+		assert_true(covered, "hole %d should keep fairway to the fence" % (index + 1))
+		assert_false(
+			hole.bounds.has_point(Vector2(end.x, end.z)),
+			"hole %d: the overrun stops at the fence" % (index + 1)
+		)
+		var inside := end - along * 2.0
+		assert_true(
+			hole.bounds.has_point(Vector2(inside.x, inside.z)),
+			"hole %d: the strip has to reach the last cell inside the map" % (index + 1)
+		)
+
+
 func test_every_hole_has_a_green_and_some_sand() -> void:
 	for index in 9:
 		var hole := HoleGenerator.generate(index, SEED)

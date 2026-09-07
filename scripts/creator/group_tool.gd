@@ -117,6 +117,9 @@ func save(title: String) -> bool:
 		if CustomHole.is_weapon(path):
 			refused.emit("A WEAPON CANNOT GO IN A STRUCTURE")
 			return false
+		if CustomHole.is_spawn(path):
+			refused.emit("A SPAWN CANNOT GO IN A STRUCTURE")
+			return false
 	var saved_path := HoleStore.save_structure(title, picked)
 	if saved_path.is_empty():
 		refused.emit("COULD NOT SAVE THAT STRUCTURE")

@@ -50,8 +50,10 @@ static func build(custom: CustomHole, base_seed := 0, index := FairwayPiece.INDE
 	HoleGenerator.add_practice_green(data, opening)
 
 	data.bounds = HoleGenerator.bounds_of(data)
+	HoleGenerator.add_exit_fairway(data)
 	HoleGenerator.add_spawn_points(data, rng, width)
 	data.height = HeightField.generate(data, rng)
 	HoleGenerator.lift_to_ground(data)
+	data.spawn_packs = SpawnPack.from_hole(custom, data.height)
 	data.index = index
 	return data

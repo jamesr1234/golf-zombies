@@ -63,7 +63,7 @@ func begin_transit(flow: MatchFlow) -> void:
 	flow.scorecard_changed.emit()
 	flow._flash_message(
 		"Next tee",
-		"Follow the arrows through the gate and run them down.\nOpen the clubhouse doors when you arrive."
+		"Follow the arrows through the gate.\nOpen the clubhouse doors when you arrive."
 	)
 
 
@@ -143,6 +143,7 @@ func attach_next_hole(flow: MatchFlow) -> void:
 	flow._place_cart_girl()
 	flow.spawner.clear_zombies()
 	flow.spawner.plant_mazes(flow._hole_node)
+	flow._sync_loadouts()
 
 
 func place_at_exit(flow: MatchFlow) -> void:
