@@ -35,6 +35,8 @@ func configure(player: Player) -> void:
 
 
 func tick(player: Player, delta: float) -> void:
+	if player.is_previewing():
+		return
 	# Riders are carried by the cart. Golfers are planted at address. Either one
 	# calling move_and_slide inside the heightmap is how a seat can freeze.
 	if (

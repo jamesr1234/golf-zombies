@@ -30,6 +30,7 @@ func before_each() -> void:
 	flow.start_in_clubhouse = false
 	flow.starting_money = 0
 	flow.start_on_cart_path = false
+	flow.start_at_cup = false
 	flow.cpu_drives_at_start = false
 	flow.begin()
 	# Most tests are about a hole in progress, so warm-up is called on straight
@@ -102,12 +103,66 @@ func test_the_ball_is_waiting_to_be_played() -> void:
 	assert_false(golf.can_claim(players[0]), "the players start too far away to swing")
 
 
+func test_play_can_open_at_the_cup() -> void:
+	var extra := WORLD.instantiate()
+	add_child_autofree(extra)
+	var other := extra.get_node("MatchFlow") as MatchFlow
+	var who := extra.get_node("Players/Player1") as Player
+	var ball_node := extra.get_node("GolfBall") as GolfBall
+	other.starting_hole = 1
+	other.start_at_cup = true
+	other.start_in_clubhouse = false
+	other.start_on_cart_path = false
+	other.cpu_drives_at_start = false
+	other.begin()
+	await wait_physics_frames(6)
+	assert_eq(other.phase, MatchFlow.Phase.RETRIEVE)
+	assert_eq(other.hole.index, 0)
+	assert_eq(other.score.hole_index, 1, "the card has already moved on to hole 2")
+	assert_eq(other.score.results[0], other.hole.par)
+	assert_false(ball_node.is_stowed())
+	var to_cup := ball_node.global_position - other.hole.cup
+	to_cup.y = 0.0
+	assert_lt(to_cup.length(), 0.8, "the ball is in the hole")
+	var to_player := who.global_position - other.hole.cup
+	to_player.y = 0.0
+	assert_lt(to_player.length(), 6.0, "you stand at the cup to pick it up")
+	assert_true(other.can_retrieve_ball(who))
+
+
+func test_hole_four_puts_the_arena_next_door() -> void:
+	var extra := WORLD.instantiate()
+	add_child_autofree(extra)
+	var other := extra.get_node("MatchFlow") as MatchFlow
+	other.starting_hole = 4
+	other.start_at_cup = true
+	other.start_in_clubhouse = false
+	other.start_on_cart_path = false
+	other.cpu_drives_at_start = false
+	other.begin()
+	await wait_physics_frames(8)
+	assert_eq(other.phase, MatchFlow.Phase.RETRIEVE)
+	assert_eq(other.hole.index, 3)
+	assert_true(ArenaHole.applies(other.next_hole), "hole 5 is already sitting past the green")
+	assert_null(other.cart_path, "no staging drive to the arena")
+	assert_eq(extra.get_tree().get_nodes_in_group("transit_boost").size(), 0)
+	assert_null(extra.find_child("EndCap", true, false))
+	var doors := ArenaDoors.of(other.next_hole_node)
+	assert_not_null(doors)
+	var to_doors := doors.global_position - other.hole.cup
+	to_doors.y = 0.0
+	assert_gt(to_doors.length(), 12.0)
+	assert_lt(to_doors.length(), 50.0, "the porta is just past the 4th green")
+	assert_engine_error("Navigation region synchronization")
+
+
 func test_play_opens_on_hole_one() -> void:
 	var extra := WORLD.instantiate()
 	add_child_autofree(extra)
 	var other := extra.get_node("MatchFlow") as MatchFlow
-	assert_eq(other.starting_hole, 1)
+	assert_eq(other.starting_hole, 4)
 	other.starting_hole = 1
+	other.start_at_cup = false
 	other.start_in_clubhouse = false
 	other.starting_money = 0
 	other.start_on_cart_path = false
@@ -123,8 +178,9 @@ func test_play_can_open_on_hole_nine() -> void:
 	var extra := WORLD.instantiate()
 	add_child_autofree(extra)
 	var other := extra.get_node("MatchFlow") as MatchFlow
-	assert_eq(other.starting_hole, 1)
+	assert_eq(other.starting_hole, 4)
 	other.starting_hole = 9
+	other.start_at_cup = false
 	other.start_in_clubhouse = false
 	other.starting_money = 0
 	other.start_on_cart_path = false
@@ -190,7 +246,8 @@ func test_playtest_can_open_on_the_cart_path() -> void:
 	await wait_physics_frames(6)
 	assert_eq(other.phase, MatchFlow.Phase.TRANSIT)
 	assert_not_null(other.cart_path)
-	assert_not_null(other.clubhouse)
+	assert_null(other.clubhouse, "hole one takes the short hop, not the shop")
+	assert_true(other.cart_path.short)
 	assert_false(other.in_clubhouse())
 	assert_true(extra.get_node("GolfBall").is_stowed())
 	assert_eq(other.score.hole_index, 1, "hole one is already in the books")
@@ -199,7 +256,7 @@ func test_playtest_can_open_on_the_cart_path() -> void:
 	assert_eq(ride.driver, who)
 	assert_lt(
 		ride.global_position.distance_to(other.cart_path.centerline[0]), 16.0,
-		"the cart starts at the clubhouse gate"
+		"the cart starts at the path gate"
 	)
 	assert_gt(extra.get_tree().get_nodes_in_group("forest_trees").size(), 8)
 	assert_gt(extra.get_tree().get_nodes_in_group("clubhouse_gate").size(), 0)
@@ -216,6 +273,7 @@ func test_playtest_cpu_drives_at_start_on_hole_one() -> void:
 	cpu.possess_cpu()
 	other.cpu_drives_at_start = true
 	other.starting_hole = 1
+	other.start_at_cup = false
 	other.start_in_clubhouse = false
 	other.starting_money = 0
 	other.start_on_cart_path = false
@@ -549,11 +607,54 @@ func test_picking_up_the_ball_opens_the_drive_to_the_next_tee() -> void:
 	assert_true(ball.is_stowed())
 	assert_eq(flow.phase, MatchFlow.Phase.TRANSIT)
 	assert_not_null(flow.cart_path)
-	assert_not_null(flow.clubhouse)
-	assert_false(flow.in_clubhouse(), "you still have to drive there and interact")
+	assert_true(flow.cart_path.short)
+	assert_null(flow.clubhouse, "the shop waits until every third hole")
+	assert_false(flow.visits_clubhouse())
+	assert_false(flow.in_clubhouse())
 	var to_tee := flow.cart_path.tee - flow.hole.cup
 	to_tee.y = 0.0
 	assert_gt(to_tee.length(), 40.0, "the next tee should be a drive, not a step")
+	assert_gt(
+		get_tree().get_nodes_in_group("transit_arrows").size(), 4,
+		"arrows should point the cart down the path"
+	)
+	assert_not_null(flow.next_hole, "the next hole is already in the world")
+	assert_not_null(flow.next_hole_node)
+	assert_true(flow.previewing, "the flyover starts before anyone can drive")
+	var planted := flow.next_hole_node
+	var to_green := flow.next_hole.practice_tee - flow.cart_path.tee
+	to_green.y = 0.0
+	assert_lt(to_green.length(), 4.0, "the planted practice green sits on the path tee")
+	flow.skip_preview()
+	assert_false(flow.previewing)
+	assert_false(flow.can_arrive_at_tee(players[0]), "reaching the tee starts PREP, no interact")
+	players[0].global_position = flow.cart_path.tee + Vector3.UP * 1.2
+	await wait_physics_frames(6)
+	assert_false(flow.in_clubhouse())
+	assert_eq(flow.phase, MatchFlow.Phase.PREP, "the next hole opens on the practice green")
+	assert_eq(flow._hole_node, planted, "PREP uses the planted hole, not a rebuild")
+	assert_null(flow.next_hole)
+	assert_eq(flow.hole.par, 4, "hole two of the template is a par four")
+	assert_eq(flow.hole.index, flow.score.hole_index)
+	assert_eq(flow.score.strokes, 0)
+	assert_eq(ball.current_surface(), Surface.Type.GREEN, "warm up before the hole starts")
+	flow.start_play()
+	await wait_physics_frames(6)
+	assert_eq(
+		ball.current_surface(), Surface.Type.TEE,
+		"the ball is teed up on the new hole, not reading the old one"
+	)
+	assert_false(ball.is_stowed())
+
+
+func test_every_third_hole_opens_the_clubhouse() -> void:
+	await _enter_clubhouse_transit()
+	assert_eq(flow.phase, MatchFlow.Phase.TRANSIT)
+	assert_not_null(flow.cart_path)
+	assert_false(flow.cart_path.short)
+	assert_not_null(flow.clubhouse)
+	assert_true(flow.visits_clubhouse())
+	assert_false(flow.in_clubhouse(), "you still have to drive there and interact")
 	assert_lt(
 		flow.clubhouse.global_position.distance_to(flow.cart_path.tee), 30.0,
 		"the clubhouse belongs at the next tee"
@@ -562,14 +663,15 @@ func test_picking_up_the_ball_opens_the_drive_to_the_next_tee() -> void:
 		flow.clubhouse.global_position.distance_to(flow.hole.cup), 40.0,
 		"it should not spawn beside the cup you just finished"
 	)
-	assert_gt(
-		get_tree().get_nodes_in_group("transit_arrows").size(), 4,
-		"arrows should point the cart down the path"
+	assert_not_null(flow.next_hole, "the next hole is already waiting out the back")
+	assert_lt(
+		flow.clubhouse.exit_point().distance_to(flow.next_hole.practice_tee),
+		flow.clubhouse.door_point().distance_to(flow.next_hole.practice_tee),
+		"the planted hole sits behind the exit before the doors open"
 	)
 	flow.spawner.stop()
-	flow.arrive_at_clubhouse()
+	_open_clubhouse_doors()
 	assert_true(flow.in_clubhouse())
-	assert_eq(flow.hole.par, 4, "opening the front door loads the next hole behind the exit")
 	assert_eq(flow.hole.index, flow.score.hole_index)
 	assert_lt(
 		flow.clubhouse.exit_point().distance_to(flow.hole.practice_tee),
@@ -584,25 +686,13 @@ func test_picking_up_the_ball_opens_the_drive_to_the_next_tee() -> void:
 	await wait_physics_frames(6)
 	assert_false(flow.in_clubhouse())
 	assert_true(flow.clubhouse.exit_open)
-	assert_eq(flow.hole.par, 4, "hole two of the template is a par four")
-	assert_eq(flow.score.strokes, 0)
 	assert_eq(flow.phase, MatchFlow.Phase.PREP, "the next hole opens on the practice green")
-	assert_eq(ball.current_surface(), Surface.Type.GREEN, "warm up before the hole starts")
-	flow.start_play()
-	await wait_physics_frames(6)
-	assert_eq(
-		ball.current_surface(), Surface.Type.TEE,
-		"the ball is teed up on the new hole, not reading the old one"
-	)
-	assert_false(ball.is_stowed())
 
 
 func test_clubhouse_elevator_fades_out_then_cuts_on_the_tee() -> void:
-	await _hole_out()
-	flow.retrieve_ball(players[0])
-	await wait_physics_frames(6)
+	await _enter_clubhouse_transit()
 	assert_eq(Music.current, Music.Track.LEVEL)
-	flow.arrive_at_clubhouse()
+	_open_clubhouse_doors()
 	assert_eq(Music.current, Music.Track.CLUBHOUSE)
 	assert_eq(Music.player().stream.resource_path, Music.CLUBHOUSE_PATH)
 	assert_not_null(Music.fader(), "the hole bed keeps playing while it fades out")
@@ -624,11 +714,10 @@ func test_clubhouse_elevator_fades_out_then_cuts_on_the_tee() -> void:
 
 
 func test_the_cart_path_has_no_swarm() -> void:
-	await _hole_out()
-	flow.retrieve_ball(players[0])
-	await wait_physics_frames(8)
+	await _enter_clubhouse_transit()
 	assert_eq(flow.phase, MatchFlow.Phase.TRANSIT)
 	assert_eq(flow.spawner.live_count(), 0, "the road to the next tee stays empty")
+	_open_clubhouse_doors()
 	players[0].global_position = flow.clubhouse.door_point() + Vector3(0.0, 0.9, 0.0)
 	players[0].open_shop()
 	await wait_physics_frames(6)
@@ -641,10 +730,8 @@ func test_the_cart_path_has_no_swarm() -> void:
 
 
 func test_shopping_does_not_score_or_advance() -> void:
-	await _hole_out()
-	flow.retrieve_ball(players[0])
-	await wait_physics_frames(6)
-	flow.arrive_at_clubhouse()
+	await _enter_clubhouse_transit()
+	_open_clubhouse_doors()
 	var hole_index := flow.score.hole_index
 	_swing(players[0], 0.05)
 	assert_eq(flow.score.strokes, 0, "practice swings are free")
@@ -654,9 +741,7 @@ func test_shopping_does_not_score_or_advance() -> void:
 
 
 func test_the_walk_from_the_tee_to_the_clubhouse_stays_on_the_ground() -> void:
-	await _hole_out()
-	flow.retrieve_ball(players[0])
-	await wait_physics_frames(6)
+	await _enter_clubhouse_transit()
 	var house := flow.clubhouse
 	assert_not_null(house)
 	assert_not_null(house.plaza)
@@ -678,10 +763,8 @@ func test_the_walk_from_the_tee_to_the_clubhouse_stays_on_the_ground() -> void:
 
 
 func test_the_exit_walks_onto_the_practice_green_then_the_tee() -> void:
-	await _hole_out()
-	flow.retrieve_ball(players[0])
-	await wait_physics_frames(6)
-	flow.arrive_at_clubhouse()
+	await _enter_clubhouse_transit()
+	_open_clubhouse_doors()
 	await wait_physics_frames(6)
 	var house := flow.clubhouse
 	assert_not_null(house)
@@ -978,8 +1061,8 @@ func test_the_beer_cart_comes_back_on_the_next_hole() -> void:
 	await _hole_out()
 	flow.retrieve_ball(players[0])
 	await wait_physics_frames(4)
-	flow.arrive_at_clubhouse()
-	flow.leave_clubhouse()
+	flow.skip_preview()
+	flow.arrive_at_next_tee()
 	await wait_physics_frames(6)
 	assert_not_null(flow.cart_girl, "the next hole has a fresh beer cart")
 	assert_eq(flow.cart_girl.visit, CartGirl.Visit.WAITING)
@@ -990,13 +1073,12 @@ func test_the_beer_cart_comes_back_on_the_next_hole() -> void:
 
 func test_a_cpu_partner_walks_out_onto_hole_two() -> void:
 	players[0].possess_cpu()
-	await _hole_out()
-	flow.retrieve_ball(players[1])
+	await _enter_clubhouse_transit()
 	flow.spawner.stop()
 	flow.spawner.clear_zombies()
 	players[0].health.take_damage(players[0].health.max_hp + 1.0)
 	assert_true(players[0].health.is_downed())
-	flow.arrive_at_clubhouse()
+	_open_clubhouse_doors()
 	assert_true(players[0].health.is_alive(), "the clubhouse stands a downed buddy back up")
 	assert_true(flow.clubhouse.inside(players[0]))
 	players[0].global_position = flow.clubhouse.to_global(Vector3(12.0, 1.2, 10.0))
@@ -1125,6 +1207,24 @@ func _steering_wheel() -> SteeringWheel:
 
 func _stand_by_ball(player: Player) -> void:
 	player.global_position = ball.global_position + Vector3(1.5, 0.9, 0.0)
+
+
+func _enter_clubhouse_transit() -> void:
+	await _hole_out()
+	# Stay on hole-one geometry so later-hole nav bakes do not fail the suite.
+	# hole_index 3 is a finished 3rd hole, so transit still plants the shop.
+	# plant_index 1 still builds hole two behind the exit.
+	flow.score.hole_index = 3
+	flow.plant_index = 1
+	flow.retrieve_ball(players[0])
+	await wait_physics_frames(6)
+	flow.skip_preview()
+
+
+## Attach hole two, the same swap the original clubhouse tests used.
+func _open_clubhouse_doors() -> void:
+	flow.score.hole_index = 1
+	flow.arrive_at_clubhouse()
 
 
 func _hole_out() -> void:

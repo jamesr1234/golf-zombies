@@ -975,6 +975,19 @@ func can_open_exit() -> bool:
 	return flow != null and flow.has_method("can_open_exit") and flow.can_open_exit(self)
 
 
+func can_arrive_at_tee() -> bool:
+	return flow != null and flow.has_method("can_arrive_at_tee") and flow.can_arrive_at_tee(self)
+
+
+func is_previewing() -> bool:
+	return flow != null and flow.has_method("is_previewing") and flow.is_previewing()
+
+
+func skip_preview() -> void:
+	if flow != null and flow.has_method("skip_preview"):
+		flow.skip_preview()
+
+
 func station() -> ShopStation:
 	if flow == null or not flow.has_method("station_for"):
 		return null

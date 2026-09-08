@@ -10,6 +10,7 @@ enum Phase { PREP, PLAYING, RETRIEVE, TRANSIT, SHOP }
 
 const HOLE_BANNER_TIME := 3.5
 const TEE_READY_RANGE := 4.0
+const TEE_ARRIVE_RANGE := 16.0
 const RETRIEVE_RANGE := 3.2
 const _Music := preload("res://scripts/fx/music.gd")
 const _WorldFx := preload("res://scripts/net/world_fx.gd")
@@ -24,6 +25,8 @@ var score: PlayerScore
 var shop: Shop
 var ball: GolfBall
 var course_seed := 20260816
+var previewing := false
+var _preview
 
 var _players: Array[Player] = []
 var _balls: Array[GolfBall] = []
@@ -133,6 +136,8 @@ func start_hole(index: int) -> void:
 	)
 	Sfx.play("hole_start", self)
 	_Music.play_lounge()
+	if ArenaHole.applies(hole):
+		begin_arena_doors(true)
 
 
 func start_play() -> void:
@@ -166,6 +171,20 @@ func shows_timer() -> bool:
 
 func in_clubhouse() -> bool:
 	return phase == Phase.SHOP
+
+
+func visits_clubhouse() -> bool:
+	if GameSettings.is_coop_vs():
+		var card := _local_team_card()
+		return card != null and card.visits_clubhouse()
+	return score != null and score.visits_clubhouse()
+
+
+func _next_plant_index() -> int:
+	if GameSettings.is_coop_vs():
+		var card := _local_team_card()
+		return card.hole_index if card != null else 0
+	return score.hole_index if score != null else 0
 
 
 func has_shop() -> bool:
@@ -346,6 +365,10 @@ func can_open_exit(who: Node3D) -> bool:
 	return course.clubhouse.can_open_exit(who)
 
 
+func can_arrive_at_tee(_who: Node3D) -> bool:
+	return false
+
+
 func station_for(who: Node3D) -> ShopStation:
 	if phase != Phase.SHOP or course.clubhouse == null:
 		return null
@@ -373,11 +396,147 @@ func leave_clubhouse() -> void:
 	_do_leave()
 
 
+func begin_arena_doors(opening: bool) -> void:
+	var host := course.hole_node if course != null else null
+	var doors := ArenaDoors.of(host)
+	if doors == null:
+		if not opening:
+			_do_start_play()
+		return
+	_abort_preview()
+	_preview = ArenaPreview.new()
+	_preview.start(doors, opening)
+	previewing = _preview.is_active()
+	if previewing:
+		Sfx.play("door_open", self)
+		if not opening and multiplayer.is_server():
+			_replicate_event.rpc("arena_close")
+	elif not opening:
+		_do_start_play()
+
+
+func begin_preview() -> void:
+	_preview = TransitPreview.new()
+	if course != null and course.cart_path != null:
+		_preview.start(course.cart_path.centerline)
+	previewing = _preview.is_active()
+	if not previewing:
+		_finish_preview()
+
+
+func skip_preview(announce := true) -> void:
+	if not previewing:
+		return
+	var sealing := _is_arena_closing()
+	if _preview != null:
+		_preview.skip()
+	_finish_preview(announce, sealing)
+
+
+func is_previewing() -> bool:
+	return previewing
+
+
+func preview_view() -> Transform3D:
+	if _preview == null:
+		return Transform3D.IDENTITY
+	return _preview.view()
+
+
+func _tick_preview(delta: float) -> void:
+	if not previewing or _preview == null:
+		return
+	if not _preview.tick(delta):
+		_finish_preview()
+
+
+func _is_arena_closing() -> bool:
+	return _preview is ArenaPreview and _preview.is_closing()
+
+
+func _abort_preview() -> void:
+	if _preview != null:
+		_preview.skip()
+	previewing = false
+	_preview = null
+
+
+func _finish_preview(announce := true, sealing := false) -> void:
+	if not sealing:
+		sealing = _is_arena_closing()
+	var was := previewing
+	previewing = false
+	_preview = null
+	if sealing and phase == Phase.PREP and not finished:
+		_do_start_play()
+		return
+	if not announce or not was or phase != Phase.TRANSIT:
+		return
+	_flash_message("Next tee", "Follow the arrows through the gate.\nEight carts. Steal the wheel.")
+
+
+func _try_arrive_on_tee() -> void:
+	if not multiplayer.is_server() or previewing or visits_clubhouse():
+		return
+	if course.next_hole == null:
+		return
+	if course.clubhouse != null and is_instance_valid(course.clubhouse):
+		return
+	if course.cart_path != null:
+		for cart in _carts:
+			if _near_path_tee(cart):
+				_arrive_at_tee()
+				return
+		for player in _players:
+			if _near_path_tee(player):
+				_arrive_at_tee()
+				return
+		return
+	if not ArenaHole.applies(course.next_hole):
+		return
+	var at := _arena_entry()
+	for cart in _carts:
+		if _near_point(cart, at):
+			_arrive_at_tee()
+			return
+	for player in _players:
+		if _near_point(player, at):
+			_arrive_at_tee()
+			return
+
+
+func _arena_entry() -> Vector3:
+	var doors := ArenaDoors.of(course.next_hole_node)
+	if doors != null:
+		return doors.global_position
+	return course.next_hole.tee
+
+
+func _near_point(who: Node3D, at: Vector3) -> bool:
+	if who == null:
+		return false
+	var offset := who.global_position - at
+	offset.y = 0.0
+	return offset.length() <= TEE_ARRIVE_RANGE
+
+
+func _near_path_tee(who: Node3D) -> bool:
+	if who == null or course.cart_path == null:
+		return false
+	var offset := who.global_position - course.cart_path.tee
+	offset.y = 0.0
+	return offset.length() <= TEE_ARRIVE_RANGE
+
+
 func arrive_at_clubhouse() -> void:
 	if not multiplayer.is_server():
 		_request_arrive.rpc_id(1)
 		return
 	_do_arrive()
+
+
+func arrive_at_next_tee() -> void:
+	arrive_at_clubhouse()
 
 
 func shop_count(dept: int = Shop.Dept.WEAPONS) -> int:
@@ -512,6 +671,8 @@ func scoreboard_text() -> String:
 
 
 func _process(delta: float) -> void:
+	if started and not finished:
+		_tick_preview(delta)
 	if not started or finished or is_between_holes():
 		return
 	if not owns_clock():
@@ -538,6 +699,8 @@ func owns_clock() -> bool:
 func _physics_process(delta: float) -> void:
 	if phase != Phase.TRANSIT or course.cart_path == null:
 		return
+	if previewing:
+		return
 	var bodies: Array[Node3D] = []
 	for cart in _carts:
 		bodies.append(cart)
@@ -545,6 +708,7 @@ func _physics_process(delta: float) -> void:
 		if player != null and not player.is_riding():
 			bodies.append(player)
 	course.cart_path.tick_bodies(bodies, delta)
+	_try_arrive_on_tee()
 
 
 func _wire_players() -> void:
@@ -673,6 +837,10 @@ func _reset_clock() -> void:
 func _do_start_play() -> void:
 	if phase != Phase.PREP or finished:
 		return
+	_abort_preview()
+	var doors := ArenaDoors.of(course.hole_node if course != null else null)
+	if doors != null:
+		doors.snap(false)
 	phase = Phase.PLAYING
 	course.close_shop(_players)
 	if not ArenaHole.applies(hole):
@@ -1024,11 +1192,15 @@ func _complete_hole() -> void:
 	_sync_local_score()
 	phase = Phase.TRANSIT
 	_rally_to_carts()
-	course.begin_transit(_carts, _players)
+	course.begin_transit(_carts, _players, not visits_clubhouse(), _next_plant_index(), course_seed)
 	_replicate_event.rpc("transit")
-	spawner_ai.begin_transit(score.hole_index, course.cart_path.spawn_points)
+	var points: Array[Vector3] = []
+	if course.cart_path != null:
+		points = course.cart_path.spawn_points
+	spawner_ai.begin_transit(score.hole_index, points)
 	scorecard_changed.emit()
-	_flash_message("Next tee", "Eight carts. Steal the wheel. Follow the arrows.")
+	if course.cart_path != null:
+		begin_preview()
 	_broadcast_scores()
 	_Music.play_level()
 
@@ -1079,12 +1251,16 @@ func _begin_coop_transit() -> void:
 		return
 	phase = Phase.TRANSIT
 	_rally_to_carts()
-	course.begin_transit(_carts, _players)
+	course.begin_transit(_carts, _players, not visits_clubhouse(), _next_plant_index(), course_seed)
 	_replicate_event.rpc("transit")
 	var next_hole := _local_team_card().hole_index if _local_team_card() != null else 0
-	spawner_ai.begin_transit(next_hole, course.cart_path.spawn_points)
+	var points: Array[Vector3] = []
+	if course.cart_path != null:
+		points = course.cart_path.spawn_points
+	spawner_ai.begin_transit(next_hole, points)
 	scorecard_changed.emit()
-	_flash_message("Next tee", "Eight carts. Steal the wheel. Follow the arrows.")
+	if course.cart_path != null:
+		begin_preview()
 	_broadcast_scores()
 	_Music.play_level()
 
@@ -1134,30 +1310,57 @@ func _rally_to_carts() -> void:
 func _do_arrive() -> void:
 	if phase != Phase.TRANSIT:
 		return
+	skip_preview(false)
+	if course.clubhouse == null or not is_instance_valid(course.clubhouse):
+		_arrive_at_tee()
+		return
 	phase = Phase.SHOP
 	spawner_ai.stop()
 	spawner_ai.clear_zombies()
 	if course.cart_path != null:
 		course.cart_path.hide_arrows()
-	if course.clubhouse != null:
-		course.clubhouse.open_doors()
-	get_tree().call_group("hud", "cover_black")
-	course.attach_next_hole(score.hole_index, course_seed, _players, _carts)
+	course.clubhouse.open_doors()
+	course.attach_next_hole(_next_plant_index(), course_seed, _players, _carts)
 	hole = course.hole
 	shop = course.shop
 	_reset_clock()
 	spawner_ai.plant_mazes(course.hole_node)
 	_sync_loadouts()
-	get_tree().call_group("hud", "reveal")
 	scorecard_changed.emit()
 	_replicate_event.rpc("shop")
 	_broadcast_scores()
 	_Music.enter_clubhouse()
 
 
+func _arrive_at_tee() -> void:
+	if phase != Phase.TRANSIT:
+		return
+	skip_preview(false)
+	spawner_ai.stop()
+	spawner_ai.clear_zombies()
+	if course.cart_path != null:
+		course.cart_path.hide_arrows()
+	course.attach_next_hole(_next_plant_index(), course_seed, _players, _carts)
+	hole = course.hole
+	shop = course.shop
+	_reset_clock()
+	spawner_ai.plant_mazes(course.hole_node)
+	_sync_loadouts()
+	phase = Phase.PREP
+	course.leave_to_prep(_players)
+	course.aim_practice(_sessions())
+	scorecard_changed.emit()
+	_replicate_event.rpc("next_tee")
+	_broadcast_scores()
+	if ArenaHole.applies(hole):
+		begin_arena_doors(true)
+
+
 func _do_leave() -> void:
 	if finished:
 		return
+	if course.next_hole != null and is_instance_valid(course.next_hole_node):
+		course.adopt_planted(_players, _carts)
 	phase = Phase.PREP
 	course.leave_to_prep(_players)
 	shop = course.shop
@@ -1257,27 +1460,48 @@ func _request_buy(item_id: String) -> void:
 func _replicate_event(kind: String) -> void:
 	match kind:
 		"play":
+			_abort_preview()
+			var doors := ArenaDoors.of(course.hole_node if course != null else null)
+			if doors != null:
+				doors.snap(false)
 			phase = Phase.PLAYING
 			course.close_shop(_players)
 			course.aim_play(_sessions())
 			_Music.play_level()
+		"arena_close":
+			begin_arena_doors(false)
 		"retrieve":
 			phase = Phase.RETRIEVE
 		"transit":
 			phase = Phase.TRANSIT
-			course.begin_transit(_carts, _players)
+			course.begin_transit(
+				_carts, _players, not visits_clubhouse(), _next_plant_index(), course_seed
+			)
+			if course.cart_path != null:
+				begin_preview()
 			_Music.play_level()
+		"next_tee":
+			skip_preview(false)
+			phase = Phase.PREP
+			if course.cart_path != null:
+				course.cart_path.hide_arrows()
+			course.attach_next_hole(_next_plant_index(), course_seed, _players, _carts)
+			hole = course.hole
+			shop = course.shop
+			course.leave_to_prep(_players)
+			course.aim_practice(_sessions())
+			if ArenaHole.applies(hole):
+				begin_arena_doors(true)
 		"shop":
+			skip_preview(false)
 			phase = Phase.SHOP
 			if course.cart_path != null:
 				course.cart_path.hide_arrows()
 			if course.clubhouse != null:
 				course.clubhouse.open_doors()
-			get_tree().call_group("hud", "cover_black")
-			course.attach_next_hole(score.hole_index if score else 0, course_seed, _players, _carts)
+			course.attach_next_hole(_next_plant_index(), course_seed, _players, _carts)
 			hole = course.hole
 			shop = course.shop
-			get_tree().call_group("hud", "reveal")
 			_Music.enter_clubhouse()
 		"prep":
 			phase = Phase.PREP
@@ -1321,10 +1545,12 @@ func note_loadout(player: Player) -> void:
 func _try_start_arena() -> void:
 	if not ArenaHole.applies(hole) or phase != Phase.PREP or finished:
 		return
+	if previewing:
+		return
 	if NetSession.is_active() and not multiplayer.is_server():
 		return
 	if ArenaHole.all_armed(_players):
-		_do_start_play()
+		begin_arena_doors(false)
 
 
 func _broadcast_look(buyer: Player) -> void:

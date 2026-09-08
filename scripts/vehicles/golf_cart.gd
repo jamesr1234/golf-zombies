@@ -538,6 +538,11 @@ func _drive(delta: float) -> void:
 			throttle = sync_stick.y
 			boosting = sync_boost
 			braking = sync_brake
+		elif driver.is_previewing():
+			throttle = 0.0
+			steer = 0.0
+			boosting = false
+			braking = false
 		else:
 			var stick := driver.input.move_vector()
 			throttle = -stick.y

@@ -19,7 +19,7 @@ static func dress(path: CartPath) -> void:
 	heading.y = 0.0
 	if heading.length_squared() < 0.0001:
 		return
-	var runs := CartPathTrack.strokes(start, heading.normalized(), start.y)
+	var runs := CartPathTrack.strokes(start, heading.normalized(), start.y, path.short)
 	var mat := _material()
 	for side in [-1.0, 1.0]:
 		var lip := _lip(runs, side, path.tee)

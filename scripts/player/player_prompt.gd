@@ -10,6 +10,8 @@ const _Zip := preload("res://scripts/course/zipline.gd")
 
 
 func text(player: Player) -> String:
+	if player.is_previewing():
+		return "%s to skip" % player.input.hint("interact")
 	if player.talking:
 		return "%s to move on" % player.input.hint("interact")
 	if player.is_ziplining():
@@ -114,6 +116,8 @@ func text(player: Player) -> String:
 		return "%s to start the hole" % player.input.hint("interact")
 	if player.can_open_doors():
 		return "%s to enter the clubhouse" % player.input.hint("interact")
+	if player.can_arrive_at_tee():
+		return "%s to the next hole" % player.input.hint("interact")
 	if player.can_open_exit():
 		return "%s to the next hole" % player.input.hint("interact")
 	if player.station() != null:

@@ -27,7 +27,7 @@ static func _floors(host: Clubhouse) -> void:
 	pad.position = Vector3(0.0, ClubhouseBuild.PLAZA_TOP + raise * 0.5, (z0 + z1) * 0.5)
 	MeshFactory.apply_grid(pad, {
 		"base": Color(0.07, 0.03, 0.02), "line": Color(0.45, 0.28, 0.08),
-		"cell": 1.6, "energy": 0.55, "scroll": 0.0, "fill": 0.16,
+		"cell": GridSnap.CELL, "energy": 0.55, "scroll": 0.0, "fill": 0.16,
 	})
 	host.add_child(pad)
 

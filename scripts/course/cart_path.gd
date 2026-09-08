@@ -39,16 +39,18 @@ var woods_spots: Array[Dictionary] = []
 var woods_keep_out := Rect2()
 var woods_need_field := false
 var woods_cheap := false
+var short := false
 var _crash_cool := 0.0
 var _pending: Array[Dictionary] = []
 
 
 static func build(
 	cup: Vector3, along: Vector3, bounds: Rect2, height: HeightField, hole_node: Node3D,
-	green_radius := 10.0, spread := false, cheap := false
+	green_radius := 10.0, spread := false, cheap := false, short := false
 ) -> CartPath:
 	var path := CartPath.new()
 	path.name = "CartPath"
+	path.short = short
 	path.heading = along
 	path.heading.y = 0.0
 	path.heading = path.heading.normalized()
@@ -57,7 +59,7 @@ static func build(
 	var deck := height.height_at(start.x, start.z)
 	start.y = deck
 	path.keep_out = bounds
-	path.centerline = CartPathTrack.centerline(start, path.heading, deck)
+	path.centerline = CartPathTrack.centerline(start, path.heading, deck, short)
 	path.track_length = CartPathTrack.length_of(path.centerline)
 	path.tee = path.centerline[path.centerline.size() - 1]
 	path.heading = CartPathTrack.finish_heading(path.centerline)
@@ -69,8 +71,9 @@ static func build(
 		path.set_process(false)
 	path._build_road()
 	CartPathRails.dress(path)
-	_Boost.dress(path)
-	path._build_end_cap()
+	if not short:
+		_Boost.dress(path)
+		path._build_end_cap()
 	path._build_tee_pad()
 	path._build_arrows(cup, height, deck)
 	if path.centerline.size() >= 2:
@@ -265,6 +268,7 @@ func _build_end_cap() -> void:
 		Vector3(PATH_WIDTH + 4.0, tall, WALL_THICKNESS),
 		Palette.WALL, Layers.BARRIER
 	)
+	cap.name = "EndCap"
 	cap.position = Vector3(back.x, tee.y + tall * 0.5, back.z)
 	cap.rotation.y = _yaw_along(heading)
 	add_child(cap)
@@ -370,6 +374,110 @@ static func _hide_old_pin(hole_node: Node3D) -> void:
 	var beam := hole_node.find_child("PinBeam", true, false) as Node3D
 	if beam != null:
 		beam.visible = false
+
+
+## Punch the planted hole's OOB walls wherever the cart path crosses them.
+static func open_across(hole_node: Node3D, centerline: Array[Vector3]) -> void:
+	if hole_node == null or centerline.size() < 2:
+		return
+	var walls: Array[StaticBody3D] = []
+	for child in hole_node.get_children():
+		var body := child as StaticBody3D
+		if body != null and (body.collision_layer & Layers.BARRIER) != 0:
+			walls.append(body)
+	for body in walls:
+		var gates := _crossings_on(hole_node, body, centerline)
+		if not gates.is_empty():
+			_punch_gates(hole_node, body, gates)
+
+
+static func _crossings_on(hole_node: Node3D, body: StaticBody3D, centerline: Array[Vector3]) -> PackedFloat32Array:
+	var size := _box_size(body)
+	if size == Vector3.ZERO:
+		return PackedFloat32Array()
+	var along_x := size.x >= size.z
+	var gates := PackedFloat32Array()
+	for i in range(1, centerline.size()):
+		var a := hole_node.to_local(centerline[i - 1])
+		var b := hole_node.to_local(centerline[i])
+		var hit := _segment_hits_wall(a, b, body.position, size, along_x)
+		if hit == INF:
+			continue
+		var fresh := true
+		for g in gates:
+			if absf(g - hit) < GATE_WIDTH * 0.4:
+				fresh = false
+				break
+		if fresh:
+			gates.append(hit)
+	return gates
+
+
+static func _segment_hits_wall(
+	a: Vector3, b: Vector3, at: Vector3, size: Vector3, along_x: bool
+) -> float:
+	if along_x:
+		if (a.z - at.z) * (b.z - at.z) > 0.0:
+			return INF
+		var span := b.z - a.z
+		var t := 0.0 if absf(span) < 0.0001 else (at.z - a.z) / span
+		var x := a.x + (b.x - a.x) * clampf(t, 0.0, 1.0)
+		if x < at.x - size.x * 0.5 - 1.0 or x > at.x + size.x * 0.5 + 1.0:
+			return INF
+		return x
+	if (a.x - at.x) * (b.x - at.x) > 0.0:
+		return INF
+	var span_x := b.x - a.x
+	var u := 0.0 if absf(span_x) < 0.0001 else (at.x - a.x) / span_x
+	var z := a.z + (b.z - a.z) * clampf(u, 0.0, 1.0)
+	if z < at.z - size.z * 0.5 - 1.0 or z > at.z + size.z * 0.5 + 1.0:
+		return INF
+	return z
+
+
+static func _punch_gates(hole_node: Node3D, body: StaticBody3D, gates: PackedFloat32Array) -> void:
+	var size := _box_size(body)
+	if size == Vector3.ZERO:
+		return
+	var mid_y := body.position.y
+	var half := GATE_WIDTH * 0.5
+	var cuts: Array[float] = []
+	for g in gates:
+		cuts.append(g)
+	cuts.sort()
+	if size.x >= size.z:
+		var left := body.position.x - size.x * 0.5
+		var right := body.position.x + size.x * 0.5
+		var cursor := left
+		for g in cuts:
+			_add_wall(
+				hole_node,
+				Vector3((cursor + g - half) * 0.5, mid_y, body.position.z),
+				Vector3(maxf(0.0, g - half - cursor), size.y, size.z)
+			)
+			cursor = g + half
+		_add_wall(
+			hole_node,
+			Vector3((cursor + right) * 0.5, mid_y, body.position.z),
+			Vector3(maxf(0.0, right - cursor), size.y, size.z)
+		)
+	else:
+		var near := body.position.z - size.z * 0.5
+		var far := body.position.z + size.z * 0.5
+		var cursor := near
+		for g in cuts:
+			_add_wall(
+				hole_node,
+				Vector3(body.position.x, mid_y, (cursor + g - half) * 0.5),
+				Vector3(size.x, size.y, maxf(0.0, g - half - cursor))
+			)
+			cursor = g + half
+		_add_wall(
+			hole_node,
+			Vector3(body.position.x, mid_y, (cursor + far) * 0.5),
+			Vector3(size.x, size.y, maxf(0.0, far - cursor))
+		)
+	body.queue_free()
 
 
 static func _open_gate(hole_node: Node3D, cup: Vector3, along: Vector3, gate_at: Vector3) -> void:

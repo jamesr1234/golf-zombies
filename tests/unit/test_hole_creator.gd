@@ -126,6 +126,58 @@ func test_the_place_tool_drops_a_piece_where_it_is_aimed() -> void:
 	tool.release()
 
 
+## Circle parks the ghost so the camera can walk around it. R2 still drops it
+## at the parked spot, not wherever the lens is pointing now.
+func test_holding_keeps_the_ghost_while_the_aim_moves() -> void:
+	var hole := CustomHole.create("Holding")
+	var tool := PlaceTool.new(hole)
+	var host := Node3D.new()
+	add_child_autofree(host)
+	tool.aim(host, host, Vector3(0.0, 0.0, -20.0))
+	var parked := tool.aim_at()
+	assert_true(tool.hold())
+	assert_true(tool.is_holding())
+	tool.aim(host, host, Vector3(5.4, 0.0, -40.0))
+	assert_almost_eq(tool.aim_at().distance_to(parked), 0.0, 0.01)
+	assert_true(tool.place())
+	assert_eq(hole.placements.size(), 1)
+	assert_almost_eq(
+		(hole.placements[0][CustomHole.POSITION] as Vector3).distance_to(parked),
+		0.0, 0.2, "R2 drops the parked piece, not the new aim"
+	)
+	assert_false(tool.is_holding())
+	tool.release()
+
+
+func test_letting_go_of_a_hold_does_not_place() -> void:
+	var hole := CustomHole.create("Unhold")
+	var tool := PlaceTool.new(hole)
+	var host := Node3D.new()
+	add_child_autofree(host)
+	tool.aim(host, host, Vector3(0.0, 0.0, -20.0))
+	var parked := tool.aim_at()
+	assert_true(tool.hold())
+	assert_true(tool.release_hold())
+	assert_false(tool.is_holding())
+	tool.aim(host, host, Vector3(5.4, 0.0, -40.0))
+	assert_gt(tool.aim_at().distance_to(parked), 1.0, "the ghost follows the lens again")
+	assert_eq(hole.placements.size(), 0)
+	tool.release()
+
+
+func test_holding_off_the_fairway_is_refused() -> void:
+	var hole := CustomHole.create("Hold Off")
+	var tool := PlaceTool.new(hole)
+	var host := Node3D.new()
+	add_child_autofree(host)
+	var reasons: Array[String] = []
+	tool.refused.connect(func(reason: String) -> void: reasons.append(reason))
+	tool.aim(host, host, Vector3(600.0, 0.0, -20.0))
+	assert_false(tool.hold())
+	assert_eq(reasons.size(), 1)
+	tool.release()
+
+
 func test_the_place_tool_will_not_drop_a_piece_off_the_fairway() -> void:
 	var hole := CustomHole.create("Off Strip")
 	var tool := PlaceTool.new(hole)
@@ -760,6 +812,12 @@ func test_circle_does_the_tool_in_hand() -> void:
 	assert_true(creator._ui.is_typing(), "group Circle opens the name pad")
 	creator._ui._keypad.close()
 	creator.switch_tool(CreatorMode.Tool.PLACE)
+	creator._place.aim(creator._held, creator._world.nav(), Vector3(0.0, 0.0, -20.0))
+	creator.context()
+	assert_true(creator._place.is_holding(), "place Circle parks the ghost when no gun is down")
+	assert_false(creator._place.is_gating())
+	creator.context()
+	assert_false(creator._place.is_holding(), "Circle again lets the ghost follow")
 	creator.hole.add_placement(RIFLE, creator._camera.aim_point())
 	creator._refresh_props()
 	creator.context()

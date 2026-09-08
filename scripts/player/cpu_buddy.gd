@@ -47,6 +47,8 @@ func tick(_delta: float) -> void:
 		shot_requested = false
 		return
 	pad.begin_frame()
+	if _player.is_previewing():
+		return
 	if _grab_gun(pad):
 		return
 	var partner := _player.partner

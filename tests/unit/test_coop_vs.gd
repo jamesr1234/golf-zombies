@@ -347,6 +347,18 @@ func test_the_ninth_carded_hole_completes_the_course() -> void:
 	assert_true(CoopVs.winner_line([card]).begins_with("Team Cyan wins"))
 
 
+func test_coop_visits_the_clubhouse_every_third_hole() -> void:
+	var card := TeamScore.new(HoleStore.course_pars())
+	card.hole_index = 1
+	assert_false(card.visits_clubhouse())
+	card.hole_index = 2
+	assert_false(card.visits_clubhouse())
+	card.hole_index = 3
+	assert_true(card.visits_clubhouse())
+	card.hole_index = 6
+	assert_true(card.visits_clubhouse())
+
+
 func test_all_eight_ninth_cards_end_the_round() -> void:
 	var pars := PackedInt32Array()
 	pars.resize(9)

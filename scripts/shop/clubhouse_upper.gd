@@ -7,7 +7,7 @@ const _Poker := preload("res://scripts/shop/clubhouse_poker.gd")
 
 const WOOD := {
 	"base": Color(0.07, 0.03, 0.02), "line": Color(0.45, 0.28, 0.08),
-	"cell": 1.6, "energy": 0.55, "scroll": 0.0, "fill": 0.16,
+	"cell": GridSnap.CELL, "energy": 0.55, "scroll": 0.0, "fill": 0.16,
 }
 
 

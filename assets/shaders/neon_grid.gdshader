@@ -7,7 +7,7 @@ render_mode diffuse_burley, specular_schlick_ggx;
 
 uniform vec3 base_color : source_color = vec3(0.02, 0.06, 0.08);
 uniform vec3 line_color : source_color = vec3(0.15, 1.0, 0.75);
-uniform float cell_size = 4.0;
+uniform float cell_size = 1.35;
 uniform float line_thickness = 1.6;
 uniform float line_energy = 2.0;
 uniform float fill_energy = 0.2;
@@ -24,7 +24,9 @@ void vertex() {
 }
 
 void fragment() {
-	vec2 grid_uv = world_position.xz / cell_size + vec2(0.0, TIME * scroll_speed);
+	// Half-cell shift so a cube snapped on its middle sits inside one square
+	// instead of on the cross. Edges land on the lines.
+	vec2 grid_uv = world_position.xz / cell_size + 0.5 + vec2(0.0, TIME * scroll_speed);
 	vec2 to_line = abs(fract(grid_uv - 0.5) - 0.5) / max(fwidth(grid_uv) * line_thickness, 0.00001);
 	float line = 1.0 - min(min(to_line.x, to_line.y), 1.0);
 	line *= 1.0 - smoothstep(fade_start, fade_end, length(VERTEX));

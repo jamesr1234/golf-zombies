@@ -14,6 +14,7 @@ signal course_completed()
 signal money_changed(money: int)
 
 const HOLE_COUNT := 12
+const CLUBHOUSE_EVERY := 3
 const MAX_OVER_PAR := 2
 const HOLE_SECONDS := 120.0
 ## Finishing with the full two minutes left pays this; each leftover second is
@@ -98,6 +99,16 @@ func hole_out() -> void:
 
 func is_course_complete() -> bool:
 	return results[results.size() - 1] != -1
+
+
+## After hole_out, hole_index is the next hole. True when that next hole
+## follows a 3rd, 6th, or 9th finish and the card still has golf left.
+func visits_clubhouse() -> bool:
+	return visits_clubhouse_after(hole_index) and not is_course_complete()
+
+
+static func visits_clubhouse_after(next_index: int) -> bool:
+	return next_index > 0 and next_index % CLUBHOUSE_EVERY == 0
 
 
 func total_strokes() -> int:

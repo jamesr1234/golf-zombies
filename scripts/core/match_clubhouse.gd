@@ -9,6 +9,8 @@ const _Music := preload("res://scripts/fx/music.gd")
 func leave(flow: MatchFlow) -> void:
 	if flow.finished:
 		return
+	if flow.next_hole != null and is_instance_valid(flow.next_hole_node):
+		adopt_planted(flow)
 	if flow.hole == null or flow.hole.index != flow.score.hole_index:
 		flow.start_hole(flow.score.hole_index)
 		return
@@ -36,6 +38,7 @@ func leave(flow: MatchFlow) -> void:
 func arrive(flow: MatchFlow) -> void:
 	if flow.phase != MatchFlow.Phase.TRANSIT:
 		return
+	flow.skip_preview(false)
 	flow.phase = MatchFlow.Phase.SHOP
 	flow.spawner.stop()
 	flow.spawner.clear_zombies()
@@ -44,7 +47,10 @@ func arrive(flow: MatchFlow) -> void:
 	if flow.clubhouse != null:
 		flow.clubhouse.open_doors()
 	flow._cover_fade()
-	attach_next_hole(flow)
+	if flow.next_hole != null and is_instance_valid(flow.next_hole_node):
+		adopt_planted(flow)
+	else:
+		attach_next_hole(flow)
 	flow._reveal_fade()
 	flow.scorecard_changed.emit()
 	_Music.enter_clubhouse()
@@ -53,18 +59,26 @@ func arrive(flow: MatchFlow) -> void:
 func begin_transit(flow: MatchFlow) -> void:
 	flow._close_shop()
 	flow.phase = MatchFlow.Phase.TRANSIT
+	var next_index := flow.score.hole_index if flow.plant_index < 0 else flow.plant_index
+	if ArenaHole.applies_index(next_index):
+		plant_arena_beside(flow)
+		flow.cart_path = null
+		flow.scorecard_changed.emit()
+		return
 	var forward := flow._along_hole()
+	var short := not flow.visits_clubhouse()
 	flow.cart_path = CartPath.build(
-		flow.hole.cup, forward, flow.hole.bounds, flow.hole.height, flow._hole_node, flow.hole.green_radius
+		flow.hole.cup, forward, flow.hole.bounds, flow.hole.height, flow._hole_node,
+		flow.hole.green_radius, false, false, short
 	)
 	flow._hole_node.add_child(flow.cart_path)
-	open_clubhouse(flow)
+	if not short:
+		open_clubhouse(flow)
+		_hold_clubhouse(flow)
+	plant_next(flow)
 	flow.spawner.begin_transit(flow.score.hole_index, flow.cart_path.spawn_points)
 	flow.scorecard_changed.emit()
-	flow._flash_message(
-		"Next tee",
-		"Follow the arrows through the gate.\nOpen the clubhouse doors when you arrive."
-	)
+	flow.begin_preview()
 
 
 func park_cart_for_transit(flow: MatchFlow) -> void:
@@ -123,7 +137,103 @@ func open_clubhouse(flow: MatchFlow) -> void:
 	flow.scorecard_changed.emit()
 
 
+## Hole 5 sits just past the 4th green. No cart path, no staging wall.
+func plant_arena_beside(flow: MatchFlow) -> void:
+	if flow.next_hole != null and is_instance_valid(flow.next_hole_node):
+		return
+	if flow.hole == null or flow.score == null:
+		return
+	var index := flow.score.hole_index if flow.plant_index < 0 else flow.plant_index
+	if not ArenaHole.applies_index(index):
+		return
+	var data := HoleStore.layout(index, flow.course_seed)
+	var node := HoleBuilder.build(data)
+	var along := flow.hole.cup - flow.hole.tee
+	along.y = 0.0
+	if along.length_squared() < 0.0001:
+		along = Vector3.FORWARD
+	else:
+		along = along.normalized()
+	var target := flow.hole.cup + along * (flow.hole.green_radius + 22.0)
+	var door_at := data.cup + ArenaHole.leave_along(data) * (
+		ArenaHole.floor_radius() + ArenaHole.STAND_DEPTH
+	)
+	var offset := HoleData.align_offset(door_at, target)
+	node.position = offset
+	data.shift(offset)
+	HoleBuilder.mute_navigation(node)
+	flow.hole_root.add_child(node)
+	MechSuit.plant_on_hole(node, data)
+	CartPath._open_gate(flow._hole_node, flow.hole.cup, along, target)
+	flow.next_hole = data
+	flow.next_hole_node = node
+
+
+func plant_next(flow: MatchFlow) -> void:
+	if flow.score == null or flow.score.is_course_complete():
+		return
+	var index := flow.score.hole_index if flow.plant_index < 0 else flow.plant_index
+	var data := (
+		CustomLayout.build(GameSettings.custom_hole, flow.course_seed) if GameSettings.is_custom()
+		else HoleStore.layout(index, flow.course_seed)
+	)
+	var node := HoleBuilder.build(data)
+	var target := flow.cart_path.tee if flow.cart_path != null else flow.hole.cup
+	if flow.clubhouse != null and is_instance_valid(flow.clubhouse):
+		var along := data.along_tee()
+		target = flow.clubhouse.global_position + along * (
+			ClubhouseBuild.DEPTH * 0.5 + ClubhouseBuild.EXIT_GAP
+		)
+	var offset := HoleData.align_offset(data.practice_tee, target)
+	node.position = offset
+	data.shift(offset)
+	flow.hole_root.add_child(node)
+	MechSuit.plant_on_hole(node, data)
+	if flow.cart_path != null:
+		CartPath.open_across(node, flow.cart_path.centerline)
+	HoleBuilder.bake_navigation(node)
+	flow.next_hole = data
+	flow.next_hole_node = node
+
+
+func adopt_planted(flow: MatchFlow) -> void:
+	if flow.next_hole == null or not is_instance_valid(flow.next_hole_node):
+		return
+	_hold_clubhouse(flow)
+	var snaps := capture_in_clubhouse(flow)
+	var old := flow._hole_node
+	flow.hole = flow.next_hole
+	flow._hole_node = flow.next_hole_node
+	flow.next_hole = null
+	flow.next_hole_node = null
+	flow.cart_path = null
+	flow.cart_girl = null
+	if old != null and is_instance_valid(old):
+		old.queue_free()
+	if ArenaHole.applies(flow.hole):
+		HoleBuilder.bake_navigation(flow._hole_node)
+	flow.hole_time_left = GameSettings.hole_seconds() + flow.score.take_bonus_seconds()
+	flow.freeze_left = flow.score.take_freeze_seconds()
+	if flow.clubhouse != null and is_instance_valid(flow.clubhouse):
+		restore_in_clubhouse(flow, snaps)
+	flow.spawner.clear_zombies()
+	flow.spawner.plant_mazes(flow._hole_node)
+	flow._sync_loadouts()
+
+
+func _hold_clubhouse(flow: MatchFlow) -> void:
+	if flow.clubhouse == null or not is_instance_valid(flow.clubhouse):
+		return
+	if flow.clubhouse.get_parent() == flow.hole_root:
+		return
+	flow.clubhouse.get_parent().remove_child(flow.clubhouse)
+	flow.hole_root.add_child(flow.clubhouse)
+
+
 func attach_next_hole(flow: MatchFlow) -> void:
+	if flow.next_hole != null and is_instance_valid(flow.next_hole_node):
+		adopt_planted(flow)
+		return
 	if flow.hole != null and flow.hole.index == flow.score.hole_index:
 		return
 	if flow.cart != null:

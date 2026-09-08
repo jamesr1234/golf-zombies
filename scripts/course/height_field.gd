@@ -57,6 +57,12 @@ func lift(point: Vector3) -> Vector3:
 	return Vector3(point.x, height_at(point.x, point.z), point.z)
 
 
+func shift(offset: Vector3) -> void:
+	origin += Vector2(offset.x, offset.z)
+	if hide.size != Vector2.ZERO:
+		hide.position += Vector2(offset.x, offset.z)
+
+
 func make_body() -> StaticBody3D:
 	var body := StaticBody3D.new()
 	body.collision_layer = Layers.WORLD

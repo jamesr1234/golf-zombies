@@ -26,6 +26,8 @@ const FIRST_SPAWN := 0.6
 const HUNT_RANGE := 48.0
 ## Six 15° bays so the cart path fits without clipping the remaining stairs.
 const GATE_BAYS := 6
+## Center bays the entry doors span. The rest of the gate stays walled.
+const DOOR_BAYS := 3
 const WARMUP := "Pick two guns.\nThe round starts when everyone has chosen."
 const WARMUP_SHORT := "Pick two guns. Last team standing wins."
 const PLAY_BANNER := "Last team standing. There is no hole. Survive."
@@ -58,17 +60,34 @@ static func flatten_reach() -> float:
 	return floor_radius() + STAND_DEPTH + CELL * 2.0
 
 
-## Bays facing down the hole, the same way the cart path leaves the green.
+## Bays facing the tee, so you drive in through the doors and leave the same way.
 static func gate_center() -> int:
-	return SIDES / 2
+	return 0
+
+
+## Cup through the doors, back toward the tee. Cart path and the weapon row.
+static func leave_along(data: HoleData) -> Vector3:
+	var along := data.tee - data.cup
+	along.y = 0.0
+	if along.length_squared() < 0.0001:
+		return Vector3(0.0, 0.0, 1.0)
+	return along.normalized()
 
 
 static func is_gate_side(side: int) -> bool:
+	return _span_side(side, GATE_BAYS)
+
+
+static func is_door_side(side: int) -> bool:
+	return _span_side(side, DOOR_BAYS)
+
+
+static func _span_side(side: int, count: int) -> bool:
 	var delta := posmod(side - gate_center(), SIDES)
 	if delta > SIDES / 2:
 		delta -= SIDES
-	var half := GATE_BAYS / 2
-	return delta >= -half and delta < GATE_BAYS - half
+	var half := count / 2
+	return delta >= -half and delta < count - half
 
 
 static func strokes_for_place(par: int, place: int) -> int:

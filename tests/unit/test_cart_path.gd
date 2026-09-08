@@ -371,6 +371,24 @@ func test_aim_at_pulls_a_wide_cart_back_onto_the_path() -> void:
 	assert_lt(aim.x, 8.0, "slide wide and the stick tugs you back to center")
 
 
+func test_the_short_path_is_a_drive_not_a_step() -> void:
+	var path := _path(true)
+	var long_path := _path()
+	assert_gt(path.track_length, 40.0, "the next tee should be a drive, not a step")
+	assert_lt(path.track_length, long_path.track_length)
+	assert_lt(path.track_length, CartPathWindmill.END_CLEAR * 2.0)
+	assert_eq(_path_mills(path).size(), 0, "a short hop does not need mills")
+	assert_gt(path.centerline.size(), 4)
+	assert_not_null(path.get_node_or_null("NextTeeBeam"), "the short hop still ends on a tee")
+	assert_null(path.get_node_or_null("EndCap"), "the next hole is open, not behind a wall")
+	var boosts := 0
+	for child in path.get_children():
+		if child.is_in_group("transit_boost"):
+			boosts += 1
+	assert_eq(boosts, 0, "the short hop has no turbo stripe")
+	assert_eq(CartPathTrack.turn_count(true), 2)
+
+
 func test_the_circuit_is_a_long_drift_track() -> void:
 	var path := _path()
 	assert_gte(CartPathTrack.turn_count(), 6, "corners are what make drifting the fast line")
@@ -665,14 +683,15 @@ func _assert_solid_lane(path: CartPath) -> void:
 	)
 
 
-func _path() -> CartPath:
+func _path(short := false) -> CartPath:
 	var data := HoleGenerator.generate(0, SEED)
 	var hole := HoleBuilder.build(data)
 	add_child_autofree(hole)
 	var along := data.cup - data.tee
 	along.y = 0.0
 	var path := CartPath.build(
-		data.cup, along.normalized(), data.bounds, data.height, hole, data.green_radius
+		data.cup, along.normalized(), data.bounds, data.height, hole, data.green_radius,
+		false, false, short
 	)
 	path.set_meta("hole_data", data)
 	hole.add_child(path)

@@ -51,39 +51,39 @@ const POWER_MULT := {
 
 ## Neon grid look per lie: dark base, glowing line colour, grid cell size in
 ## metres, line emission strength, and vertical scroll for the water.
-## Cell sizes shrink as the lie gets better, so the grid alone tells you what you
-## are standing on.
+## Every painted cell is the extra-small cube so lines meet block edges. Colour
+## and energy tell you the lie.
 const LOOK := {
 	Type.ROUGH: {
 		"base": Color(0.03, 0.07, 0.04), "line": Color(0.12, 0.5, 0.28),
-		"cell": 8.0, "energy": 0.7, "scroll": 0.0, "fill": 0.18,
+		"cell": GridSnap.CELL, "energy": 0.7, "scroll": 0.0, "fill": 0.18,
 	},
 	Type.FAIRWAY: {
 		"base": Color(0.04, 0.14, 0.05), "line": Color(0.22, 0.7, 0.24),
-		"cell": 5.0, "energy": 1.35, "scroll": 0.0, "fill": 0.38,
+		"cell": GridSnap.CELL, "energy": 1.35, "scroll": 0.0, "fill": 0.38,
 	},
 	Type.TEE: {
 		"base": Color(0.04, 0.18, 0.1), "line": Palette.CYAN,
-		"cell": 2.0, "energy": 2.0, "scroll": 0.0, "fill": 0.45,
+		"cell": GridSnap.CELL, "energy": 2.0, "scroll": 0.0, "fill": 0.45,
 	},
 	Type.FRINGE: {
 		"base": Color(0.05, 0.20, 0.07), "line": Color(0.38, 0.95, 0.32),
-		"cell": 1.5, "energy": 2.15, "scroll": 0.0, "fill": 0.48,
+		"cell": GridSnap.CELL, "energy": 2.15, "scroll": 0.0, "fill": 0.48,
 	},
 	Type.BUNKER: {
 		"base": Color(0.13, 0.08, 0.02), "line": Palette.AMBER,
-		"cell": 1.6, "energy": 1.8, "scroll": 0.0,
+		"cell": GridSnap.CELL, "energy": 1.8, "scroll": 0.0,
 	},
 	## Hot lime disk. Fill stays visible after the grid fades, so the dance floor
 	## still reads from the tee instead of vanishing into the fairway.
 	Type.GREEN: {
 		"base": Color(0.16, 0.72, 0.08), "line": Color(0.62, 1.0, 0.12),
-		"cell": 0.65, "energy": 4.0, "scroll": 0.0, "fill": 2.4,
+		"cell": GridSnap.CELL, "energy": 4.0, "scroll": 0.0, "fill": 2.4,
 		"fade_start": 48.0, "fade_end": 360.0,
 	},
 	Type.WATER: {
 		"base": Color(0.02, 0.03, 0.14), "line": Color(0.2, 0.5, 1.0),
-		"cell": 2.4, "energy": 2.4, "scroll": 0.35, "opacity": 0.52,
+		"cell": GridSnap.CELL, "energy": 2.4, "scroll": 0.35, "opacity": 0.52,
 	},
 }
 
@@ -91,7 +91,7 @@ const LOOK := {
 ## the hole green, turned down so it does not blow out the tee.
 const PRACTICE_LOOK := {
 	"base": Color(0.06, 0.26, 0.09), "line": Color(0.42, 0.95, 0.38),
-	"cell": 1.2, "energy": 2.2, "scroll": 0.0, "fill": 0.65,
+	"cell": GridSnap.CELL, "energy": 2.2, "scroll": 0.0, "fill": 0.65,
 }
 
 ## Small vertical offsets keep coplanar patches from z-fighting.
@@ -120,9 +120,9 @@ static func look_for(patch: Dictionary) -> Dictionary:
 	return look_of(patch["type"], bool(patch.get("practice", false)))
 
 
-## The bright, tight lime grid. Fairway is green grass too, but coarser and
-## dimmer; this is the putting-surface look. The collar around the cup stays in
-## the same lime family so you still know you can putt from it.
+## The bright lime grid. Fairway is green grass too, but dimmer; this is the
+## putting-surface look. The collar around the cup stays in the same lime family
+## so you still know you can putt from it.
 static func looks_like_green(type: Type) -> bool:
 	var look: Dictionary = LOOK[type]
 	var line: Color = look["line"]

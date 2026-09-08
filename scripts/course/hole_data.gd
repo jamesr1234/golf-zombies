@@ -99,6 +99,60 @@ func lift(point: Vector3) -> Vector3:
 	return height.lift(point)
 
 
+## Move every world-space point on XZ so a planted hole can sit on a cart path.
+func shift(offset: Vector3) -> void:
+	var flat := Vector3(offset.x, 0.0, offset.z)
+	if flat.length_squared() < 0.0001:
+		return
+	tee += flat
+	cup += flat
+	practice_tee += flat
+	practice_cup += flat
+	_shift_points(centerline, flat)
+	_shift_points(spawn_points, flat)
+	_shift_if_set("mountain", flat)
+	_shift_if_set("culvert", flat)
+	_shift_if_set("cart_pad", flat)
+	_shift_if_set("mech_pad", flat)
+	_shift_if_set("race_hoop", flat)
+	for patch in patches:
+		patch["position"] = _shifted(patch.get("position", Vector3.ZERO), flat)
+	for prop in props:
+		prop["position"] = _shifted(prop.get("position", Vector3.ZERO), flat)
+	for jump in jumps:
+		jump["position"] = _shifted(jump.get("position", Vector3.ZERO), flat)
+	for boost in boosts:
+		boost["from"] = _shifted(boost.get("from", Vector3.ZERO), flat)
+		boost["to"] = _shifted(boost.get("to", Vector3.ZERO), flat)
+	for pack in spawn_packs:
+		pack["position"] = _shifted(pack.get("position", Vector3.ZERO), flat)
+	bounds.position += Vector2(flat.x, flat.z)
+	if height != null:
+		height.shift(flat)
+
+
+func _shift_if_set(field: String, flat: Vector3) -> void:
+	var at: Vector3 = get(field)
+	if at == Vector3.INF:
+		return
+	set(field, at + flat)
+
+
+func _shift_points(points: Array[Vector3], flat: Vector3) -> void:
+	for i in points.size():
+		points[i] = points[i] + flat
+
+
+static func _shifted(point: Variant, flat: Vector3) -> Vector3:
+	if point is Vector3:
+		return (point as Vector3) + flat
+	return flat
+
+
+static func align_offset(from: Vector3, toward: Vector3) -> Vector3:
+	return Vector3(toward.x - from.x, 0.0, toward.z - from.z)
+
+
 func length() -> float:
 	var total := 0.0
 	for i in range(1, centerline.size()):

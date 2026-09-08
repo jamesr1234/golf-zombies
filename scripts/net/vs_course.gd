@@ -20,7 +20,11 @@ var cart_path: CartPath
 var clubhouse: Clubhouse
 var cart_girl: CartGirl
 var shop: Shop
+var next_hole: HoleData
+var next_hole_node: Node3D
 var _clubhouse_wait := -1.0
+var _plant_index := -1
+var _plant_seed := 0
 
 @onready var hole_root: Node3D = $"../HoleRoot"
 
@@ -29,6 +33,10 @@ func rebuild(index: int, seed: int) -> HoleData:
 	MechSuit.release_all(get_tree())
 	cart_girl = null
 	cart_path = null
+	if next_hole_node != null and is_instance_valid(next_hole_node):
+		next_hole_node.queue_free()
+	next_hole_node = null
+	next_hole = null
 	if hole_node != null:
 		hole_root.remove_child(hole_node)
 		hole_node.queue_free()
@@ -41,6 +49,8 @@ func rebuild(index: int, seed: int) -> HoleData:
 
 
 func along_hole() -> Vector3:
+	if ArenaHole.applies(hole):
+		return ArenaHole.leave_along(hole)
 	var forward := hole.cup - hole.tee
 	forward.y = 0.0
 	return forward.normalized()
@@ -212,21 +222,38 @@ func aim_play(sessions: Array) -> void:
 	place_tee_balls(balls)
 
 
-func begin_transit(carts: Array[GolfCart], players: Array[Player] = []) -> CartPath:
+func begin_transit(
+	carts: Array[GolfCart],
+	players: Array[Player] = [],
+	short := false,
+	next_index := -1,
+	seed := 0
+) -> CartPath:
 	var spread := _Forest.should_spread(NetSession.is_active())
 	var cheap := _Forest.should_cheap(NetSession.is_active())
 	_discard_clubhouse()
+	_plant_index = next_index if next_index >= 0 else hole.index + 1
+	_plant_seed = seed
+	if ArenaHole.applies_index(_plant_index):
+		plant_arena_beside()
+		cart_path = null
+		_park_carts_for_transit(carts)
+		place_players_at_carts(players, carts)
+		return null
 	var forward := along_hole()
 	cart_path = CartPath.build(
 		hole.cup, forward, hole.bounds, hole.height, hole_node, hole.green_radius,
-		spread, cheap
+		spread, cheap, short
 	)
 	hole_node.add_child(cart_path)
 	_clubhouse_wait = -1.0
-	if spread:
-		_clubhouse_wait = CLUBHOUSE_WAIT
-	else:
-		_open_clubhouse()
+	if not short:
+		if spread:
+			_clubhouse_wait = CLUBHOUSE_WAIT
+		else:
+			_open_clubhouse()
+			_hold_clubhouse()
+	plant_next()
 	_park_carts_for_transit(carts)
 	place_players_at_carts(players, carts)
 	return cart_path
@@ -240,6 +267,8 @@ func _process(delta: float) -> void:
 		return
 	_clubhouse_wait = -1.0
 	_open_clubhouse()
+	_hold_clubhouse()
+	plant_next()
 
 
 func _park_carts_for_transit(carts: Array[GolfCart]) -> void:
@@ -347,7 +376,94 @@ func _open_clubhouse() -> void:
 	hole_node.add_child(clubhouse)
 
 
+func plant_arena_beside() -> void:
+	if next_hole != null and is_instance_valid(next_hole_node):
+		return
+	if hole == null or not ArenaHole.applies_index(_plant_index):
+		return
+	var data := HoleStore.layout(_plant_index, _plant_seed)
+	var node := HoleBuilder.build(data)
+	var along := hole.cup - hole.tee
+	along.y = 0.0
+	if along.length_squared() < 0.0001:
+		along = Vector3.FORWARD
+	else:
+		along = along.normalized()
+	var target := hole.cup + along * (hole.green_radius + 22.0)
+	var door_at := data.cup + ArenaHole.leave_along(data) * (
+		ArenaHole.floor_radius() + ArenaHole.STAND_DEPTH
+	)
+	var offset := HoleData.align_offset(door_at, target)
+	node.position = offset
+	data.shift(offset)
+	HoleBuilder.mute_navigation(node)
+	hole_root.add_child(node)
+	MechSuit.plant_on_hole(node, data)
+	CartPath._open_gate(hole_node, hole.cup, along, target)
+	next_hole = data
+	next_hole_node = node
+
+
+func plant_next() -> void:
+	if next_hole != null and is_instance_valid(next_hole_node):
+		return
+	if hole == null or cart_path == null or _plant_index < 0:
+		return
+	if not cart_path.short and (clubhouse == null or not is_instance_valid(clubhouse)):
+		return
+	var data := HoleStore.layout(_plant_index, _plant_seed)
+	var node := HoleBuilder.build(data)
+	var target := cart_path.tee
+	if clubhouse != null and is_instance_valid(clubhouse):
+		var along := data.along_tee()
+		target = clubhouse.global_position + along * (
+			ClubhouseBuild.DEPTH * 0.5 + ClubhouseBuild.EXIT_GAP
+		)
+	var offset := HoleData.align_offset(data.practice_tee, target)
+	node.position = offset
+	data.shift(offset)
+	hole_root.add_child(node)
+	MechSuit.plant_on_hole(node, data)
+	if cart_path != null:
+		CartPath.open_across(node, cart_path.centerline)
+	HoleBuilder.bake_navigation(node)
+	next_hole = data
+	next_hole_node = node
+
+
+func adopt_planted(players: Array[Player], _carts: Array[GolfCart] = []) -> void:
+	if next_hole == null or not is_instance_valid(next_hole_node):
+		return
+	_hold_clubhouse()
+	var snaps := _capture_in_clubhouse(players)
+	var old := hole_node
+	hole = next_hole
+	hole_node = next_hole_node
+	next_hole = null
+	next_hole_node = null
+	cart_path = null
+	if old != null and is_instance_valid(old):
+		old.queue_free()
+	if ArenaHole.applies(hole):
+		HoleBuilder.bake_navigation(hole_node)
+	if clubhouse != null and is_instance_valid(clubhouse):
+		_restore_in_clubhouse(players, snaps)
+	place_cart_girl()
+
+
+func _hold_clubhouse() -> void:
+	if clubhouse == null or not is_instance_valid(clubhouse):
+		return
+	if clubhouse.get_parent() == hole_root:
+		return
+	clubhouse.get_parent().remove_child(clubhouse)
+	hole_root.add_child(clubhouse)
+
+
 func attach_next_hole(index: int, seed: int, players: Array[Player], carts: Array[GolfCart]) -> void:
+	if next_hole != null and is_instance_valid(next_hole_node):
+		adopt_planted(players, carts)
+		return
 	for cart in carts:
 		cart.eject_all()
 	var snaps := _capture_in_clubhouse(players)

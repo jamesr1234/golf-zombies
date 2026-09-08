@@ -1,7 +1,8 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scripts/golf/golf_ball.gd" id="1_ball"]
 [ext_resource type="Script" path="res://scripts/fx/ball_trail.gd" id="2_trail"]
+[ext_resource type="Script" path="res://scripts/fx/ball_pulse.gd" id="3_pulse"]
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_1"]
 radius = 0.15
@@ -28,6 +29,9 @@ shape = SubResource("SphereShape3D_1")
 
 [node name="Mesh" type="MeshInstance3D" parent="."]
 mesh = SubResource("SphereMesh_1")
+
+[node name="Pulse" type="Node" parent="Mesh"]
+script = ExtResource("3_pulse")
 
 [node name="Trail" type="MeshInstance3D" parent="."]
 script = ExtResource("2_trail")

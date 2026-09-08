@@ -8,7 +8,7 @@ render_mode blend_mix, depth_draw_always, cull_disabled, diffuse_burley, specula
 
 uniform vec3 base_color : source_color = vec3(0.02, 0.03, 0.14);
 uniform vec3 line_color : source_color = vec3(0.2, 0.5, 1.0);
-uniform float cell_size = 2.4;
+uniform float cell_size = 1.35;
 uniform float line_thickness = 1.6;
 uniform float line_energy = 2.4;
 uniform float fill_energy = 0.2;
@@ -32,7 +32,7 @@ float grid_line(vec2 uv, float thickness) {
 }
 
 void fragment() {
-	vec2 base_uv = world_position.xz / cell_size;
+	vec2 base_uv = world_position.xz / cell_size + 0.5;
 	float line = grid_line(base_uv + vec2(0.0, TIME * scroll_speed), line_thickness);
 	float drift = grid_line(
 		base_uv * ripple_scale - vec2(TIME * scroll_speed * 0.6, 0.0), line_thickness

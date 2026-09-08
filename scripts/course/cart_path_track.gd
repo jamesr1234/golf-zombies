@@ -19,6 +19,13 @@ const LEGS: Array = [
 	[70.0, -85.0, 20.0],
 	[100.0, 0.0, 0.0],
 ]
+## Connector used on holes that skip the clubhouse: two bends and a finish
+## straight, about 130m of tarmac so it is still a drive.
+const SHORT_LEGS: Array = [
+	[36.0, 55.0, 16.0],
+	[42.0, -48.0, 16.0],
+	[50.0, 0.0, 0.0],
+]
 const JOIN := 1.1
 const ARC_STEP_DEG := 10.0
 ## Far enough down the line to set up a drift; pull back onto the tarmac if wide.
@@ -26,7 +33,11 @@ const AIM_AHEAD := 16.0
 const AIM_PULL := 0.55
 
 
-static func centerline(origin: Vector3, heading: Vector3, start_h: float) -> Array[Vector3]:
+static func legs(short := false) -> Array:
+	return SHORT_LEGS if short else LEGS
+
+
+static func centerline(origin: Vector3, heading: Vector3, start_h: float, short := false) -> Array[Vector3]:
 	var points: Array[Vector3] = []
 	var pos := origin
 	var dir := heading
@@ -34,7 +45,7 @@ static func centerline(origin: Vector3, heading: Vector3, start_h: float) -> Arr
 	dir = dir.normalized()
 	var travelled := 0.0
 	points.append(_lift(pos, start_h))
-	for leg in LEGS:
+	for leg in legs(short):
 		var dist := float(leg[0])
 		var turn := float(leg[1])
 		var radius := float(leg[2])
@@ -67,9 +78,9 @@ static func finish_heading(points: Array[Vector3]) -> Vector3:
 	return along.normalized()
 
 
-static func turn_count() -> int:
+static func turn_count(short := false) -> int:
 	var total := 0
-	for leg in LEGS:
+	for leg in legs(short):
 		if absf(float(leg[1])) >= 40.0:
 			total += 1
 	return total
@@ -164,13 +175,13 @@ static func aim_at(points: Array[Vector3], from: Vector3, ahead := AIM_AHEAD) ->
 
 
 ## Exact straights and circular sweeps the centerline was sampled from.
-static func strokes(origin: Vector3, heading: Vector3, start_h: float) -> Array[Dictionary]:
+static func strokes(origin: Vector3, heading: Vector3, start_h: float, short := false) -> Array[Dictionary]:
 	var pos := origin
 	var dir := heading
 	dir.y = 0.0
 	dir = dir.normalized()
 	var runs: Array[Dictionary] = []
-	for leg in LEGS:
+	for leg in legs(short):
 		var dist := float(leg[0])
 		var turn := float(leg[1])
 		var radius := float(leg[2])

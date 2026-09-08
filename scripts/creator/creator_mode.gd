@@ -207,6 +207,8 @@ func cancel() -> void:
 			elif _place.is_roaming():
 				if _place.abort_spawn():
 					Sfx.play("ui_back", self)
+			elif _place.release_hold():
+				Sfx.play("ui_back", self)
 			else:
 				var hover := _hover_point()
 				# #region agent log
@@ -338,8 +340,6 @@ func draw_weapon_line() -> void:
 	_place.start_gate(_camera.aim_point())
 
 
-## Circle / F: the extra the tool in hand needs, so one button covers merge
-## and a weapon line instead of parking those on two face buttons.
 func snap_surface() -> void:
 	if tool != Tool.PLACE:
 		return
@@ -355,14 +355,31 @@ func toggle_yaw_snap() -> void:
 	_refresh_ui()
 
 
+## Circle / F: merge a group, draw a weapon line when a gun is already down,
+## or park the ghost so the camera can walk around it before R2 places.
 func context() -> void:
 	match tool:
 		Tool.GROUP:
 			ask_group()
 		Tool.PLACE:
-			draw_weapon_line()
+			_place_context()
 		_:
 			pass
+
+
+func _place_context() -> void:
+	if _place.is_holding():
+		_place.release_hold()
+		Sfx.play("ui_back", self)
+		_refresh_ui()
+		return
+	if _place.nearest_weapon(_camera.aim_point()) >= 0:
+		draw_weapon_line()
+		return
+	if _place.hold():
+		Sfx.play("ui_move", self)
+		_ui.flash("HOLDING")
+		_refresh_ui()
 
 
 func ask_group() -> void:

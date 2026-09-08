@@ -49,6 +49,8 @@ func tick(delta: float) -> void:
 		VsMatchFlow.Phase.SHOP:
 			_shop()
 		VsMatchFlow.Phase.TRANSIT:
+			if _player.is_previewing():
+				return
 			_transit()
 		_:
 			_hole(delta)
@@ -320,7 +322,7 @@ func _transit() -> void:
 		if _near_clubhouse():
 			_ghost.tap("interact")
 		return
-	if _can("can_open_doors"):
+	if _can("can_open_doors") or _can("can_arrive_at_tee"):
 		_ghost.tap("interact")
 		return
 	var cart := _cart()

@@ -99,7 +99,20 @@ static func bake_navigation(root: Node3D) -> void:
 	for child in root.get_children():
 		var region := child as NavigationRegion3D
 		if region != null:
+			region.enabled = true
+			if root.is_inside_tree():
+				region.set_navigation_map(root.get_world_3d().get_navigation_map())
 			region.bake_navigation_mesh(bakes_on_thread())
+
+
+static func mute_navigation(root: Node3D) -> void:
+	if root == null:
+		return
+	for child in root.get_children():
+		var region := child as NavigationRegion3D
+		if region != null:
+			region.enabled = false
+			region.set_navigation_map(RID())
 			return
 
 

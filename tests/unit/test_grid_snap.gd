@@ -9,6 +9,28 @@ func test_the_cell_is_the_extra_small_cube() -> void:
 	assert_almost_eq(GridSnap.CELL, 1.35, 0.001)
 
 
+func test_an_extra_small_cube_fills_one_painted_cell() -> void:
+	var cube: Node3D = _cube("extra_small")
+	add_child_autofree(cube)
+	cube.position = GridSnap.anchored_at(cube, Vector3.ZERO, 0.0)
+	var box := GridSnap.world_aabb(cube)
+	var half := GridSnap.CELL * 0.5
+	assert_almost_eq(box.position.x, -half, 0.01)
+	assert_almost_eq(box.end.x, half, 0.01)
+	assert_almost_eq(box.position.z, -half, 0.01)
+	assert_almost_eq(box.end.z, half, 0.01)
+
+
+func test_painted_grids_use_the_extra_small_cell() -> void:
+	for type in Surface.LOOK:
+		assert_almost_eq(
+			float(Surface.LOOK[type]["cell"]), GridSnap.CELL, 0.001, Surface.name_of(type)
+		)
+	assert_almost_eq(float(Surface.PRACTICE_LOOK["cell"]), GridSnap.CELL, 0.001)
+	assert_almost_eq(float(ClubhouseUpper.WOOD["cell"]), GridSnap.CELL, 0.001)
+	assert_almost_eq(float(SpiralTrack.LOOK["cell"]), GridSnap.CELL, 0.001)
+
+
 func test_a_position_rounds_onto_the_cell_grid() -> void:
 	assert_eq(GridSnap.to_grid(Vector3(-10.0, 0.2, -7.0)), Vector3(-9.45, 0.0, -6.75))
 	for axis in GridSnap.to_grid(Vector3(-2.0, 8.0, 3.3)):

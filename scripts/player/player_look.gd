@@ -91,6 +91,8 @@ func tick(player: Player, delta: float) -> void:
 
 
 func view_transform(player: Player) -> Transform3D:
+	if player.is_previewing():
+		return player.flow.preview_view()
 	if player.is_climbing():
 		return player.climber.view_transform(player)
 	if player.is_ziplining():

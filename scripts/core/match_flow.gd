@@ -19,6 +19,8 @@ const CART_TEE_SIDE := 10.5
 const CLUBHOUSE_SIDE := ClubhouseBuild.TEE_SIDE
 const RETRIEVE_RANGE := 3.2
 const CART_RECALL_RANGE := 24.0
+## How close to the staging tee you have to be to call the next hole on.
+const TEE_ARRIVE_RANGE := 16.0
 ## How close to the tee you have to be to call the hole on.
 const TEE_READY_RANGE := 4.0
 
@@ -31,6 +33,8 @@ const TEE_READY_RANGE := 4.0
 @export var starting_money := 0
 ## Spawn on the clubhouse circuit so the drive can be checked without holing out.
 @export var start_on_cart_path := false
+## Playtest: stand on the green with the ball in the cup, ready to pick it up.
+@export var start_at_cup := false
 ## Hole 1 playtest: the CPU boards as driver and throttles up right away so the
 ## human can grapple onto a moving cart.
 @export var cpu_drives_at_start := false
@@ -46,6 +50,12 @@ var clubhouse: Clubhouse
 var phase: Phase = Phase.PLAYING
 var cart_path: CartPath
 var cart_girl: CartGirl
+var next_hole: HoleData
+var next_hole_node: Node3D
+## Tests plant a cheaper layout while still forcing a clubhouse visit.
+var plant_index := -1
+var previewing := false
+var _preview
 
 @onready var ball: GolfBall = $"../GolfBall"
 @onready var cart: GolfCart = $"../GolfCart"
@@ -87,6 +97,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if started and not finished:
 		_update_clubhouse_music()
+		_tick_preview(delta)
 	if not started or finished or is_between_holes():
 		return
 	if freeze_left > 0.0:
@@ -101,15 +112,19 @@ func _process(delta: float) -> void:
 
 
 func _physics_process(delta: float) -> void:
-	if phase != Phase.TRANSIT or cart_path == null:
+	if phase != Phase.TRANSIT:
 		return
-	var bodies: Array[Node3D] = []
-	if cart != null:
-		bodies.append(cart)
-	for player in _players:
-		if player != null and not player.is_riding():
-			bodies.append(player)
-	cart_path.tick_bodies(bodies, delta)
+	if previewing:
+		return
+	if cart_path != null:
+		var bodies: Array[Node3D] = []
+		if cart != null:
+			bodies.append(cart)
+		for player in _players:
+			if player != null and not player.is_riding():
+				bodies.append(player)
+		cart_path.tick_bodies(bodies, delta)
+	_try_arrive_on_tee()
 
 
 ## Called once the HUDs are listening, so the first hole banner is not announced
@@ -126,6 +141,8 @@ func begin() -> void:
 		_begin_on_cart_path(index)
 	elif start_in_clubhouse:
 		_begin_in_clubhouse(index)
+	elif start_at_cup:
+		_begin_at_cup(index)
 	else:
 		start_hole(index)
 
@@ -179,6 +196,10 @@ func in_clubhouse() -> bool:
 	return phase == Phase.SHOP
 
 
+func visits_clubhouse() -> bool:
+	return score != null and score.visits_clubhouse()
+
+
 ## Warm-up putting, either on the practice green or in the clubhouse. Nothing hit
 ## in these phases scores, penalises, or finishes a hole.
 func is_practice() -> bool:
@@ -201,6 +222,10 @@ func can_open_exit(who: Node3D) -> bool:
 	if phase != Phase.SHOP or clubhouse == null or not is_instance_valid(clubhouse):
 		return false
 	return clubhouse.can_open_exit(who)
+
+
+func can_arrive_at_tee(_who: Node3D) -> bool:
+	return false
 
 
 func station_for(who: Node3D) -> ShopStation:
@@ -334,6 +359,18 @@ func _begin_in_clubhouse(index: int) -> void:
 	_Music.enter_clubhouse()
 
 
+func _begin_at_cup(index: int) -> void:
+	start_hole(index)
+	if hole == null or ArenaHole.applies(hole):
+		return
+	start_play()
+	score.strokes = score.par()
+	_place_players_at_green()
+	_complete_hole(true)
+	if ball != null:
+		ball.place_at(hole.lift(hole.cup) + Vector3.UP * 0.08)
+
+
 func _begin_on_cart_path(index: int) -> void:
 	_rebuild_hole(index)
 	golf.release()
@@ -349,6 +386,7 @@ func _begin_on_cart_path(index: int) -> void:
 func start_hole(index: int) -> void:
 	# Every hole is generated around the origin, so the old one has to leave the
 	# physics space before the new one arrives or the ball reads a stale lie.
+	skip_preview(false)
 	phase = Phase.PREP
 	cart_path = null
 	_close_shop()
@@ -374,6 +412,8 @@ func start_hole(index: int) -> void:
 	_flash_message(hole.banner_title(), _warmup_copy(index))
 	Sfx.play("hole_start", self)
 	_Music.play_lounge()
+	if ArenaHole.applies(hole):
+		begin_arena_doors(true)
 
 
 func _warmup_copy(index: int) -> String:
@@ -395,6 +435,10 @@ func _warmup_copy(index: int) -> String:
 func _rebuild_hole(index: int) -> void:
 	MechSuit.release_all(get_tree())
 	cart_girl = null
+	if next_hole_node != null and is_instance_valid(next_hole_node):
+		next_hole_node.queue_free()
+	next_hole_node = null
+	next_hole = null
 	if _hole_node != null:
 		hole_root.remove_child(_hole_node)
 		_hole_node.queue_free()
@@ -564,6 +608,11 @@ func can_start_play(who: Node3D) -> bool:
 func start_play() -> void:
 	if phase != Phase.PREP or finished:
 		return
+	_abort_preview()
+	if ArenaHole.applies(hole):
+		var doors := ArenaDoors.of(_hole_node)
+		if doors != null:
+			doors.snap(false)
 	phase = Phase.PLAYING
 	golf.release()
 	if not ArenaHole.applies(hole):
@@ -595,8 +644,10 @@ func note_loadout(_player: Player) -> void:
 func _try_start_arena() -> void:
 	if not ArenaHole.applies(hole) or phase != Phase.PREP or finished:
 		return
+	if previewing:
+		return
 	if ArenaHole.all_armed(_players):
-		start_play()
+		begin_arena_doors(false)
 
 
 func _tee_race_car() -> GolfCart:
@@ -646,6 +697,17 @@ func _place_players() -> void:
 		_players[i].spawn_at(hole.lift(spot) + Vector3.UP * 1.2, yaw)
 
 
+func _place_players_at_green() -> void:
+	_refresh_team()
+	var forward := _along_hole()
+	var lateral := forward.cross(Vector3.UP).normalized()
+	var yaw := rad_to_deg(atan2(forward.x, forward.z))
+	for i in _players.size():
+		var side := -1.0 if i == 0 else 1.0
+		var spot := hole.cup + forward * 1.8 + lateral * side * 1.4
+		_players[i].spawn_at(hole.lift(spot) + Vector3.UP * 1.2, yaw)
+
+
 ## The cart waits behind the tee, off to one side so it is never in the way of the
 ## first shot. Anyone still riding is put out first, since the old hole is gone.
 func _place_cart() -> void:
@@ -677,6 +739,8 @@ func _summon_cart_girl() -> void:
 func _along_hole() -> Vector3:
 	if RaceHole.applies(hole):
 		return hole.along_tee()
+	if ArenaHole.applies(hole):
+		return ArenaHole.leave_along(hole)
 	var forward := hole.cup - hole.tee
 	forward.y = 0.0
 	return forward.normalized()
@@ -746,8 +810,9 @@ func _complete_hole(from_cup: bool) -> void:
 	if relative <= 0:
 		_cheer_hole_out()
 	var arena := ArenaHole.applies(hole)
+	var to_house := GameState.visits_clubhouse_after(score.hole_index + 1)
 	var pickup := (
-		"Drive to the clubhouse." if arena
+		("Drive to the clubhouse." if to_house else "Drive to the next hole.") if arena
 		else ("Pick your ball out of the hole." if from_cup else "Pick up your ball.")
 	)
 	var title := "Double bogey"
@@ -778,6 +843,8 @@ func _complete_hole(from_cup: bool) -> void:
 		return
 	phase = Phase.RETRIEVE
 	_park_cart_for_transit()
+	if ArenaHole.applies_index(score.hole_index):
+		clubhouse_flow.plant_arena_beside(self)
 
 
 func _payout_text(score_pay: int, bonus: int) -> String:
@@ -809,6 +876,161 @@ func leave_clubhouse() -> void:
 ## is already waiting out the back.
 func arrive_at_clubhouse() -> void:
 	clubhouse_flow.arrive(self)
+
+
+func arrive_at_next_tee() -> void:
+	arrive_on_planted_hole()
+
+
+func arrive_on_planted_hole() -> void:
+	if phase != Phase.TRANSIT or visits_clubhouse():
+		return
+	if clubhouse != null and is_instance_valid(clubhouse):
+		return
+	if next_hole == null or not is_instance_valid(next_hole_node):
+		return
+	skip_preview(false)
+	clubhouse_flow.adopt_planted(self)
+	phase = Phase.PREP
+	if not ArenaHole.applies(hole):
+		_aim_at_practice()
+		_place_cart_girl()
+	scorecard_changed.emit()
+	_flash_message(hole.banner_title(), _warmup_copy(score.hole_index))
+	Sfx.play("hole_start", self)
+	_Music.play_lounge()
+	if ArenaHole.applies(hole):
+		begin_arena_doors(true)
+
+
+func begin_arena_doors(opening: bool) -> void:
+	var doors := ArenaDoors.of(_hole_node)
+	if doors == null:
+		if not opening:
+			start_play()
+		return
+	_abort_preview()
+	_preview = ArenaPreview.new()
+	_preview.start(doors, opening)
+	previewing = _preview.is_active()
+	if previewing:
+		Sfx.play("door_open", self)
+	elif not opening:
+		start_play()
+
+
+func begin_preview() -> void:
+	_preview = TransitPreview.new()
+	if cart_path != null:
+		_preview.start(cart_path.centerline)
+	previewing = _preview.is_active()
+	if not previewing:
+		_finish_preview()
+
+
+func skip_preview(announce := true) -> void:
+	if not previewing:
+		return
+	var sealing := _is_arena_closing()
+	if _preview != null:
+		_preview.skip()
+	_finish_preview(announce, sealing)
+
+
+func is_previewing() -> bool:
+	return previewing
+
+
+func preview_view() -> Transform3D:
+	if _preview == null:
+		return Transform3D.IDENTITY
+	return _preview.view()
+
+
+func _tick_preview(delta: float) -> void:
+	if not previewing or _preview == null:
+		return
+	if not _preview.tick(delta):
+		_finish_preview()
+
+
+func _is_arena_closing() -> bool:
+	return _preview is ArenaPreview and _preview.is_closing()
+
+
+func _abort_preview() -> void:
+	if _preview != null:
+		_preview.skip()
+	previewing = false
+	_preview = null
+
+
+func _finish_preview(announce := true, sealing := false) -> void:
+	if not sealing:
+		sealing = _is_arena_closing()
+	var was := previewing
+	previewing = false
+	_preview = null
+	if sealing and phase == Phase.PREP and not finished:
+		start_play()
+		return
+	if not announce or not was or phase != Phase.TRANSIT:
+		return
+	var arrive := (
+		"Open the clubhouse doors when you arrive."
+		if visits_clubhouse()
+		else "Drive onto the next tee."
+	)
+	_flash_message("Next tee", "Follow the arrows through the gate.\n%s" % arrive)
+
+
+func _try_arrive_on_tee() -> void:
+	if previewing or visits_clubhouse():
+		return
+	if next_hole == null:
+		return
+	if cart_path != null:
+		if _near_path_tee(cart):
+			arrive_on_planted_hole()
+			return
+		for player in _players:
+			if _near_path_tee(player):
+				arrive_on_planted_hole()
+				return
+		return
+	if not ArenaHole.applies(next_hole):
+		return
+	var at := _arena_entry()
+	if _near_point(cart, at):
+		arrive_on_planted_hole()
+		return
+	for player in _players:
+		if _near_point(player, at):
+			arrive_on_planted_hole()
+			return
+
+
+func _arena_entry() -> Vector3:
+	var doors := ArenaDoors.of(next_hole_node)
+	if doors != null:
+		return doors.global_position
+	return next_hole.tee
+
+
+func _near_point(who: Node3D, at: Vector3) -> bool:
+	if who == null:
+		return false
+	var offset := who.global_position - at
+	offset.y = 0.0
+	return offset.length() <= TEE_ARRIVE_RANGE
+
+
+func _near_path_tee(who: Node3D) -> bool:
+	if who == null or cart_path == null:
+		return false
+	var offset := who.global_position - cart_path.tee
+	offset.y = 0.0
+	return offset.length() <= TEE_ARRIVE_RANGE
 
 
 func _aim_at_practice() -> void:

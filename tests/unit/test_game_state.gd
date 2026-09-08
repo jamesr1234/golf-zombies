@@ -197,3 +197,19 @@ func test_bonus_and_freeze_seconds_are_consumed_once() -> void:
 	assert_almost_eq(score.take_freeze_seconds(), 15.0, 0.001)
 	assert_eq(score.freeze_seconds, 0.0)
 	assert_eq(score.take_bonus_seconds(), 0.0)
+
+
+func test_the_clubhouse_waits_until_every_third_hole() -> void:
+	var card := GameState.new(HoleStore.course_pars())
+	assert_eq(card.pars.size(), 12)
+	var house: Array[int] = []
+	for next_index in range(1, 13):
+		if GameState.visits_clubhouse_after(next_index):
+			house.append(next_index)
+		card.hole_index = next_index
+		card.results[next_index - 1] = 4
+		if next_index < 12:
+			assert_eq(card.visits_clubhouse(), next_index % 3 == 0, "next hole %d" % next_index)
+	assert_eq(house, [3, 6, 9, 12])
+	card.hole_index = 11
+	assert_false(card.visits_clubhouse(), "the last hole ends the run")

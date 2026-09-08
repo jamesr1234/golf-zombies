@@ -14,6 +14,14 @@ var cpu_shot_latched := false
 
 
 func tick(player: Player, delta: float) -> void:
+	if player.is_previewing():
+		if (
+			player.input.just_pressed("interact")
+			or player.input.just_pressed("swing")
+			or player.input.just_pressed("shoot")
+		):
+			player.skip_preview()
+		return
 	if player.is_climbing() or player.is_ziplining():
 		return
 	if player.is_grappling() and player.input.just_pressed("interact"):
@@ -96,8 +104,8 @@ func cpu_shot_hold_applies(player: Player) -> bool:
 	if player.state != Player.State.NORMAL or player.shopping or player.talking or player.is_milling() or player.is_poker_seated():
 		return false
 	if (
-		player.can_open_doors() or player.can_open_exit() or player.station() != null
-		or player.npc() != null or player.can_retrieve_ball()
+		player.can_open_doors() or player.can_arrive_at_tee() or player.can_open_exit()
+		or player.station() != null or player.npc() != null or player.can_retrieve_ball()
 	):
 		return false
 	if player.can_start_play() or player.beer.cart_for(player) != null or mill_control(player) != null:
@@ -145,6 +153,8 @@ func use(player: Player) -> void:
 			player.golf.try_toggle(player)
 	elif player.can_open_doors():
 		player.open_doors()
+	elif player.can_arrive_at_tee():
+		player.flow.arrive_at_next_tee()
 	elif player.poker.use(player):
 		pass
 	elif player.station() != null:

@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/hud.gd" id="1_hud"]
 [ext_resource type="Script" path="res://scripts/ui/swing_meter_ui.gd" id="2_meter"]
@@ -6,6 +6,7 @@
 [ext_resource type="Script" path="res://scripts/ui/poker_board_hud.gd" id="4_board"]
 [ext_resource type="Script" path="res://scripts/ui/poker_result_hud.gd" id="5_result"]
 [ext_resource type="Script" path="res://scripts/ui/poker_act_hud.gd" id="6_act"]
+[ext_resource type="Script" path="res://scripts/ui/ball_arrow.gd" id="7_arrow"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bg"]
 bg_color = Color(0.04, 0.02, 0.09, 0.78)
@@ -360,3 +361,10 @@ offset_right = -16.0
 offset_bottom = -108.0
 mouse_filter = 2
 script = ExtResource("3_map")
+
+[node name="BallArrow" type="Control" parent="Root"]
+visible = false
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+script = ExtResource("7_arrow")

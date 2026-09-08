@@ -25,12 +25,7 @@ static func dress(host: Node3D, data: HoleData) -> void:
 	root.name = ROOT_NAME
 	host.add_child(root)
 	var cup := data.cup
-	var along := data.cup - data.tee
-	along.y = 0.0
-	if along.length_squared() < 0.0001:
-		along = Vector3(0.0, 0.0, -1.0)
-	else:
-		along = along.normalized()
+	var along := ArenaHole.leave_along(data)
 	root.set_meta(_META_CUP, cup)
 	root.set_meta(_META_ALONG, along)
 	var radius := ArenaHole.floor_radius()
@@ -40,6 +35,7 @@ static func dress(host: Node3D, data: HoleData) -> void:
 		if ArenaHole.is_gate_side(side):
 			continue
 		crowd = _seat_bay(root, bay, cup, crowd)
+	_place_doors(root, cup)
 	_place_scoreboard(root, cup, radius)
 	_place_weapons(root, data)
 	ObstacleLeds.adopt(root)
@@ -61,6 +57,8 @@ static func open_exit(host: Node) -> void:
 
 
 static func _is_exit_piece(node_name: String) -> bool:
+	if node_name == ArenaDoors.NAME:
+		return true
 	for side in ArenaHole.SIDES:
 		if not ArenaHole.is_gate_side(side):
 			continue
@@ -164,10 +162,17 @@ static func _place_bay(root: Node3D, cup: Vector3, radius: float, side: int) -> 
 			Vector3((ArenaHole.XL - ArenaHole.MED) * 0.5, 0.0, -(ArenaHole.XL + ArenaHole.LARGE)),
 			"StepsM_%d" % side
 		))
-	root.add_child(_piece(
-		_Wall, xform, Vector3(0.0, 0.0, -ArenaHole.STAND_DEPTH), "Wall_%d" % side
-	))
+	if not ArenaHole.is_door_side(side):
+		root.add_child(_piece(
+			_Wall, xform, Vector3(0.0, 0.0, -ArenaHole.STAND_DEPTH), "Wall_%d" % side
+		))
 	return xform
+
+
+static func _place_doors(root: Node3D, cup: Vector3) -> void:
+	var doors := ArenaDoors.new()
+	root.add_child(doors)
+	doors.build(cup)
 
 
 static func _piece(packed: PackedScene, bay: Transform3D, local: Vector3, node_name: String) -> Node3D:
@@ -193,12 +198,7 @@ static func _place_weapons(root: Node3D, data: HoleData) -> void:
 	var n := ArenaHole.WEAPONS.size()
 	if n <= 0:
 		return
-	var along := data.cup - data.tee
-	along.y = 0.0
-	if along.length_squared() < 0.0001:
-		along = Vector3(0.0, 0.0, 1.0)
-	else:
-		along = along.normalized()
+	var along := ArenaHole.leave_along(data)
 	var side := along.cross(Vector3.UP).normalized()
 	var start := -0.5 * float(n - 1) * ArenaHole.WEAPON_GAP
 	for i in n:

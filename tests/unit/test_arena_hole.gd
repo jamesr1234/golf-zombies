@@ -75,7 +75,10 @@ func test_the_built_hole_is_a_sealed_bowl() -> void:
 	assert_null(root.find_child("PracticeGreen", true, false))
 	var arena := root.find_child(ArenaBuild.ROOT_NAME, true, false)
 	assert_not_null(arena)
-	assert_null(arena.find_child("Gate", true, false), "the bowl stays sealed until the round ends")
+	assert_null(arena.find_child("Gate", true, false), "the leave gap is the doors, not a missing wall")
+	var doors := ArenaDoors.of(root)
+	assert_not_null(doors, "the gate is a pair of hinged doors")
+	assert_false(doors.is_open())
 	var steps := 0
 	var walls := 0
 	for node in arena.get_children():
@@ -88,7 +91,7 @@ func test_the_built_hole_is_a_sealed_bowl() -> void:
 		steps, (ArenaHole.SIDES - ArenaHole.GATE_BAYS) * 3,
 		"the leave bays stay on the deck so the cart is not climbing stairs"
 	)
-	assert_eq(walls, ArenaHole.SIDES)
+	assert_eq(walls, ArenaHole.SIDES - ArenaHole.DOOR_BAYS)
 	assert_not_null(arena.find_child("Scoreboard", true, false))
 	var crowd := get_tree().get_nodes_in_group(ArenaBuild.CROWD_GROUP)
 	assert_between(crowd.size(), 50, 80)
@@ -115,9 +118,7 @@ func test_every_weapon_is_on_the_floor() -> void:
 	add_child_autofree(root)
 	var guns := root.find_children("*", "GunPickup", true, false)
 	assert_eq(guns.size(), ArenaHole.WEAPONS.size())
-	var along := data.cup - data.tee
-	along.y = 0.0
-	along = along.normalized()
+	var along := ArenaHole.leave_along(data)
 	var across := along.cross(Vector3.UP).normalized()
 	var seen: PackedStringArray = []
 	var slots: Array[float] = []
@@ -143,24 +144,25 @@ func test_every_weapon_is_on_the_floor() -> void:
 
 func test_the_gate_faces_the_cart_path() -> void:
 	var hole := HoleGenerator.generate(ArenaHole.INDEX, SEED)
-	var along := hole.cup - hole.tee
-	along.y = 0.0
-	along = along.normalized()
+	var along := ArenaHole.leave_along(hole)
 	var theta := float(ArenaHole.gate_center()) * TAU / float(ArenaHole.SIDES)
 	var outward := Vector3(sin(theta), 0.0, cos(theta))
-	assert_gt(outward.dot(along), 0.9, "the gap has to point down the hole")
+	assert_gt(outward.dot(along), 0.9, "the doors face the tee you arrive from")
 	var opened := 0
+	var door_sides := 0
 	for side in ArenaHole.SIDES:
 		if ArenaHole.is_gate_side(side):
 			opened += 1
+		if ArenaHole.is_door_side(side):
+			door_sides += 1
+			assert_true(ArenaHole.is_gate_side(side), "doors sit in the leave gap")
 	assert_eq(opened, ArenaHole.GATE_BAYS)
+	assert_eq(door_sides, ArenaHole.DOOR_BAYS)
 
 
 func test_the_leave_lane_is_even_for_the_cart() -> void:
 	var data := HoleGenerator.generate(ArenaHole.INDEX, SEED)
-	var along := data.cup - data.tee
-	along.y = 0.0
-	along = along.normalized()
+	var along := ArenaHole.leave_along(data)
 	var side := along.cross(Vector3.UP).normalized()
 	var deck := data.height.height_at(data.cup.x, data.cup.z)
 	var far := maxf(data.bounds.size.x, data.bounds.size.y) * 0.5
@@ -233,11 +235,16 @@ func test_opening_the_exit_clears_the_leave_bays() -> void:
 	var root := HoleBuilder.build(data)
 	add_child_autofree(root)
 	var arena := root.find_child(ArenaBuild.ROOT_NAME, true, false)
-	var center := "Wall_%d" % ArenaHole.gate_center()
-	assert_not_null(arena.find_child(center, true, false))
+	var doors := ArenaDoors.of(root)
+	assert_not_null(doors)
+	assert_null(arena.find_child("Wall_%d" % ArenaHole.gate_center(), true, false))
 	ArenaBuild.open_exit(root)
+	assert_true(doors.is_queued_for_deletion(), "the entry doors have to leave with the walls")
 	for side in ArenaHole.SIDES:
 		var wall := arena.find_child("Wall_%d" % side, true, false)
+		if ArenaHole.is_door_side(side):
+			assert_null(wall)
+			continue
 		assert_not_null(wall)
 		if ArenaHole.is_gate_side(side):
 			assert_true(wall.is_queued_for_deletion())
@@ -331,12 +338,53 @@ func test_a_wipe_during_warmup_still_opens_the_exit() -> void:
 	_assert_leave_gap_open(flow)
 
 
+func test_the_arena_opens_then_seals_after_the_loadout() -> void:
+	var world: Node3D = load("res://scenes/world.tscn").instantiate()
+	add_child_autofree(world)
+	var flow := world.get_node("MatchFlow") as MatchFlow
+	var human := world.get_node("Players/Player2") as Player
+	var cpu := world.get_node("Players/Player1") as Player
+	flow.starting_hole = 5
+	flow.start_in_clubhouse = false
+	flow.cpu_drives_at_start = false
+	flow.begin()
+	await wait_physics_frames(6)
+	var doors := ArenaDoors.of(flow.hole_root)
+	assert_not_null(doors)
+	assert_true(flow.is_previewing(), "arrival plays the doors swinging in")
+	assert_false(doors.is_open())
+	assert_eq(flow.phase, MatchFlow.Phase.PREP)
+	flow.skip_preview(false)
+	assert_false(flow.is_previewing())
+	assert_true(doors.is_open())
+	assert_eq(flow.phase, MatchFlow.Phase.PREP)
+	assert_true(human.weapon.add_gun(load("res://resources/weapons/rifle.tres")))
+	assert_true(human.weapon.add_gun(load("res://resources/weapons/shotgun.tres")))
+	assert_true(cpu.weapon.add_gun(load("res://resources/weapons/rifle.tres")))
+	assert_true(cpu.weapon.add_gun(load("res://resources/weapons/shotgun.tres")))
+	flow.note_loadout(human)
+	assert_eq(flow.phase, MatchFlow.Phase.PREP, "the last player still has to pick")
+	flow.note_loadout(cpu)
+	assert_true(flow.is_previewing(), "the doors close before the feed starts")
+	assert_eq(flow.phase, MatchFlow.Phase.PREP)
+	flow.skip_preview(false)
+	assert_eq(flow.phase, MatchFlow.Phase.PLAYING)
+	assert_false(doors.is_open(), "the pit seals for the fight")
+
+
 func _assert_leave_gap_open(flow: MatchFlow) -> void:
 	var arena := flow.hole_root.find_child(ArenaBuild.ROOT_NAME, true, false)
 	assert_not_null(arena)
-	var gate := arena.find_child("Wall_%d" % ArenaHole.gate_center(), true, false)
-	assert_not_null(gate)
-	assert_true(gate.is_queued_for_deletion(), "the leave-side wall has to open")
+	var doors := ArenaDoors.of(flow.hole_root)
+	assert_not_null(doors)
+	assert_true(doors.is_queued_for_deletion(), "the entry doors have to open the leave gap")
+	for side in ArenaHole.SIDES:
+		if not ArenaHole.is_gate_side(side) or ArenaHole.is_door_side(side):
+			continue
+		var wall := arena.find_child("Wall_%d" % side, true, false)
+		assert_not_null(wall)
+		assert_true(wall.is_queued_for_deletion(), "the leave-side wall has to open")
+		return
 
 
 class PrepFlow:

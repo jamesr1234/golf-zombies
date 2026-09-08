@@ -8,8 +8,9 @@ extends RefCounted
 ## whole actions would double up, since the gameplay map already puts several of
 ## these on the very keys the creator uses.
 ##
-## D-pad walks the list you can see. Shoulders change the tool. Circle does the
-## extra the current tool needs (weapon line, or merge). Options is the rest.
+## D-pad walks the list you can see. Shoulders change the tool. Circle parks a
+## piece so you can walk around it, or draws a weapon line when a gun is down.
+## Group Circle is merge. Options is the rest.
 
 const BUTTONS: PackedStringArray = [
 	"shoot", "aim", "melee", "shield", "swap_weapon_prev", "swap_weapon",
@@ -17,12 +18,12 @@ const BUTTONS: PackedStringArray = [
 ]
 
 const HINT := (
-	"1 2 3 TOOL   Q/E LIST   TAB SHELF   R TURN   F DO   T SNAP"
+	"1 2 3 TOOL   Q/E LIST   TAB SHELF   R TURN   F HOLD   T SNAP"
 	+ "   Y ROTATE SNAP   BKSP UNDO   CTRL+Y REDO   ESC MENU"
 )
 const PAD_HINT := (
 	"R2 PLACE   L2 UNDO   D-PAD LIST / TURN   L1/R1 TOOL   SQUARE SHELF"
-	+ "   CIRCLE DO   L3 SURFACE   R3 ROTATE SNAP   TRIANGLE UP   CROSS DOWN"
+	+ "   CIRCLE HOLD   L3 SURFACE   R3 ROTATE SNAP   TRIANGLE UP   CROSS DOWN"
 	+ "   OPTIONS MENU"
 )
 

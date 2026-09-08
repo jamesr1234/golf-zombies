@@ -4,6 +4,7 @@ extends Object
 ## call attach, so the editor and a live hole stay in sync.
 
 const SHADER := preload("res://assets/shaders/led_edge.gdshader")
+const OVERLAY_SHADER := preload("res://assets/shaders/led_edge_overlay.gdshader")
 const NODE := "Leds"
 ## Narrowest a bar may draw. Below roughly two pixels an unfiltered line starts
 ## dropping pixels and reads as a dashed one.
@@ -202,6 +203,12 @@ static func _bind(mesh_node: MeshInstance3D, xf: Transform3D, boxes: Array[AABB]
 
 static func edge_material(energy := Palette.GLOW_STRONG) -> ShaderMaterial:
 	return _material(energy)
+
+
+static func overlay_material(energy := Palette.GLOW_SOFT) -> ShaderMaterial:
+	var mat := _material(energy)
+	mat.shader = OVERLAY_SHADER
+	return mat
 
 
 static func mesh_from_segs(segs: Array) -> ArrayMesh:

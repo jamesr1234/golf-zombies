@@ -18,7 +18,7 @@ const LAUNCH_DEG := 26.0
 const LOOK := {
 	"base": Color(0.07, 0.08, 0.1),
 	"line": Color(0.42, 0.78, 0.88),
-	"cell": 3.5,
+	"cell": GridSnap.CELL,
 	"energy": 1.05,
 	"scroll": 0.0,
 	"fill": 0.26,

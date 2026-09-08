@@ -34,6 +34,9 @@ func draw(data: HoleData) -> void:
 				ends[0], ends[1], hole.width(),
 				hole.can_append(_fairway.picked)
 			)
+			# #region agent log
+			_dbg_fairway(data, hole, ends)
+			# #endregion
 		CreatorMode.Tool.GROUP:
 			_marks.ring(_group.center(), _group.radius, Palette.AMBER)
 			for i in hole.placements.size():
@@ -84,6 +87,8 @@ func picked_label() -> String:
 				return "CHASE RANGE"
 			if _place.is_roaming():
 				return "SPAWN YARD"
+			if _place.is_holding():
+				return "HOLDING"
 			return _place.picked_label()
 		CreatorMode.Tool.GROUP:
 			return "READY TO MERGE" if _group.can_save() else "RING TWO OR MORE PIECES"
@@ -140,3 +145,44 @@ func _draw_spawns(hole: CustomHole) -> void:
 		_marks.ring(at, chase, chase_color)
 	if CustomHole.is_spawn(_place.picked_path()) and not _place.is_roaming():
 		_marks.marker(_place.aim_at(), Palette.CYAN)
+
+
+# #region agent log
+var _dbg_n := 0
+
+
+func _dbg_fairway(data: HoleData, hole: CustomHole, ends: Array[Vector3]) -> void:
+	_dbg_n += 1
+	if _dbg_n > 80 or (_dbg_n > 1 and _dbg_n % 20 != 0):
+		return
+	var h0 := 0.0
+	var h1 := 0.0
+	if data != null and data.height != null:
+		h0 = data.height.height_at(ends[0].x, ends[0].z)
+		h1 = data.height.height_at(ends[1].x, ends[1].z)
+	var piece := FairwayPiece.at(_fairway.picked)
+	var f := FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-f6d8e1.log", FileAccess.READ_WRITE)
+	if f == null:
+		f = FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-f6d8e1.log", FileAccess.WRITE)
+	if f == null:
+		return
+	f.seek_end()
+	f.store_line(JSON.stringify({
+		"sessionId": "f6d8e1", "runId": "pre-fix", "hypothesisId": "BE",
+		"location": "creator_view.gd:draw",
+		"message": "fairway ghost piece vs ground",
+		"timestamp": Time.get_ticks_msec(),
+		"data": {
+			"piece": String(piece.get("id", "")),
+			"turn": piece.get("turn", 0.0),
+			"width": snappedf(hole.width(), 0.01),
+			"draw_y": CreatorMarks.LIFT,
+			"h_from": snappedf(h0, 0.01),
+			"h_to": snappedf(h1, 0.01),
+			"y_gap_from": snappedf(CreatorMarks.LIFT - h0, 0.01),
+			"y_gap_to": snappedf(CreatorMarks.LIFT - h1, 0.01),
+			"chord": snappedf(ends[0].distance_to(ends[1]), 0.01),
+		},
+	}))
+	f.close()
+# #endregion

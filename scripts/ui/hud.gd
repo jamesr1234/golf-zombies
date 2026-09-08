@@ -31,6 +31,7 @@ const SWEET_CALLOUT := "Nice shot!"
 @onready var shop_title: Label = $Root/Shop/Panel/Lines/Title
 @onready var shop_body: Label = $Root/Shop/Panel/Lines/Body
 @onready var hole_map: HoleMap = $Root/HoleMap
+@onready var ball_arrow: BallArrow = $Root/BallArrow
 @onready var board_hud: PokerBoardHud = $Root/PokerBoard
 @onready var poker_result: PokerResultHud = $Root/PokerResult
 @onready var poker_act: PokerActHud = $Root/PokerAct
@@ -115,6 +116,7 @@ func _process(delta: float) -> void:
 	_update_board()
 	_update_act()
 	_update_map()
+	_update_arrow()
 	_update_drunk()
 	prompt_label.text = HudStyle.chrome(player.get_prompt())
 
@@ -366,6 +368,13 @@ func _update_act() -> void:
 	poker_act.refresh(player)
 
 
+func _owned_ball() -> GolfBall:
+	var owned: GolfBall = player.golf.ball if player != null and player.golf != null else null
+	if owned == null and flow != null:
+		owned = flow.ball as GolfBall
+	return owned
+
+
 func _update_map() -> void:
 	var show: bool = player.wants_map() and flow.hole != null
 	if show and not hole_map.visible:
@@ -377,13 +386,43 @@ func _update_map() -> void:
 	hole_map.you = player.global_position
 	hole_map.you_color = player.body_color
 	hole_map.has_ball = false
-	var owned: GolfBall = player.golf.ball if player.golf != null else null
-	if owned == null:
-		owned = flow.ball as GolfBall
+	var owned := _owned_ball()
 	if owned != null:
 		hole_map.has_ball = true
 		hole_map.ball = owned.global_position
 	hole_map.queue_redraw()
+
+
+func _update_arrow() -> void:
+	if ball_arrow == null:
+		return
+	var owned := _owned_ball()
+	if not BallArrow.allowed(player, owned):
+		ball_arrow.tracking = false
+		ball_arrow.visible = false
+		return
+	var cam := get_viewport().get_camera_3d()
+	if cam == null:
+		ball_arrow.tracking = false
+		ball_arrow.visible = false
+		return
+	var screen := cam.unproject_position(owned.global_position)
+	var behind := cam.is_position_behind(owned.global_position)
+	var area := ball_arrow.size
+	if area.x < 8.0 or area.y < 8.0:
+		area = get_viewport().get_visible_rect().size
+	var hidden := not BallArrow.on_screen(Rect2(Vector2.ZERO, area), screen, behind)
+	var blocked := BallArrow.occluded(
+		cam.get_world_3d(), cam.global_position, owned.global_position, [owned.get_rid()]
+	)
+	var show := hidden or blocked
+	ball_arrow.camera = cam
+	ball_arrow.at = owned.global_position
+	ball_arrow.color = player.body_color
+	ball_arrow.tracking = show
+	ball_arrow.visible = show
+	if show:
+		ball_arrow.queue_redraw()
 
 
 func _update_drunk() -> void:

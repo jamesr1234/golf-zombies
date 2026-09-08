@@ -38,6 +38,8 @@ var surface_snap := false
 ## Right-stick click turns this off so a piece can be nudged off the 45s, then
 ## back on to drop it onto the same angles again.
 var yaw_snap := true
+## Circle parks the ghost so the camera can walk around it. R2 still drops it.
+var _holding := false
 var height: HeightField
 var space: PhysicsDirectSpaceState3D
 
@@ -174,8 +176,9 @@ func aim(holder: Node3D, neighbors: Node, at: Vector3) -> void:
 		_clear_ghost()
 		return
 	if CustomHole.is_spawn(path):
-		_clear_ghost()
-		_at = _grounded(at)
+		if not _holding:
+			_clear_ghost()
+			_at = _grounded(at)
 		return
 	if path != _ghost_path:
 		_build_ghost(holder, path)
@@ -185,10 +188,14 @@ func aim(holder: Node3D, neighbors: Node, at: Vector3) -> void:
 		var zip := _ghost as Zipline
 		if zip != null:
 			zip.collapse_end()
-	_at = _surface_snapped(neighbors, at) if surface_snap else _snapped(neighbors, at)
+	if not _holding:
+		_at = _surface_snapped(neighbors, at) if surface_snap else _snapped(neighbors, at)
 	_ghost.rotation.y = deg_to_rad(yaw)
 	_ghost.position = GridSnap.anchored_at(_ghost, _at, yaw)
 	_ghost.visible = hole.covers(_at)
+	# #region agent log
+	_dbg_place_ghost(path)
+	# #endregion
 
 
 func place() -> bool:
@@ -204,10 +211,12 @@ func place() -> bool:
 		return false
 	if CustomHole.is_zipline(path):
 		zip_from = _at
+		_holding = false
 		return true
 	hole.add_placement(path, GridSnap.stored_offset(_at, height), yaw)
 	# A gun asks for its line straight away. Walking away leaves it live for the
 	# whole hole, which is the sane default.
+	_holding = false
 	if CustomHole.is_weapon(path):
 		gating = hole.placements.size() - 1
 	elif CustomHole.is_spawn(path):
@@ -229,6 +238,31 @@ func clear_zip() -> bool:
 
 func aim_at() -> Vector3:
 	return _at
+
+
+func is_holding() -> bool:
+	return _holding
+
+
+## Park the ghost where it is. The camera can walk around it; R2 still places.
+func hold() -> bool:
+	if _holding or is_gating() or is_zipping() or is_roaming():
+		return false
+	if picked_path().is_empty():
+		refused.emit("NOTHING TO PLACE")
+		return false
+	if not hole.covers(_at):
+		refused.emit("OFF THE FAIRWAY. NOTHING OUT THERE IS REACHABLE.")
+		return false
+	_holding = true
+	return true
+
+
+func release_hold() -> bool:
+	if not _holding:
+		return false
+	_holding = false
+	return true
 
 
 func is_gating() -> bool:
@@ -407,6 +441,7 @@ func release() -> void:
 		abort_spawn()
 	gating = -1
 	zip_from = Vector3.INF
+	_holding = false
 	_clear_ghost()
 
 
@@ -419,6 +454,8 @@ func summary() -> String:
 		return "SET THE CHASE   %d M   CLICK TO SET   RIGHT CLICK TO CANCEL" % roundi(aggro_radius)
 	if is_roaming():
 		return "SET THE YARD   %d M   CLICK TO SET   RIGHT CLICK TO CANCEL" % roundi(roam_radius)
+	if is_holding():
+		return "HOLDING   CLICK TO SET   RIGHT CLICK TO MOVE AGAIN"
 	var lock := ""
 	if surface_snap:
 		lock += "   SURFACE SNAP"
@@ -569,6 +606,7 @@ func _fade(node: Node) -> void:
 		var ghost := StandardMaterial3D.new()
 		ghost.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		ghost.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		ghost.cull_mode = BaseMaterial3D.CULL_DISABLED
 		ghost.albedo_color = Color(Palette.CYAN, GHOST_ALPHA)
 		mesh.material_override = ghost
 	var body := node as CollisionObject3D
@@ -584,3 +622,46 @@ func _clear_ghost() -> void:
 		_ghost.queue_free()
 	_ghost = null
 	_ghost_path = ""
+
+
+# #region agent log
+var _dbg_n := 0
+
+
+func _dbg_place_ghost(path: String) -> void:
+	_dbg_n += 1
+	if _dbg_n > 200 or (_dbg_n > 1 and _dbg_n % 20 != 0):
+		return
+	var cull := -1
+	var meshes := 0
+	var leds := 0
+	if _ghost != null:
+		for node in _ghost.find_children("*", "MeshInstance3D", true, false):
+			meshes += 1
+			if String(node.name) == "Leds":
+				leds += 1
+			var mat := (node as MeshInstance3D).material_override as StandardMaterial3D
+			if mat != null:
+				cull = mat.cull_mode
+	var f := FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-f6d8e1.log", FileAccess.READ_WRITE)
+	if f == null:
+		f = FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-f6d8e1.log", FileAccess.WRITE)
+	if f == null:
+		return
+	f.seek_end()
+	f.store_line(JSON.stringify({
+		"sessionId": "f6d8e1", "runId": "post-fix", "hypothesisId": "J",
+		"location": "place_tool.gd:aim",
+		"message": "place ghost cull and meshes",
+		"timestamp": Time.get_ticks_msec(),
+		"data": {
+			"path": path.get_file(),
+			"yaw": snappedf(yaw, 0.1),
+			"visible": _ghost.visible if _ghost != null else false,
+			"cull_mode": cull,
+			"meshes": meshes,
+			"leds": leds,
+		},
+	}))
+	f.close()
+# #endregion
