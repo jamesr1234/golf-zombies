@@ -1,7 +1,7 @@
 Golf Zombies for Mac (Apple Silicon / M1, universal)
 
 If macOS says the app is damaged or corrupt, that is Gatekeeper,
-not a broken file. The build is not Apple-notarized.
+not a broken file. The build is unsigned and not Apple-notarized.
 
 In Terminal, from this folder:
 

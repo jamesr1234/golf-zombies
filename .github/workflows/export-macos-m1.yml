@@ -92,7 +92,9 @@ jobs:
             find build -maxdepth 3 -print || true
             exit 1
           fi
-          # Steam looks next to the binary, not inside the PCK.
+          # Steam looks next to the binary, not inside the PCK. The
+          # preset leaves the bundle unsigned so this copy does not
+          # invalidate a sealed CodeResources hash.
           cp steam_appid.txt "$app/Contents/MacOS/steam_appid.txt"
           cp "export/macos/Open Golf Zombies.command" "export/macos/README.txt" build/macos/
           chmod +x "build/macos/Open Golf Zombies.command"

@@ -27,8 +27,9 @@ only that universal Mac binary. Download **GolfZombies-macos-m1.zip** from
 once `main` publishes it. Pull request runs attach the same zip on the
 **Export macOS M1** check instead of replacing that release. Unzip it.
 
-The build is not Apple-notarized. macOS will often say the app is **damaged**
-or **corrupt**. That is Gatekeeper, not a broken file. In Terminal:
+The build is unsigned and not Apple-notarized. macOS will often say the app
+is **damaged** or **corrupt**. That is Gatekeeper, not a broken file. In
+Terminal:
 
 ```bash
 cd ~/Downloads
