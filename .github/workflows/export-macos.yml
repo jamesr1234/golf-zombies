@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   export:
@@ -102,3 +102,26 @@ jobs:
           name: GolfZombies-macos
           path: GolfZombies-macos.zip
           if-no-files-found: error
+
+      # Actions artifacts are easy to miss on the PR Checks tab. A prerelease
+      # puts a normal download button on the Releases page.
+      - name: Publish Mac preview release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: macos-preview
+          name: Golf Zombies for Mac
+          prerelease: true
+          make_latest: false
+          target_commitish: ${{ github.event.pull_request.head.sha || github.sha }}
+          files: GolfZombies-macos.zip
+          body: |
+            Universal Mac app (Apple Silicon + Intel).
+
+            Unzip, then right-click **Golf Zombies** and choose **Open**.
+            The build is not notarized, so Gatekeeper will warn the first time:
+
+            ```
+            xattr -cr "Golf Zombies.app"
+            open "Golf Zombies.app"
+            ```
+
