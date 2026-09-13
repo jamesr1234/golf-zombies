@@ -1,0 +1,137 @@
+# Builds a universal macOS .app that runs natively on Apple Silicon (M1).
+# Official Godot templates only ship godot_macos_release.universal.
+# Same Godot 4.6.1 as the GUT workflow.
+name: Export macOS M1
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# write is only used by the main-branch release step. PR jobs skip it.
+permissions:
+  contents: write
+
+jobs:
+  export:
+    name: Apple Silicon (universal) .app
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      GODOT_VERSION: "4.6.1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache Godot and export templates
+        id: cache-godot
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ runner.temp }}/godot
+            ${{ runner.temp }}/export-templates
+          key: godot-${{ env.GODOT_VERSION }}-stable-linux-macos-m1-export
+
+      - name: Download Godot ${{ env.GODOT_VERSION }}
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        working-directory: ${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          mkdir -p godot
+          curl -fsSL -o godot.zip \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q godot.zip -d godot
+          mv "godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64" godot/godot
+          chmod +x godot/godot
+          rm -f godot.zip
+
+      - name: Download export templates
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        working-directory: ${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          curl -fsSL -o templates.tpz \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          mkdir -p export-templates
+          unzip -q templates.tpz -d export-templates
+          rm -f templates.tpz
+
+      - name: Install Godot and templates
+        run: |
+          set -euo pipefail
+          chmod +x "${{ runner.temp }}/godot/godot"
+          echo "${{ runner.temp }}/godot" >> "$GITHUB_PATH"
+          template_src="${{ runner.temp }}/export-templates/templates"
+          if [[ ! -d "$template_src" ]]; then
+            echo "::error::Export templates missing at $template_src"
+            ls -la "${{ runner.temp }}/export-templates" || true
+            exit 1
+          fi
+          dest="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          mkdir -p "$dest"
+          cp -a "$template_src/." "$dest/"
+          test -f "$dest/macos.zip"
+
+      - name: Import project
+        run: godot --headless --import --quit-after 1
+
+      - name: Export macOS Apple Silicon
+        run: |
+          set -euo pipefail
+          mkdir -p build/macos
+          godot --headless --export-release "macOS Apple Silicon" \
+            "build/macos/Golf Zombies.app"
+          app="build/macos/Golf Zombies.app"
+          if [[ ! -d "$app" ]]; then
+            echo "::error::Export did not create $app"
+            find build -maxdepth 3 -print || true
+            exit 1
+          fi
+          # Steam looks next to the binary, not inside the PCK. The
+          # preset leaves the bundle unsigned so this copy does not
+          # invalidate a sealed CodeResources hash.
+          cp steam_appid.txt "$app/Contents/MacOS/steam_appid.txt"
+          cp "export/macos/Open Golf Zombies.command" "export/macos/README.txt" build/macos/
+          chmod +x "build/macos/Open Golf Zombies.command"
+          rm -f GolfZombies-macos-m1.zip
+          (cd build/macos && zip -r -y ../../GolfZombies-macos-m1.zip \
+            "Golf Zombies.app" "Open Golf Zombies.command" "README.txt")
+          ls -lh GolfZombies-macos-m1.zip
+          unzip -l GolfZombies-macos-m1.zip | head
+
+      - name: Upload macOS M1 app
+        uses: actions/upload-artifact@v4
+        with:
+          name: GolfZombies-macos-m1
+          path: GolfZombies-macos-m1.zip
+          if-no-files-found: error
+
+      # PR runs upload the zip as an artifact. Only main (or a manual
+      # dispatch on main) updates the public macos-m1-preview tag.
+      - name: Publish Mac M1 preview release
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: macos-m1-preview
+          name: Golf Zombies for Mac (Apple Silicon)
+          prerelease: true
+          make_latest: false
+          target_commitish: ${{ github.sha }}
+          files: GolfZombies-macos-m1.zip
+          body: |
+            Universal Mac app that runs natively on Apple Silicon (M1). Download **GolfZombies-macos-m1.zip**.
+
+            macOS will often say the app is **damaged or corrupt**. That is Gatekeeper
+            blocking an unsigned download, not a broken zip.
+
+            ```
+            cd ~/Downloads
+            unzip -o GolfZombies-macos-m1.zip
+            xattr -dr com.apple.quarantine "Golf Zombies.app"
+            open "Golf Zombies.app"
+            ```
