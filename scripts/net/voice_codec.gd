@@ -1,12 +1,14 @@
 class_name VoiceCodec
 extends Object
-## 16 kHz mono PCM plus a cheap energy gate. VoiceChat owns devices and RPCs;
-## this file stays headless so GUT can pack a tone without opening a mic.
+## 16 kHz mono PCM plus a cheap energy gate. A short hangover keeps a quiet
+## word from dropping the line. VoiceChat owns devices and RPCs; this file
+## stays headless so GUT can pack a tone without opening a mic.
 
 const RATE := 16000
 const PACKET_MS := 20
 const PACKET_FRAMES := RATE * PACKET_MS / 1000
-const VAD_THRESHOLD := 0.015
+const VAD_THRESHOLD := 0.005
+const VAD_HANG_PACKETS := 18
 const LIVE_PATH := "user://voice.cfg"
 const TEST_PATH := "user://voice_test.cfg"
 
@@ -44,10 +46,18 @@ static func is_speech(frames: PackedVector2Array, threshold := VAD_THRESHOLD) ->
 	return rms(frames) >= threshold
 
 
-static func should_transmit(muted: bool, open_mic: bool, ptt: bool, speech: bool) -> bool:
+static func should_transmit(
+	muted: bool, open_mic: bool, ptt: bool, speech: bool, hanging := false
+) -> bool:
 	if muted:
 		return false
-	return speech if open_mic else ptt
+	if not open_mic:
+		return ptt
+	return speech or hanging
+
+
+static func next_hang(speech: bool, hang: int, packets := VAD_HANG_PACKETS) -> int:
+	return packets if speech else maxi(hang - 1, 0)
 
 
 static func accepts_peer(peer_id: int) -> bool:
