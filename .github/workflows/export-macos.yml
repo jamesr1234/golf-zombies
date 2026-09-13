@@ -91,8 +91,12 @@ jobs:
           fi
           # Steam looks next to the binary, not inside the PCK.
           cp steam_appid.txt "$app/Contents/MacOS/steam_appid.txt"
+          cp "export/macos/Open Golf Zombies.command" "export/macos/README.txt" build/macos/
+          chmod +x "build/macos/Open Golf Zombies.command"
+          rm -f GolfZombies-macos.zip
           # -y keeps any symlinks Godot puts in the bundle.
-          (cd build/macos && zip -r -y ../../GolfZombies-macos.zip "Golf Zombies.app")
+          (cd build/macos && zip -r -y ../../GolfZombies-macos.zip \
+            "Golf Zombies.app" "Open Golf Zombies.command" "README.txt")
           ls -lh GolfZombies-macos.zip
           unzip -l GolfZombies-macos.zip | head
 
@@ -115,13 +119,15 @@ jobs:
           target_commitish: ${{ github.event.pull_request.head.sha || github.sha }}
           files: GolfZombies-macos.zip
           body: |
-            Universal Mac app (Apple Silicon + Intel).
+            Universal Mac app (Apple Silicon + Intel). Download **GolfZombies-macos.zip**.
 
-            Unzip, then right-click **Golf Zombies** and choose **Open**.
-            The build is not notarized, so Gatekeeper will warn the first time:
+            macOS will often say the app is **damaged or corrupt**. That is Gatekeeper
+            blocking an unsigned download, not a broken zip.
 
             ```
-            xattr -cr "Golf Zombies.app"
+            cd ~/Downloads
+            unzip -o GolfZombies-macos.zip
+            xattr -dr com.apple.quarantine "Golf Zombies.app"
             open "Golf Zombies.app"
             ```
 

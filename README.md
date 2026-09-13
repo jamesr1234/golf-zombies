@@ -21,16 +21,16 @@ Open the project in Godot and press F5, or from the command line:
 ### macOS app (Apple Silicon and Intel)
 
 The **macOS** export preset builds a universal `.app` (arm64 + x86_64), so it
-runs natively on an M1 MacBook Pro. GitHub Actions uploads
-`GolfZombies-macos.zip` on every pull request, push to `main`, and manual run
-(**Actions → Export macOS → GolfZombies-macos**).
+runs natively on an M1 MacBook Pro. Download **GolfZombies-macos.zip** from
+[Releases (macos-preview)](https://github.com/jamesr1234/golf-zombies/releases/tag/macos-preview)
+(about 116 MB). Unzip it.
 
-Unzip, then right-click **Golf Zombies** and choose **Open**. The build is
-ad-hoc signed, not notarized, so Gatekeeper will warn on the first launch. If
-macOS still blocks it:
+The build is not Apple-notarized. macOS will often say the app is **damaged**
+or **corrupt**. That is Gatekeeper, not a broken file. In Terminal:
 
 ```bash
-xattr -cr "Golf Zombies.app"
+cd ~/Downloads
+xattr -dr com.apple.quarantine "Golf Zombies.app"
 open "Golf Zombies.app"
 ```
 
