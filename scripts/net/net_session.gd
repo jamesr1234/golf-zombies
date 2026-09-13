@@ -294,6 +294,7 @@ func close() -> void:
 	multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
 	SteamLobby.leave_lobby()
 	seats.clear()
+	CourseDeck.clear()
 	_active = false
 	_hosting = false
 	_connecting = false
@@ -319,15 +320,18 @@ func start_match() -> void:
 	## Send each remote a packet, then run locally. Broadcast+call_local can
 	## still lose the start if the host is the only one on the wire.
 	var mode := int(GameSettings.mode)
+	var course := CourseDeck.pack()
 	for peer_id in multiplayer.get_peers():
-		_begin_match.rpc_id(peer_id, course_seed, int(GameSettings.difficulty), ids, seat_list, mode)
-	_begin_match(course_seed, int(GameSettings.difficulty), ids, seat_list, mode)
+		_begin_match.rpc_id(
+			peer_id, course_seed, int(GameSettings.difficulty), ids, seat_list, mode, course
+		)
+	_begin_match(course_seed, int(GameSettings.difficulty), ids, seat_list, mode, course)
 
 
 @rpc("authority", "call_local", "reliable")
 func _begin_match(
 	seed: int, difficulty: int, ids: PackedInt32Array, seat_list: PackedInt32Array,
-	mode: int = int(GameSettings.Mode.ONLINE_VS)
+	mode: int = int(GameSettings.Mode.ONLINE_VS), course: Array = []
 ) -> void:
 	course_seed = seed
 	seats.clear()
@@ -335,6 +339,7 @@ func _begin_match(
 		seats[ids[i]] = seat_list[i] if i < seat_list.size() else i
 	GameSettings.mode = mode as GameSettings.Mode
 	GameSettings.difficulty = difficulty as GameSettings.Kind
+	CourseDeck.apply(course)
 	match_starting.emit()
 	## Changing scenes in this same call drops the outgoing start packet on the
 	## host, so the joiner never leaves the lobby.
