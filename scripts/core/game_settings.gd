@@ -71,6 +71,7 @@ static func reset() -> void:
 	difficulty = Kind.MEDIUM
 	custom_hole = null
 	creator_hole = null
+	CourseDeck.clear()
 
 
 static func mute_master(muted: bool) -> void:
