@@ -80,13 +80,13 @@ static func course_slot(title: String) -> int:
 
 
 ## Newest playable hole titled for this slot, or null to keep the generated one.
-## An online match prefers the host pack sitting in CourseDeck.
+## An online match uses only the host pack: a slot the host never saved stays
+## generated, even if this machine has its own titled save.
 static func course_hole(index: int) -> CustomHole:
 	if index < 0 or index >= GameState.HOLE_COUNT:
 		return null
-	var session := CourseDeck.hole(index)
-	if session != null:
-		return session
+	if CourseDeck.is_live():
+		return CourseDeck.hole(index)
 	return disk_course_hole(index)
 
 

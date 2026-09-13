@@ -37,12 +37,32 @@ func test_a_packed_hole_6_wins_over_a_different_local_save() -> void:
 
 
 func test_an_empty_pack_leaves_generated_holes() -> void:
+	var local := CustomHole.create("Hole 2")
+	assert_true(HoleStore.save_hole(local))
 	CourseDeck.apply([])
+	assert_true(CourseDeck.is_live())
+	assert_eq(HoleStore.disk_course_hole(1).id, local.id)
 	var data := HoleStore.layout(1, SEED)
-	assert_null(data.custom)
+	assert_null(data.custom, "the host left this slot generated")
 	assert_eq(data.index, 1)
 	assert_true(data.has_culvert())
 	assert_eq(HoleStore.course_pars()[1], HoleGenerator.pars()[1])
+
+
+func test_a_missing_host_slot_ignores_the_joiners_save() -> void:
+	var host := CustomHole.create("Hole 1")
+	assert_true(HoleStore.save_hole(host))
+	var packed := CourseDeck.pack()
+	HoleStore.clear_sandbox()
+	var local := CustomHole.create("Hole 6")
+	assert_true(HoleStore.save_hole(local))
+	CourseDeck.apply(packed)
+	assert_eq(HoleStore.course_hole(0).id, host.id)
+	assert_null(HoleStore.course_hole(5), "the joiner's Hole 6 is not in the match")
+	assert_eq(HoleStore.disk_course_hole(5).id, local.id)
+	var data := HoleStore.layout(5, SEED)
+	assert_null(data.custom)
+	assert_eq(HoleStore.course_pars()[5], HoleGenerator.pars()[5])
 
 
 func test_flatten_drops_user_structure_paths() -> void:
@@ -76,6 +96,7 @@ func test_clear_restores_the_disk_slot() -> void:
 	CourseDeck.apply([{CourseDeck.INDEX: 0, CourseDeck.HOLE: other.to_dict()}])
 	assert_eq(HoleStore.course_hole(0).id, other.id)
 	CourseDeck.clear()
+	assert_false(CourseDeck.is_live())
 	assert_eq(HoleStore.course_hole(0).id, disk.id)
 
 
@@ -85,9 +106,11 @@ func test_reset_and_close_drop_the_session() -> void:
 	assert_eq(CourseDeck.hole(5).id, host.id)
 	GameSettings.reset()
 	assert_null(CourseDeck.hole(5))
+	assert_false(CourseDeck.is_live())
 	CourseDeck.apply([{CourseDeck.INDEX: 5, CourseDeck.HOLE: host.to_dict()}])
 	NetSession.close()
 	assert_null(CourseDeck.hole(5))
+	assert_false(CourseDeck.is_live())
 
 
 func test_begin_match_installs_the_host_pack() -> void:
