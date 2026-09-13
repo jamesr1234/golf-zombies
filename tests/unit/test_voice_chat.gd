@@ -28,12 +28,26 @@ func test_silence_is_not_speech() -> void:
 	assert_true(VoiceCodec.is_speech(VoiceCodec.tone(VoiceCodec.PACKET_FRAMES)))
 
 
+func test_a_quiet_voice_still_counts() -> void:
+	var soft := VoiceCodec.tone(VoiceCodec.PACKET_FRAMES, 0.01)
+	assert_true(VoiceCodec.is_speech(soft), "soft speech clears the gate")
+	var hush := VoiceCodec.tone(VoiceCodec.PACKET_FRAMES, 0.002)
+	assert_false(VoiceCodec.is_speech(hush), "near-silence stays gated")
+
+
 func test_mute_and_ptt_gate_a_send() -> void:
 	assert_false(VoiceCodec.should_transmit(true, false, true, true), "mute wins")
 	assert_false(VoiceCodec.should_transmit(false, false, false, true), "PTT is off")
 	assert_true(VoiceCodec.should_transmit(false, false, true, false), "PTT sends even if quiet")
 	assert_true(VoiceCodec.should_transmit(false, true, false, true), "open mic needs speech")
+	assert_true(VoiceCodec.should_transmit(false, true, false, false, true), "hangover keeps open mic live")
 	assert_false(VoiceCodec.should_transmit(false, true, true, false), "open mic ignores PTT on hush")
+
+
+func test_hangover_counts_down_after_speech() -> void:
+	assert_eq(VoiceCodec.next_hang(true, 0), VoiceCodec.VAD_HANG_PACKETS)
+	assert_eq(VoiceCodec.next_hang(false, 3), 2)
+	assert_eq(VoiceCodec.next_hang(false, 0), 0)
 
 
 func test_cpu_peers_are_skipped() -> void:
@@ -78,6 +92,21 @@ func test_open_mic_needs_speech() -> void:
 	VoiceChat.set_open_mic(true)
 	assert_false(VoiceChat.try_send(VoiceCodec.silence(VoiceCodec.PACKET_FRAMES), true))
 	assert_true(VoiceChat.try_send(VoiceCodec.tone(VoiceCodec.PACKET_FRAMES), false))
+
+
+func test_open_mic_holds_through_a_quiet_dip() -> void:
+	assert_eq(NetSession.host(FREE_PORT), OK)
+	VoiceChat.set_open_mic(true)
+	assert_true(VoiceChat.try_send(VoiceCodec.tone(VoiceCodec.PACKET_FRAMES, 0.01), false))
+	for i in VoiceCodec.VAD_HANG_PACKETS:
+		assert_true(
+			VoiceChat.try_send(VoiceCodec.silence(VoiceCodec.PACKET_FRAMES), false),
+			"hang packet %d stays open" % i
+		)
+	assert_false(
+		VoiceChat.try_send(VoiceCodec.silence(VoiceCodec.PACKET_FRAMES), false),
+		"hangover ends"
+	)
 
 
 func test_prefs_remember_the_headset() -> void:
