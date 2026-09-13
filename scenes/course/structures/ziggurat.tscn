@@ -11,22 +11,22 @@
 [node name="Ziggurat" type="Node3D"]
 
 [node name="cube_extra_large" parent="." instance=ExtResource("1_cube_extra_large")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.7, 0, 0)
 
 [node name="cube_large" parent="." instance=ExtResource("2_cube_large")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.35, 9.45, -1.35)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 12.15, -1.35)
 
 [node name="cube_medium" parent="." instance=ExtResource("3_cube_medium")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.7, 16.2, -2.7)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.4, 21.6, -2.7)
 
 [node name="cube_small" parent="." instance=ExtResource("4_cube_small")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.7, 20.25, -2.7)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.4, 28.35, -2.7)
 
 [node name="steps_extra_large" parent="." instance=ExtResource("5_steps_extra_large")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.45, 0, 0)
 
 [node name="pillar_extra_small" parent="." instance=ExtResource("6_pillar_extra_small")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 22.95, -4.05)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.75, 32.4, -4.05)
 
 [node name="cube_extra_small" parent="." instance=ExtResource("7_cube_extra_small")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 22.95, -4.05)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.75, 32.4, -4.05)

@@ -8,7 +8,7 @@ extends Node3D
 const CELL := 1.35
 const USE_RANGE := 2.8
 const DECK := 0.34
-const DECK_CELLS := 2.0
+const DECK_CELLS := 3.0
 const POST_H := 3.2
 const POST_R := 0.1
 const CABLE_R := 0.045

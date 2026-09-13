@@ -1,36 +1,31 @@
 class_name MechVisuals
 extends Node3D
-## Articulated giant suit. Same stride idea as the player robot: pace fades the
-## walk in, arms counter-swing, and a parked suit idles with a hydraulic bob.
+## Articulated giant suit. Each stride snaps the limbs to a planted pose instead
+## of easing through a sine, so a tap looks like a hydraulic lunge.
 
 const MODEL_PATH := "res://assets/mechs/mech_suit.glb"
-const SCALE := 4.0
+const MODEL_EXPORT_SCALE := 4.0
+const SCALE := 1.0
 const HEIGHT := 5.0 * SCALE
 const WIDTH := 2.4 * SCALE
 const HATCH := "Hatch"
-const STAIRS := "Stairs"
-const RAMP := "StairRamp"
-const DECK := "BoardDeck"
 const LEFT_POD := "LeftPod"
 const RIGHT_POD := "RightPod"
-const STEP_RISE := 0.32
-const STEP_RUN := 0.38
-const STEP_WIDTH := 2.8
-const STEP_THICK := 0.12
-const PLATFORM_Y := 3.05 * SCALE
-const PLATFORM_Z := 3.28
-const PLATFORM_SIZE := Vector3(3.2, 0.22, 2.2)
+## Visual bit culled while the pilot holds L2, so the visor cam sees only the world.
+const BODY_LAYER := 1 << 4
 
 const HIP_Y := 2.22
-const STRIDE_RATE := 4.6
-const LEG_SWING_DEG := 24.0
-const ARM_SWING_DEG := 32.0
-const KNEE_DEG := 28.0
-const ELBOW_DEG := 22.0
-const LEAN_DEG := 7.0
-const TWIST_DEG := 8.0
-const BOUNCE := 0.1
+const LEG_SWING_DEG := 52.0
+const ARM_SWING_DEG := 58.0
+const KNEE_DEG := 46.0
+const ELBOW_DEG := 38.0
+const LEAN_DEG := 12.0
+const TWIST_DEG := 16.0
+const BOUNCE := 0.16
 const IDLE_BOB := 0.035
+const SNAP_START := 0.2
+const SNAP_SPAN := 0.18
+const SETTLE := 0.12
 
 var hips: Node3D
 var torso: Node3D
@@ -42,6 +37,7 @@ var arms: Array[Node3D] = []
 var elbows: Array[Node3D] = []
 var _phase := 0.0
 var _idle := 0.0
+var _stand := 1.0
 
 
 static func build() -> MechVisuals:
@@ -53,7 +49,6 @@ static func build() -> MechVisuals:
 
 static func attach(suit: CollisionObject3D) -> MechVisuals:
 	_fit_body(suit)
-	add_stair_collision(suit)
 	var root := build()
 	suit.add_child(root)
 	root._bind_muzzles(suit)
@@ -68,20 +63,6 @@ static func set_closed(root: Node3D, on: bool) -> void:
 	var hatch_node := root.find_child(HATCH, true, false) as Node3D
 	if hatch_node != null:
 		hatch_node.rotation.x = deg_to_rad(-8.0 if on else -78.0)
-	set_stairs(root, not on)
-
-
-static func set_stairs(root: Node3D, on: bool) -> void:
-	var stairs := root.get_node_or_null(STAIRS) as Node3D
-	if stairs != null:
-		stairs.visible = on
-
-
-static func set_stairs_solid(suit: CollisionObject3D, on: bool) -> void:
-	for name: String in [RAMP, DECK]:
-		var shape := suit.get_node_or_null(name) as CollisionShape3D
-		if shape != null:
-			shape.disabled = not on
 
 
 static func mini(parent: Node3D, scale := 0.22) -> Node3D:
@@ -92,7 +73,20 @@ static func mini(parent: Node3D, scale := 0.22) -> Node3D:
 	return root
 
 
+static func preview() -> MechVisuals:
+	var root := build()
+	root.name = "MechGhost"
+	root.top_level = true
+	return root
+
+
 static func view_local() -> Vector3:
+	# Behind and above the helmet so the default view frames the swinging limbs.
+	return Vector3(0.0, 5.35, 2.05) * SCALE
+
+
+static func scope_local() -> Vector3:
+	# Past the visor. Combined with BODY_LAYER culling, no suit geometry stays in frame.
 	return Vector3(0.0, 4.55, -0.86) * SCALE
 
 
@@ -101,7 +95,7 @@ static func seat_local() -> Vector3:
 
 
 static func cockpit_local() -> Vector3:
-	return Vector3(0.0, PLATFORM_Y + 1.1, PLATFORM_Z)
+	return Vector3(0.0, 1.0, 0.35) * SCALE
 
 
 static func muzzle_local(right: bool) -> Vector3:
@@ -109,45 +103,70 @@ static func muzzle_local(right: bool) -> Vector3:
 	return Vector3(side, 3.72, -0.58) * SCALE
 
 
-static func step_count() -> int:
-	return maxi(12, ceili(PLATFORM_Y / STEP_RISE))
-
-
-static func stair_run() -> float:
-	return float(step_count()) * STEP_RUN
-
-
 func apply_closed(on: bool) -> void:
 	if hatch != null:
 		hatch.rotation.x = deg_to_rad(-8.0 if on else -78.0)
-	set_stairs(self, not on)
 
 
 func animate(delta: float, pace: float) -> void:
-	var speed := clampf(pace, 0.0, 1.0)
-	_phase = wrapf(_phase + speed * STRIDE_RATE * delta, 0.0, TAU)
-	_idle = wrapf(_idle + delta * 1.5, 0.0, TAU)
-	pose(speed)
+	if pace <= 0.01:
+		stride(delta, 0.0, true, false)
+		return
+	_phase = wrapf(_phase + clampf(pace, 0.0, 1.0) * PI * delta / 0.28, 0.0, TAU)
+	stride(delta, fposmod(_phase / PI, 1.0), _phase < PI, true)
 
 
 func pose(pace: float) -> void:
+	if pace <= 0.01:
+		stride(0.0, 0.0, true, false)
+		return
+	stride(0.0, 0.5, true, true)
+
+
+func stride(delta: float, progress: float, left_swing: bool, moving: bool) -> void:
 	if hips == null or torso == null:
 		return
-	var bounce := absf(sin(_phase)) * BOUNCE * SCALE * pace
-	var idle := sin(_idle) * IDLE_BOB * SCALE * (1.0 - pace)
+	_idle = wrapf(_idle + delta * 1.5, 0.0, TAU)
+	if moving:
+		_stand = 0.0
+	else:
+		_stand = move_toward(_stand, 1.0, delta / SETTLE)
+	var amp := 1.0 - _stand
+	var k := snap01(progress)
+	var planted := not moving or k >= 1.0
+	var side := 1.0 if left_swing else -1.0
+	var bounce := 0.0
+	if moving and not planted:
+		bounce = BOUNCE * SCALE * (0.35 + k * 0.65)
+	elif planted and amp > 0.0:
+		bounce = -BOUNCE * SCALE * 0.45
+	var idle := sin(_idle) * IDLE_BOB * SCALE * (1.0 - amp)
 	hips.position.y = HIP_Y * SCALE + bounce + idle
-	torso.rotation.x = deg_to_rad(-LEAN_DEG * pace)
-	torso.rotation.y = deg_to_rad(sin(_phase) * TWIST_DEG * pace)
+	torso.rotation.x = deg_to_rad(-LEAN_DEG * amp * (0.4 + 0.6 * k))
+	torso.rotation.y = deg_to_rad(side * lerpf(TWIST_DEG, -TWIST_DEG, k) * amp)
 	if head != null:
-		head.rotation.y = deg_to_rad(-sin(_phase) * TWIST_DEG * 0.45 * pace)
-	_swing_legs(pace)
-	_swing_arms(pace)
+		head.rotation.y = deg_to_rad(-side * lerpf(TWIST_DEG, -TWIST_DEG, k) * 0.45 * amp)
+	_swing_legs(k, side, amp)
+	_swing_arms(k, side, amp)
+
+
+static func snap01(t: float) -> float:
+	return clampf((clampf(t, 0.0, 1.0) - SNAP_START) / SNAP_SPAN, 0.0, 1.0)
 
 
 func _assemble() -> void:
 	_build_rig()
-	add_child(_stairs())
+	_build_strafe_glows()
 	pose(0.0)
+
+
+func show_strafe(dir: float) -> void:
+	var left := get_node_or_null("LeftStrafeGlow") as Node3D
+	var right := get_node_or_null("RightStrafeGlow") as Node3D
+	if left != null:
+		left.visible = dir > 0.05
+	if right != null:
+		right.visible = dir < -0.05
 
 
 func _ready() -> void:
@@ -206,6 +225,7 @@ func _skin() -> void:
 		return
 	root.position = Vector3.ZERO
 	root.rotation.y = PI
+	root.scale = Vector3.ONE * (SCALE / MODEL_EXPORT_SCALE)
 	_steal(_part(root, "Torso"), torso, ["Head", "Hatch", "LArm", "RArm"])
 	_steal(_part(root, "Head"), head, ["Visor"])
 	_steal(_part(root, "Visor"), head.get_node("Visor"))
@@ -267,6 +287,7 @@ func _paint() -> void:
 	}
 	for node in find_children("*", "MeshInstance3D", true, false):
 		var mesh := node as MeshInstance3D
+		mesh.layers = BODY_LAYER
 		var src := mesh.get_active_material(0)
 		if src == null:
 			continue
@@ -278,22 +299,53 @@ func _paint() -> void:
 			mesh.material_override = painted
 
 
-func _swing_legs(pace: float) -> void:
-	for i in legs.size():
-		var phase := _phase if i == 0 else _phase + PI
-		legs[i].rotation.x = deg_to_rad(PlayerBody.limb_angle_deg(phase, pace, LEG_SWING_DEG))
-		if i < knees.size():
-			var bend := KNEE_DEG * 0.35 + absf(sin(phase)) * KNEE_DEG * pace
-			knees[i].rotation.x = deg_to_rad(bend)
+func _build_strafe_glows() -> void:
+	_strafe_glow("LeftStrafeGlow", -1.0)
+	_strafe_glow("RightStrafeGlow", 1.0)
 
 
-func _swing_arms(pace: float) -> void:
-	for i in arms.size():
-		var phase := _phase + PI if i == 0 else _phase
-		arms[i].rotation.x = deg_to_rad(PlayerBody.limb_angle_deg(phase, pace, ARM_SWING_DEG))
-		arms[i].rotation.z = deg_to_rad((-8.0 if i == 0 else 8.0) * (0.35 + pace * 0.65))
-		if i < elbows.size():
-			elbows[i].rotation.x = deg_to_rad(10.0 + absf(sin(phase)) * ELBOW_DEG * pace)
+func _strafe_glow(node_name: String, side: float) -> void:
+	var root := Node3D.new()
+	root.name = node_name
+	root.position = Vector3(side * 1.52, 2.28, 0.18) * SCALE
+	root.visible = false
+	add_child(root)
+	var ball := MeshFactory.sphere(0.68 * SCALE, Palette.AMBER, Palette.GLOW_MEDIUM)
+	ball.layers = BODY_LAYER
+	root.add_child(ball)
+	var lamp := OmniLight3D.new()
+	lamp.light_color = Palette.AMBER
+	lamp.light_energy = 2.4
+	lamp.omni_range = 3.8 * SCALE
+	root.add_child(lamp)
+
+
+func _swing_legs(k: float, side: float, amp: float) -> void:
+	var swing := lerpf(-LEG_SWING_DEG, LEG_SWING_DEG, k) * amp
+	if legs.size() > 0:
+		legs[0].rotation.x = deg_to_rad(-side * swing)
+	if legs.size() > 1:
+		legs[1].rotation.x = deg_to_rad(side * swing)
+	var lift := (1.0 - absf(k * 2.0 - 1.0)) * amp
+	if knees.size() > 0:
+		knees[0].rotation.x = deg_to_rad(KNEE_DEG * (0.2 + 0.8 * lift))
+	if knees.size() > 1:
+		knees[1].rotation.x = deg_to_rad(KNEE_DEG * (0.2 + 0.8 * lift))
+
+
+func _swing_arms(k: float, side: float, amp: float) -> void:
+	var swing := lerpf(-ARM_SWING_DEG, ARM_SWING_DEG, k) * amp
+	if arms.size() > 0:
+		arms[0].rotation.x = deg_to_rad(side * swing)
+		arms[0].rotation.z = deg_to_rad(-10.0 * (0.4 + amp * 0.6))
+	if arms.size() > 1:
+		arms[1].rotation.x = deg_to_rad(-side * swing)
+		arms[1].rotation.z = deg_to_rad(10.0 * (0.4 + amp * 0.6))
+	var pump := (1.0 - absf(k * 2.0 - 1.0)) * amp
+	if elbows.size() > 0:
+		elbows[0].rotation.x = deg_to_rad(12.0 + ELBOW_DEG * pump)
+	if elbows.size() > 1:
+		elbows[1].rotation.x = deg_to_rad(12.0 + ELBOW_DEG * pump)
 
 
 func _bind_muzzles(suit: Node) -> void:
@@ -312,71 +364,13 @@ func _mount_muzzle(suit: Node, marker: String, pod_name: String) -> void:
 	muzzle.global_transform = world
 
 
-func _stairs() -> Node3D:
-	var root := Node3D.new()
-	root.name = STAIRS
-	var top_z := _stair_top_z()
-	var count := step_count()
-	for i in count:
-		var step := MeshFactory.box(
-			Vector3(STEP_WIDTH, STEP_THICK, STEP_RUN * 0.92),
-			Palette.MECH_FRAME,
-			Palette.GLOW_FAINT
-		)
-		step.position = Vector3(
-			0.0,
-			STEP_RISE * (float(i) + 0.5),
-			top_z + STEP_RUN * (float(count - i) - 0.5)
-		)
-		root.add_child(step)
-	var deck := MeshFactory.box(PLATFORM_SIZE, Palette.MECH_FRAME, Palette.GLOW_SOFT)
-	deck.position = Vector3(0.0, PLATFORM_Y, PLATFORM_Z)
-	root.add_child(deck)
-	for side: float in [-1.0, 1.0]:
-		var rail := MeshFactory.box(
-			Vector3(0.08, 0.9, PLATFORM_SIZE.z), Palette.ICE, Palette.GLOW_FAINT
-		)
-		rail.position = Vector3(
-			side * (PLATFORM_SIZE.x * 0.5 - 0.08),
-			PLATFORM_Y + 0.45,
-			PLATFORM_Z
-		)
-		root.add_child(rail)
-	return root
-
-
-static func add_stair_collision(suit: CollisionObject3D) -> void:
-	var run := stair_run()
-	var rise := float(step_count()) * STEP_RISE
-	var length := Vector2(run, rise).length()
-	var ramp := CollisionShape3D.new()
-	ramp.name = RAMP
-	var ramp_box := BoxShape3D.new()
-	ramp_box.size = Vector3(STEP_WIDTH, 0.28, length)
-	ramp.shape = ramp_box
-	ramp.rotation.x = atan2(rise, run)
-	ramp.position = Vector3(0.0, rise * 0.5, _stair_top_z() + run * 0.5)
-	suit.add_child(ramp)
-	var deck := CollisionShape3D.new()
-	deck.name = DECK
-	var deck_box := BoxShape3D.new()
-	deck_box.size = PLATFORM_SIZE
-	deck.shape = deck_box
-	deck.position = Vector3(0.0, PLATFORM_Y, PLATFORM_Z)
-	suit.add_child(deck)
-
-
-static func _stair_top_z() -> float:
-	return PLATFORM_Z + PLATFORM_SIZE.z * 0.5
-
-
 static func _fit_body(suit: CollisionObject3D) -> void:
 	_shape(suit, "Hull", Vector3(2.2, 3.8, 1.45) * SCALE, Vector3(0.0, 2.15, -0.18) * SCALE)
 	_shape(suit, "Crush/Shape", Vector3(2.5, 0.9, 2.3) * SCALE, Vector3(0.0, 0.4, 0.0) * SCALE)
 	var cockpit := suit.get_node_or_null("Cockpit") as Node3D
 	if cockpit != null:
 		cockpit.position = cockpit_local()
-	_shape(suit, "Cockpit/Shape", Vector3(2.4, 2.2, 2.4), Vector3.ZERO)
+	_shape(suit, "Cockpit/Shape", Vector3(3.6, 2.4, 3.4) * SCALE, Vector3.ZERO)
 	_marker(suit, "PilotSeat", seat_local())
 	_marker(suit, "PilotView", view_local())
 	_marker(suit, "LeftMuzzle", muzzle_local(false))

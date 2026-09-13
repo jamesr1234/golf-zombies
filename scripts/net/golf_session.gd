@@ -31,15 +31,34 @@ func _coop_may_play(player: Node) -> bool:
 	return true
 
 
+func release() -> void:
+	var had_golfer := golfer != null
+	super.release()
+	if not had_golfer or not _should_replicate_golfer():
+		return
+	_replicate_golfer.rpc(0)
+
+
 func try_toggle(player: Node) -> void:
 	if NetSession.is_active() and not multiplayer.is_server():
 		_request_toggle.rpc_id(1)
 		return
 	super.try_toggle(player)
-	if NetSession.is_active() and golfer == player:
+	if not _should_replicate_golfer():
+		return
+	if golfer == player:
 		_replicate_golfer.rpc(_peer_of(player))
-	elif NetSession.is_active() and golfer == null:
+	elif golfer == null:
 		_replicate_golfer.rpc(0)
+
+
+func _should_replicate_golfer() -> bool:
+	return (
+		NetSession.is_active()
+		and is_inside_tree()
+		and multiplayer != null
+		and multiplayer.is_server()
+	)
 
 
 func _strike() -> void:

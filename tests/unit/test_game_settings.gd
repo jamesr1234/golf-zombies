@@ -4,7 +4,15 @@ extends GutTest
 
 func after_each() -> void:
 	GameSettings.reset()
+	GameSettings.mute_master(false)
 	InputActions.register_for_mode(GameSettings.Mode.SOLO)
+
+
+func test_mute_master_silences_and_restores_the_bus() -> void:
+	GameSettings.mute_master(true)
+	assert_true(AudioServer.is_bus_mute(AudioServer.get_bus_index("Master")))
+	GameSettings.mute_master(false)
+	assert_false(AudioServer.is_bus_mute(AudioServer.get_bus_index("Master")))
 
 
 func test_defaults_to_solo_medium() -> void:

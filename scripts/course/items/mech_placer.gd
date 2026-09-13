@@ -75,7 +75,7 @@ static func _blocked(world: World3D, at: Vector3, buyer: Player) -> bool:
 
 static func _lift(hole, at: Vector3) -> Vector3:
 	if hole != null and hole.has_method("lift"):
-		return hole.lift(at) + Vector3.UP * 0.05
+		return hole.lift(at)
 	return at
 
 

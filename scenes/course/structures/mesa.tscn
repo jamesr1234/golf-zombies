@@ -9,25 +9,25 @@
 [node name="Mesa" type="Node3D"]
 
 [node name="cube_extra_large" parent="." instance=ExtResource("1_cube_extra_large")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.7, 0, 0)
 
 [node name="cube_extra_large2" parent="." instance=ExtResource("1_cube_extra_large")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.45, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14.85, 0, 0)
 
 [node name="platform_extra_large" parent="." instance=ExtResource("2_platform_extra_large")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 9.45, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.7, 12.15, 0)
 
 [node name="platform_extra_large2" parent="." instance=ExtResource("2_platform_extra_large")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.45, 9.45, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14.85, 12.15, 0)
 
 [node name="ramp_extra_large" parent="." instance=ExtResource("3_ramp_extra_large")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.45, 0, 0)
 
 [node name="cube_medium" parent="." instance=ExtResource("4_cube_medium")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.4, 10.8, -2.7)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.1, 13.5, -2.7)
 
 [node name="pillar_small" parent="." instance=ExtResource("5_pillar_small")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 10.8, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.7, 13.5, 0)
 
 [node name="pillar_small2" parent="." instance=ExtResource("5_pillar_small")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17.55, 10.8, -8.1)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22.95, 13.5, -10.8)

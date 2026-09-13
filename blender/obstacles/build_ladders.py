@@ -6,10 +6,10 @@ import bpy
 CELL = 1.35
 SIZES = [
     ("ExtraSmall", "extra_small", 1, (-0.675, -202.5, 0.0)),
-    ("Small", "small", 2, (39.825, -202.5, 0.0)),
-    ("Medium", "medium", 3, (80.325, -202.5, 0.0)),
-    ("Large", "large", 5, (120.825, -202.5, 0.0)),
-    ("ExtraLarge", "extra_large", 7, (161.325, -202.5, 0.0)),
+    ("Small", "small", 3, (39.825, -202.5, 0.0)),
+    ("Medium", "medium", 5, (80.325, -202.5, 0.0)),
+    ("Large", "large", 7, (120.825, -202.5, 0.0)),
+    ("ExtraLarge", "extra_large", 9, (161.325, -202.5, 0.0)),
 ]
 EXPORT_DIR = "/Users/jamesritchie/golf-zombies/assets/obstacles"
 RUNG = 0.45

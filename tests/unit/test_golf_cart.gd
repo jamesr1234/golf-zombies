@@ -91,11 +91,12 @@ func test_throttle_is_proportional_and_clamped() -> void:
 func test_a_windmill_fling_kills_drive_and_throws_the_cart() -> void:
 	var cart := GolfCart.new()
 	cart.drive_speed = 16.0
-	cart.fling(Vector3.RIGHT, 34.0, 14.0, 1.0)
+	cart.fling(Vector3.RIGHT, CartPathWindmill.FLING_SPEED, CartPathWindmill.FLING_LIFT, 1.0)
 	assert_true(cart.is_flung())
 	assert_eq(cart.drive_speed, 0.0)
-	assert_almost_eq(cart.velocity.x, 34.0, 0.01)
-	assert_almost_eq(cart.velocity.y, 14.0, 0.01)
+	assert_almost_eq(cart.velocity.x, CartPathWindmill.FLING_SPEED, 0.01)
+	assert_almost_eq(cart.velocity.y, CartPathWindmill.FLING_LIFT, 0.01)
+	assert_gt(cart.velocity.y, cart.velocity.x, "the mill has to send you up, not sideways")
 	cart.recover_at(Vector3.ZERO, 0.0)
 	assert_false(cart.is_flung())
 	assert_eq(cart.velocity, Vector3.ZERO)
@@ -143,9 +144,10 @@ func test_cruising_speed_flattens_the_smaller_zombies() -> void:
 	assert_gt(damage, RUNNER.max_hp)
 
 
-func test_full_speed_flattens_a_brute() -> void:
+func test_full_speed_would_flatten_a_brute_if_they_took_cart_damage() -> void:
 	var damage := GolfCart.crush_damage(GolfCart.MAX_SPEED)
-	assert_gt(damage, BRUTE.max_hp, "at this speed a brute does not survive the hit")
+	assert_gt(damage, BRUTE.max_hp, "the formula is still lethal; brutes just refuse it")
+	assert_true(CartBrute.ignores_crush(BRUTE))
 
 
 func test_reversing_over_something_hurts_just_as_much() -> void:
@@ -580,7 +582,7 @@ func test_a_ram_plate_hits_harder() -> void:
 
 
 func test_a_boost_stripe_outpaces_the_trigger() -> void:
-	assert_gt(_Boost.SPEED, GolfCart.BOOST_SPEED * 2.0)
+	assert_gt(_Boost.SPEED, GolfCart.BOOST_SPEED * 1.5)
 	var from_cruise := _Boost.cart_speed(GolfCart.MAX_SPEED, 0.5)
 	assert_gt(from_cruise, GolfCart.BOOST_SPEED)
 	assert_gt(from_cruise, GolfCart.MAX_SPEED * 1.5)

@@ -35,7 +35,7 @@ static func view_transform(target: Vector3, yaw_deg: float) -> Transform3D:
 func spin(look: Vector2, tumble := true) -> void:
 	yaw = wrapf(yaw - look.x, -180.0, 180.0)
 	if tumble:
-		pitch = wrapf(pitch + look.y, -180.0, 180.0)
+		pitch = wrapf(pitch - look.y, -180.0, 180.0)
 	_apply_spin()
 
 
@@ -64,9 +64,21 @@ func _rebuild(item: Dictionary) -> void:
 		return
 	_pose = Node3D.new()
 	add_child(_pose)
-	Props.preview(_pose, item)
-	visible = _pose.get_child_count() > 0
+	var content := Node3D.new()
+	_pose.add_child(content)
+	Props.preview(content, item)
+	_anchor(content)
+	visible = content.get_child_count() > 0
 	_apply_spin()
+
+
+## Guns and kits are built from the grip, not the hull middle. Slide the mesh
+## onto the pose origin so a look tumble turns the item in place.
+func _anchor(content: Node3D) -> void:
+	var box := GridSnap.local_aabb(content)
+	if box.size == Vector3.ZERO:
+		return
+	content.position = -box.get_center()
 
 
 func _apply_spin() -> void:

@@ -7,19 +7,19 @@
 [node name="RampArena" type="Node3D"]
 
 [node name="cube_large" parent="." instance=ExtResource("1_cube_large")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.75, 0, -6.75)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.45, 0, -9.45)
 
 [node name="ramp_large" parent="." instance=ExtResource("2_ramp_large")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -6.75)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -9.45)
 
 [node name="ramp_large2" parent="." instance=ExtResource("2_ramp_large")]
-transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 20.25, 0, -13.5)
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 28.35, 0, -18.9)
 
 [node name="ramp_large3" parent="." instance=ExtResource("2_ramp_large")]
-transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 13.5, 0, 0)
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 18.9, 0, 0)
 
 [node name="ramp_large4" parent="." instance=ExtResource("2_ramp_large")]
-transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 6.75, 0, -20.25)
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 9.45, 0, -28.35)
 
 [node name="pillar_extra_small" parent="." instance=ExtResource("3_pillar_extra_small")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.45, 6.75, -9.45)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.15, 9.45, -12.15)

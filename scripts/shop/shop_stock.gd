@@ -92,7 +92,7 @@ static func items() -> Array[Dictionary]:
 		},
 		{
 			"id": "mech", "name": "Mech Suit", "price": Shop.MECH_PRICE, "kind": "mech",
-			"info": "One giant suit for this hole. Climb in, press Circle to seal. Eight rockets, then reload. One per round.",
+			"info": "One suit you drop with gear, like the hex. Climb in, press Circle to seal. Eight rockets, then reload. One per round.",
 		},
 	]
 

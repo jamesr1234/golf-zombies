@@ -283,7 +283,7 @@ func test_neighbor_boxes_skip_the_piece_being_placed() -> void:
 	second.position = first.position
 	var boxes: Array = _Snap.neighbor_boxes(host, second)
 	assert_eq(boxes.size(), 1)
-	assert_almost_eq(boxes[0].size.x, _Snap.CELL * 3.0, 0.01)
+	assert_almost_eq(boxes[0].size.x, _Snap.CELL * 5.0, 0.01)
 
 
 func test_world_aabb_skips_meshes_that_are_off_the_tree() -> void:

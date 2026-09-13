@@ -3,25 +3,25 @@
 [ext_resource type="Script" path="res://scripts/course/items/mech_suit.gd" id="1_mech"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_hull"]
-size = Vector3(8.8, 15.2, 5.8)
+size = Vector3(2.2, 3.8, 1.45)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_crush"]
-size = Vector3(10, 3.6, 9.2)
+size = Vector3(2.5, 0.9, 2.3)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_cockpit"]
-size = Vector3(2.4, 2.2, 2.4)
+size = Vector3(3.6, 2.4, 3.4)
 
 [node name="MechSuit" type="CharacterBody3D"]
 script = ExtResource("1_mech")
 
 [node name="Hull" type="CollisionShape3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 8.6, -0.72)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.15, -0.18)
 shape = SubResource("BoxShape3D_hull")
 
 [node name="Crush" type="Area3D" parent="."]
 
 [node name="Shape" type="CollisionShape3D" parent="Crush"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 0)
 shape = SubResource("BoxShape3D_crush")
 
 [node name="Cockpit" type="Area3D" parent="."]
@@ -31,13 +31,13 @@ monitorable = false
 shape = SubResource("BoxShape3D_cockpit")
 
 [node name="PilotSeat" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 10.2, 0.2)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.55, 0.05)
 
 [node name="PilotView" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 18.2, -3.44)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5.35, 2.05)
 
 [node name="LeftMuzzle" type="Marker3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.48, 14.88, -2.32)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.12, 3.72, -0.58)
 
 [node name="RightMuzzle" type="Marker3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.48, 14.88, -2.32)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.12, 3.72, -0.58)

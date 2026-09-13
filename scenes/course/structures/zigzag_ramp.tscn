@@ -10,19 +10,19 @@
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 
 [node name="platform_small" parent="." instance=ExtResource("2_platform_small")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.7, 1.35, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 2.025, 0)
 
 [node name="ramp_small2" parent="." instance=ExtResource("1_ramp_small")]
-transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 5.4, 1.35, -2.7)
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 8.1, 2.025, -4.05)
 
 [node name="platform_small2" parent="." instance=ExtResource("2_platform_small")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.7, 2.7, -5.4)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 3.375, -8.1)
 
 [node name="ramp_small3" parent="." instance=ExtResource("1_ramp_small")]
-transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 2.7, 2.7, -8.1)
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 4.05, 3.375, -12.15)
 
 [node name="platform_small3" parent="." instance=ExtResource("2_platform_small")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4.05, -5.4)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4.725, -8.1)
 
 [node name="wall_extra_small" parent="." instance=ExtResource("3_wall_extra_small")]
-transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 6.75, 1.35, 0)
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 9.45, 2.025, 0)

@@ -257,7 +257,7 @@ func test_the_right_stick_spins_hovered_stock_a_full_turn() -> void:
 	assert_almost_eq(inspect.yaw, -90.0, 0.01)
 	inspect.spin(Vector2(300.0, 45.0))
 	assert_almost_eq(inspect.yaw, wrapf(-390.0, -180.0, 180.0), 0.01)
-	assert_almost_eq(inspect.pitch, 45.0, 0.01)
+	assert_almost_eq(inspect.pitch, -45.0, 0.01)
 	assert_almost_eq(inspect._pose.rotation_degrees.y, inspect.yaw, 0.01)
 
 
@@ -293,7 +293,7 @@ func test_the_right_stick_spins_apparel_without_turning_the_robot() -> void:
 	assert_almost_eq(buyer.body.rotation.y, 0.0, 0.01)
 	assert_almost_eq(buyer.body.rotation.x, 0.0, 0.01)
 	assert_almost_eq(buyer._inspect.yaw, -90.0, 0.01)
-	assert_almost_eq(buyer._inspect.pitch, 40.0, 0.01)
+	assert_almost_eq(buyer._inspect.pitch, -40.0, 0.01)
 
 
 func test_walking_off_the_counter_does_not_close_the_shop() -> void:
@@ -357,9 +357,10 @@ func test_the_mech_is_one_per_round() -> void:
 	var item := _find("mech")
 	assert_eq(String(item["kind"]), "mech")
 	assert_eq(int(item["price"]), Shop.MECH_PRICE)
-	assert_string_contains(shop.info(item), "One giant")
+	assert_string_contains(shop.info(item), "drop with gear")
 	assert_true(shop.buy("mech", score, _loadout(), buyer))
 	assert_true(score.mech_bought)
+	assert_eq(score.mech_charges, 1, "the buy is a drop charge, not an instant spawn")
 	assert_eq(score.money, Shop.MECH_PRICE)
 	assert_false(shop.buy("mech", score, _loadout(), buyer), "one per round even after it is gone")
 	assert_eq(score.money, Shop.MECH_PRICE)

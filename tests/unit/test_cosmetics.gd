@@ -113,6 +113,22 @@ func test_buying_the_preview_keeps_it_when_you_walk_off() -> void:
 	assert_eq(_chest_color(body), Palette.VIOLET)
 
 
+func test_inspect_spin_stays_on_the_item_middle() -> void:
+	var inspect = InspectScript.new()
+	add_child_autofree(inspect)
+	inspect.show_item(ShopStock.weapons()[0])
+	var hold: Vector3 = inspect.global_position
+	var mid: Vector3 = GridSnap.world_aabb(inspect._pose).get_center()
+	assert_almost_eq(mid.x, hold.x, 0.05)
+	assert_almost_eq(mid.y, hold.y, 0.05)
+	assert_almost_eq(mid.z, hold.z, 0.05)
+	inspect.spin(Vector2(90.0, 70.0))
+	mid = GridSnap.world_aabb(inspect._pose).get_center()
+	assert_almost_eq(mid.x, hold.x, 0.05)
+	assert_almost_eq(mid.y, hold.y, 0.05)
+	assert_almost_eq(mid.z, hold.z, 0.05)
+
+
 func test_the_inspect_camera_looks_at_the_stock() -> void:
 	var target := Vector3(5.0, 1.12, 10.0)
 	var view := InspectScript.view_transform(target, 0.0)

@@ -13,7 +13,7 @@ const ACTIONS: PackedStringArray = [
 	"sprint", "jump", "shoot", "aim", "zoom", "slide", "reload", "melee", "swap_weapon",
 	"swap_weapon_prev", "swap_gear", "swap_gear_prev",
 	"interact", "revive", "swing", "pause", "map", "ascend", "grab", "shield",
-	"grapple",
+	"grapple", "talk",
 ]
 
 
@@ -69,6 +69,7 @@ static func _register_keyboard(prefix: String) -> void:
 	_key(prefix + "_pause", KEY_ESCAPE)
 	_key(prefix + "_shield", KEY_C)
 	_key(prefix + "_grapple", KEY_V)
+	_key(prefix + "_talk", KEY_T)
 	_key(prefix + "_zoom", KEY_Z)
 	_key(prefix + "_slide", KEY_Z)
 	_mouse(prefix + "_shoot", MOUSE_BUTTON_LEFT)
@@ -112,6 +113,7 @@ static func _register_gamepad_for(prefix: String, device: int) -> void:
 	_button(prefix + "_revive", JOY_BUTTON_Y, device)
 	_button(prefix + "_map", JOY_BUTTON_Y, device)
 	_button(prefix + "_pause", JOY_BUTTON_START, device)
+	_button(prefix + "_talk", JOY_BUTTON_BACK, device)
 	_button(prefix + "_shield", JOY_BUTTON_RIGHT_SHOULDER, device)
 	_button(prefix + "_ascend", JOY_BUTTON_RIGHT_SHOULDER, device)
 	_button(prefix + "_grab", JOY_BUTTON_B, device)

@@ -22,10 +22,10 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 0, 0)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 
 [node name="pillar_small2" parent="." instance=ExtResource("3_pillar_small")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.8, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.15, 0, 0)
 
 [node name="platform_small" parent="." instance=ExtResource("4_platform_small")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.4, 4.05, -5.4)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.4, 6.75, -5.4)
 
 [node name="ramp_extra_small" parent="." instance=ExtResource("5_ramp_extra_small")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 0, -5.4)
@@ -34,10 +34,10 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 0, -5.4)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -5.4)
 
 [node name="wall_extra_small" parent="." instance=ExtResource("7_wall_extra_small")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.8, 0, -5.4)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.15, 0, -5.4)
 
 [node name="tunnel_extra_small" parent="." instance=ExtResource("8_tunnel_extra_small")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.4, 0, -10.8)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.4, 0, -13.5)
 
 [node name="ladder_extra_small" parent="." instance=ExtResource("9_ladder_extra_small")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.8, 0, -4.05)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.15, 0, -4.05)

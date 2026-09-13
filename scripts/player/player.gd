@@ -78,6 +78,8 @@ var state: State = State.NORMAL
 var floored_for := 0.0
 @export var aiming := false
 var brain: CpuBuddy
+## Solo buddy is parked off the course in the clubhouse and after a hole-out.
+var on_course := true
 var shopping := false
 var shop_choice := 0
 var shop_dept := Shop.Dept.WEAPONS
@@ -211,6 +213,9 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if not on_course:
+		velocity = Vector3.ZERO
+		return
 	floored_for = maxf(0.0, floored_for - delta)
 	if (
 		state == State.RIDING
@@ -246,7 +251,8 @@ func _physics_process(delta: float) -> void:
 			input.pressed("sprint"),
 			look_yaw(),
 			look_pitch(),
-			input.just_pressed("jump")
+			input.just_pressed("jump"),
+			(1.0 if input.pressed("shield") else 0.0) - (1.0 if input.pressed("melee") else 0.0)
 		)
 		if not is_golfing():
 			if input.just_pressed("shoot"):
@@ -400,6 +406,33 @@ func is_cpu() -> bool:
 	return brain != null or vs_brain != null
 
 
+func is_on_course() -> bool:
+	return on_course
+
+
+func set_on_course(on: bool) -> void:
+	if on_course == on:
+		return
+	if not on:
+		if is_riding() and cart != null:
+			cart.eject(self)
+		if is_in_mech():
+			eject_from_mech(global_position + Vector3.UP * 0.4, look.yaw)
+		if is_poker_seated():
+			poker.stand(self)
+		close_shop()
+		stop_talk()
+		if brain != null:
+			brain.shot_requested = false
+	on_course = on
+	visible = on
+	_set_solid(on)
+	if not on:
+		velocity = Vector3.ZERO
+		if is_inside_tree():
+			spawn_at(Vector3(0.0, -250.0, 0.0), 0.0)
+
+
 func seat_index() -> int:
 	var seat := NetSession.seat_for(peer_id)
 	return seat if seat >= 0 else 0
@@ -528,9 +561,12 @@ func cabin_layer() -> int:
 
 
 func view_cull_mask() -> int:
+	var mask := 0xFFFFF
 	if look.hides_own_cabin(self):
-		return 0xFFFFF & ~cabin_layer()
-	return 0xFFFFF
+		mask &= ~cabin_layer()
+	if is_in_mech() and aiming and not is_golfing():
+		mask &= ~MechVisuals.BODY_LAYER
+	return mask
 
 
 func add_mouse_look(relative: Vector2) -> void:
@@ -831,6 +867,15 @@ func _request_place_ladder(at: Vector3, yaw_deg: float, span: float) -> void:
 
 
 @rpc("any_peer", "reliable")
+func _request_place_mech(at: Vector3, yaw_deg: float) -> void:
+	if not multiplayer.is_server():
+		return
+	if multiplayer.get_remote_sender_id() != peer_id:
+		return
+	place.host_place_mech(self, at, yaw_deg)
+
+
+@rpc("any_peer", "reliable")
 func _request_throw_ladder() -> void:
 	if not multiplayer.is_server():
 		return
@@ -884,8 +929,13 @@ func incoming_damage(amount: float) -> float:
 func apply_hit(amount: float, from: Vector3, hit_at := Vector3.INF) -> void:
 	if NetSession.defers_world():
 		return
+	if not hit_fx.can_take_hit():
+		return
 	var was_alive := health.is_alive()
-	health.take_damage(incoming_damage(amount))
+	var incoming := incoming_damage(amount)
+	health.take_damage(incoming)
+	if incoming > 0.0:
+		hit_fx.register_hit()
 	if not was_alive:
 		return
 	motion.knock_from(self, from)

@@ -244,7 +244,7 @@ func nearest_player(zombie: Zombie) -> Player:
 	var best_distance := INF
 	for node in zombie.get_tree().get_nodes_in_group("players"):
 		var player := node as Player
-		if player == null or not player.health.is_alive():
+		if player == null or not player.health.is_alive() or not player.is_on_course():
 			continue
 		var distance := zombie.global_position.distance_to(player.global_position)
 		if distance < best_distance:
@@ -259,7 +259,7 @@ func pick_target(zombie: Zombie) -> Node3D:
 	if Zombie.hunts(zombie.allied, true, false):
 		for node in zombie.get_tree().get_nodes_in_group("players"):
 			var player := node as Player
-			if player == null or not player.health.is_alive():
+			if player == null or not player.health.is_alive() or not player.is_on_course():
 				continue
 			if zombie.hunts_in_yard() and not zombie.roam_contains(player.global_position):
 				continue

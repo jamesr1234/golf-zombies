@@ -122,7 +122,7 @@ func _skip(data: HoleData, spot: Vector3) -> bool:
 
 
 func _cap_start(data: HoleData, points: Array[Vector3]) -> void:
-	if points.size() < 2:
+	if data.open_tee_end or not data.has_practice() or points.size() < 2:
 		return
 	var dir: Vector3 = points[1] - points[0]
 	dir.y = 0.0
@@ -159,6 +159,28 @@ func _panel(at: Vector3, dir: Vector3, outward: Vector3, length := STEP + OVERLA
 	mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	mesh.transform = xform
 	add_child(mesh)
+
+
+## Drop lip panels that sit on the cart path, so a turning exit is not a dead end.
+static func open_across(hole_node: Node3D, centerline: Array[Vector3]) -> void:
+	if hole_node == null or centerline.size() < 2:
+		return
+	var field := hole_node.find_child("FairwayField", true, false) as Node3D
+	if field == null:
+		return
+	var keep := CartPath.PATH_WIDTH * 0.5 + HIT_THICK
+	var drop: Array[Node] = []
+	for child in field.get_children():
+		var node := child as Node3D
+		if node == null:
+			continue
+		var at := node.global_position if field.is_inside_tree() else field.to_global(node.position)
+		if CartPathTrack.distance_to(centerline, at) > keep:
+			continue
+		drop.append(node)
+	for node in drop:
+		field.remove_child(node)
+		node.free()
 
 
 func _fade(energy: float) -> void:

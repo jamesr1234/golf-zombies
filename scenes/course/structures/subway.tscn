@@ -10,22 +10,22 @@
 [node name="Subway" type="Node3D"]
 
 [node name="tunnel_large" parent="." instance=ExtResource("1_tunnel_large")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.7, 0, 0)
 
 [node name="tunnel_large2" parent="." instance=ExtResource("1_tunnel_large")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.75, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.15, 0, 0)
 
 [node name="tunnel_medium" parent="." instance=ExtResource("2_tunnel_medium")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.5, 0, -1.35)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 21.6, 0, -1.35)
 
 [node name="steps_medium" parent="." instance=ExtResource("3_steps_medium")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.05, 0, -2.7)
 
 [node name="wall_medium" parent="." instance=ExtResource("4_wall_medium")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17.55, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28.35, 0, 0)
 
 [node name="cube_small" parent="." instance=ExtResource("5_cube_small")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17.55, 0, -2.7)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28.35, 0, -2.7)
 
 [node name="pillar_small" parent="." instance=ExtResource("6_pillar_small")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.7, 9.45, -4.05)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.4, 12.15, -4.05)

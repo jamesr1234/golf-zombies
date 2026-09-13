@@ -46,6 +46,8 @@ func _ready() -> void:
 	SteamLobby.invite_accepted.connect(_on_invite)
 	SteamLobby.lobby_error.connect(_on_lost)
 	_Music.play_lounge()
+	InputActions.register_all()
+	VoiceChat.speaking_changed.connect(_refresh)
 	_refresh()
 	_consume_invite()
 
@@ -59,6 +61,8 @@ func _exit_tree() -> void:
 		SteamLobby.invite_accepted.disconnect(_on_invite)
 	if SteamLobby.lobby_error.is_connected(_on_lost):
 		SteamLobby.lobby_error.disconnect(_on_lost)
+	if VoiceChat.speaking_changed.is_connected(_refresh):
+		VoiceChat.speaking_changed.disconnect(_refresh)
 
 
 func _host() -> void:
@@ -263,6 +267,8 @@ func _roster() -> String:
 			tag += "  host"
 		if NetSession.is_cpu_peer(peer_id):
 			tag = "CPU"
+		elif VoiceChat.is_speaking(peer_id):
+			tag += "  talking"
 		var label := CoopVs.player_label(seat) if GameSettings.is_coop_vs() else _seat_name(seat)
 		lines.append("%s   %s" % [label, tag])
 	if GameSettings.is_coop_vs() and NetSession.is_host():
@@ -379,6 +385,7 @@ func _build() -> void:
 	_status.label_settings = HudStyle.readout(Palette.CYAN, 16)
 	root.add_child(_status)
 	root.add_child(_fields())
+	root.add_child(VoicePad.new())
 	_list = Label.new()
 	_list.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_list.label_settings = HudStyle.readout(Palette.ICE, 16)

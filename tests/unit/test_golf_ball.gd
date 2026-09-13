@@ -59,6 +59,16 @@ func test_a_rough_strike_is_slower_than_a_fairway_strike() -> void:
 	)
 
 
+func test_an_obstacle_strike_matches_a_fairway_strike() -> void:
+	var ball := await _ball_on_cube()
+	assert_eq(ball.current_surface(), Surface.Type.FAIRWAY)
+	assert_false(ball.is_putting(), "a rest on a piece is a swing, not a putt")
+	ball.strike(0.0, 0.0, 1.0)
+	var fairway := Shot.velocity(0.0, 0.0, 1.0, Surface.Type.FAIRWAY, false)
+	assert_gt(ball.linear_velocity.y, 0.0)
+	assert_almost_eq(ball.linear_velocity.length(), fairway.length(), 0.001)
+
+
 func test_a_slow_ball_drops_into_the_cup() -> void:
 	var cup := Cup.create(Vector3(0.0, 2.0, 0.0))
 	add_child_autofree(cup)
@@ -94,4 +104,23 @@ func _ball_on(type: Surface.Type) -> GolfBall:
 	var ball := GolfBall.new()
 	add_child_autofree(ball)
 	ball.enter_surface(type)
+	return ball
+
+
+func _ball_on_cube() -> GolfBall:
+	var cube := StaticBody3D.new()
+	cube.scene_file_path = "res://assets/obstacles/cube_small.glb"
+	cube.collision_layer = Layers.WORLD
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(4.0, 4.0, 4.0)
+	shape.shape = box
+	shape.position.y = 2.0
+	cube.add_child(shape)
+	add_child_autofree(cube)
+	var ball := GolfBall.new()
+	add_child_autofree(ball)
+	ball.enter_surface(Surface.Type.GREEN)
+	ball.place_at(Vector3(0.0, 4.0, 0.0))
+	await wait_physics_frames(4)
 	return ball

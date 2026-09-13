@@ -2,7 +2,11 @@ class_name GolfBall
 extends RigidBody3D
 ## The one shared ball. Reads its lie from the surface patches it overlaps and
 ## reports the three events the match cares about: at rest, hazard, holed.
+## A rest on an obstacle is a fairway lie, even when a painted patch still
+## reaches the piece.
 ## Water is a swim, not a penalty: the ball sinks and waits to be picked up.
+
+const _ChipScale := preload("res://scripts/golf/chip_scale.gd")
 
 signal came_to_rest(position: Vector3)
 signal entered_hazard(kind: String)
@@ -119,7 +123,7 @@ func place_at(position: Vector3) -> void:
 
 func strike(
 	yaw_deg: float, deviation_deg: float, power: float, kit: ClubKit = null, green_span := 0.0,
-	loft_bias := 0.0
+	loft_bias := 0.0, hole_dist := 0.0
 ) -> void:
 	var surface := current_surface()
 	_putting = Shot.can_putt(surface)
@@ -129,6 +133,8 @@ func strike(
 	var launch := Shot.velocity(
 		yaw_deg, deviation_deg, power, surface, _putting, kit, green_span, loft_bias
 	)
+	if not _putting:
+		launch = _ChipScale.scale_launch(launch, hole_dist, loft_bias, kit, green_span)
 	if _putting:
 		launch.y = 0.0
 	linear_velocity = launch
@@ -136,9 +142,38 @@ func strike(
 	_in_play = true
 	_closed = false
 	_rest_timer = 0.0
+	# #region agent log
+	var _dbg_st := FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-f5be46.log", FileAccess.READ_WRITE)
+	if _dbg_st == null:
+		_dbg_st = FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-f5be46.log", FileAccess.WRITE)
+	else:
+		_dbg_st.seek_end()
+	if _dbg_st != null:
+		var _p := global_position
+		_dbg_st.store_line(JSON.stringify({
+			"sessionId": "f5be46",
+			"hypothesisId": "E",
+			"location": "golf_ball.gd:strike",
+			"message": "ball struck",
+			"data": {
+				"pos": [_p.x, _p.y, _p.z],
+				"launch": [launch.x, launch.y, launch.z],
+				"power": power,
+				"putting": _putting,
+				"surface": current_surface(),
+				"in_bounds": bounds.has_point(Vector2(_p.x, _p.z)),
+				"under_world": _p.y < UNDER_THE_WORLD,
+				"bounds": [bounds.position.x, bounds.position.y, bounds.size.x, bounds.size.y],
+			},
+			"timestamp": Time.get_ticks_msec(),
+		}))
+		_dbg_st.close()
+	# #endregion
 
 
 func current_surface() -> Surface.Type:
+	if _resting_on_obstacle():
+		return Surface.Type.FAIRWAY
 	var types := _query_lies()
 	for type in _surfaces:
 		types.append(type)
@@ -362,6 +397,30 @@ func _physics_process(delta: float) -> void:
 		if _in_play:
 			var off_the_map := not bounds.has_point(Vector2(global_position.x, global_position.z))
 			if off_the_map or global_position.y < UNDER_THE_WORLD:
+				# #region agent log
+				var _dbg_oob := FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-f5be46.log", FileAccess.READ_WRITE)
+				if _dbg_oob == null:
+					_dbg_oob = FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-f5be46.log", FileAccess.WRITE)
+				else:
+					_dbg_oob.seek_end()
+				if _dbg_oob != null:
+					var _p := global_position
+					_dbg_oob.store_line(JSON.stringify({
+						"sessionId": "f5be46",
+						"hypothesisId": "B",
+						"location": "golf_ball.gd:_physics_process",
+						"message": "OOB trip",
+						"data": {
+							"pos": [_p.x, _p.y, _p.z],
+							"vel": [linear_velocity.x, linear_velocity.y, linear_velocity.z],
+							"off_the_map": off_the_map,
+							"under_world": _p.y < UNDER_THE_WORLD,
+							"bounds": [bounds.position.x, bounds.position.y, bounds.size.x, bounds.size.y],
+						},
+						"timestamp": Time.get_ticks_msec(),
+					}))
+					_dbg_oob.close()
+				# #endregion
 				_in_play = false
 				_putting = false
 				entered_hazard.emit("out of bounds")
@@ -445,11 +504,29 @@ func _query_lies() -> Array:
 
 
 func _check_grounded() -> bool:
+	return not _ground_hit().is_empty()
+
+
+func _resting_on_obstacle() -> bool:
+	var node := _ground_hit().get("collider") as Node
+	while node != null:
+		if GridSnap.is_obstacle(node):
+			return true
+		node = node.get_parent()
+	return false
+
+
+func _ground_hit() -> Dictionary:
+	if not is_inside_tree():
+		return {}
+	var world := get_world_3d()
+	if world == null:
+		return {}
 	var query := PhysicsRayQueryParameters3D.create(
 		global_position, global_position + Vector3.DOWN * (RADIUS + 0.2),
 		Layers.WORLD | Layers.PROP, [get_rid()]
 	)
-	return not get_world_3d().direct_space_state.intersect_ray(query).is_empty()
+	return world.direct_space_state.intersect_ray(query)
 
 
 func _on_body_hit(body: Node) -> void:

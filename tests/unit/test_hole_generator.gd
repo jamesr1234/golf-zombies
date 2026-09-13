@@ -224,8 +224,9 @@ func test_every_hole_has_a_green_and_some_sand() -> void:
 				fringes += 1
 			elif patch["type"] == Surface.Type.BUNKER:
 				bunkers += 1
-		assert_eq(greens, 2, "hole %d should have a green and a practice green" % (index + 1))
-		assert_eq(fringes, 2, "hole %d should have a collar around each" % (index + 1))
+		var want := 2 if hole.has_practice() else 1
+		assert_eq(greens, want, "hole %d green count" % (index + 1))
+		assert_eq(fringes, want, "hole %d should have a collar around each green" % (index + 1))
 		if hole.is_setpiece() or ArenaHole.applies(hole):
 			assert_eq(bunkers, 0, "a set-piece strip has no side sand")
 		else:
@@ -265,9 +266,17 @@ func test_the_fringe_is_a_collar_around_the_green() -> void:
 	)
 
 
-func test_every_hole_opens_with_a_practice_green() -> void:
+func test_only_clubhouse_holes_open_with_a_practice_green() -> void:
 	for index in 9:
 		var hole := HoleGenerator.generate(index, SEED)
+		assert_eq(hole.has_practice(), GameState.has_practice_tee(index), "hole %d" % (index + 1))
+		if not hole.has_practice():
+			for patch in hole.patches:
+				assert_false(
+					bool(patch.get("practice", false)),
+					"hole %d: no warm-up green between clubhouses" % (index + 1)
+				)
+			continue
 		var walk := hole.practice_tee.distance_to(hole.tee)
 		assert_between(walk, 8.0, 30.0, "hole %d: a walk from the tee, not a hike" % (index + 1))
 		assert_almost_eq(
@@ -306,6 +315,8 @@ func test_every_hole_opens_with_a_practice_green() -> void:
 func test_the_practice_green_is_flat_and_level_with_the_tee() -> void:
 	for index in 9:
 		var hole := HoleGenerator.generate(index, SEED)
+		if not hole.has_practice():
+			continue
 		var at := hole.practice_center()
 		assert_almost_eq(
 			hole.height.height_at(at.x + 2.0, at.z), hole.height.height_at(at.x - 2.0, at.z), 0.25,
@@ -392,6 +403,8 @@ func test_most_spawn_points_sit_on_the_fairway_away_from_the_tee() -> void:
 func test_every_hole_has_gentle_ground() -> void:
 	for index in 9:
 		var hole := HoleGenerator.generate(index, SEED)
+		if ArenaHole.applies(hole):
+			continue
 		var relief := hole.height.max_height - hole.height.min_height
 		assert_gt(relief, 0.6, "hole %d should not be a slab" % (index + 1))
 		if hole.is_setpiece():
@@ -488,6 +501,8 @@ func test_the_tee_and_green_stay_locally_flat() -> void:
 func test_the_clubhouse_pad_is_flat_and_level_with_the_tee() -> void:
 	for index in 9:
 		var hole := HoleGenerator.generate(index, SEED)
+		if not hole.has_practice():
+			continue
 		var house := ClubhouseBuild.at_exit(hole.practice_tee, hole.cup - hole.tee)
 		var yaw := deg_to_rad(ClubhouseBuild.yaw_at_exit(hole.cup - hole.tee))
 		var lo := INF
@@ -516,6 +531,8 @@ func test_the_clubhouse_pad_is_flat_and_level_with_the_tee() -> void:
 func test_props_stay_out_of_the_clubhouse() -> void:
 	for index in 9:
 		var hole := HoleGenerator.generate(index, SEED)
+		if not hole.has_practice():
+			continue
 		for prop in hole.props:
 			assert_false(
 				ClubhouseBuild.covers_exit_ground(

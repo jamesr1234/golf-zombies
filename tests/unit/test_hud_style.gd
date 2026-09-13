@@ -45,6 +45,17 @@ func test_hud_applies_the_scoreboard_style_on_ready() -> void:
 	assert_not_null(hud.score_label.label_settings.font)
 
 
+func test_the_status_text_sits_top_right_without_a_banner() -> void:
+	var hud: Hud = HUD_SCENE.instantiate()
+	add_child_autofree(hud)
+	assert_eq(hud.message.get_node_or_null("Panel"), null)
+	assert_eq(hud.message.anchor_left, 1.0)
+	assert_eq(hud.message.anchor_right, 1.0)
+	assert_gt(hud.message.offset_top, hud.money_label.offset_bottom - 1.0)
+	assert_eq(hud.message_title.horizontal_alignment, HORIZONTAL_ALIGNMENT_RIGHT)
+	assert_eq(hud.message_body.horizontal_alignment, HORIZONTAL_ALIGNMENT_RIGHT)
+
+
 func test_the_shop_menu_sits_on_the_left() -> void:
 	var hud: Hud = HUD_SCENE.instantiate()
 	add_child_autofree(hud)
@@ -68,6 +79,23 @@ func test_a_sweet_callout_uses_scoreboard_chrome() -> void:
 	hud.flash_callout(Hud.SWEET_CALLOUT)
 	assert_eq(hud.message_title.text, "NICE SHOT!")
 	assert_true(hud.message.visible)
+
+
+func test_the_mech_hides_the_gun_crosshair_until_l2() -> void:
+	var who: Player = preload("res://scenes/players/player.tscn").instantiate()
+	var suit: MechSuit = preload("res://scenes/course/items/mech_suit.tscn").instantiate()
+	add_child_autofree(suit)
+	add_child_autofree(who)
+	await wait_physics_frames(2)
+	who.global_position = suit.get_node("Cockpit").global_position
+	assert_true(Hud.shows_gun_crosshair(who))
+	assert_false(Hud.shows_mech_reticle(who))
+	suit.try_close(who)
+	assert_false(Hud.shows_gun_crosshair(who), "no pip while walking the suit")
+	assert_false(Hud.shows_mech_reticle(who))
+	who.aiming = true
+	assert_true(Hud.shows_mech_reticle(who), "L2 brings up the targeting brackets")
+	assert_false(Hud.shows_gun_crosshair(who))
 
 
 func test_the_ammo_readout_says_putter_on_the_green() -> void:

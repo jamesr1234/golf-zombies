@@ -1,11 +1,12 @@
 extends GutTest
 ## Obstacle GLBs import with convex collision so a ball can bounce off them.
-## Every edge is an integer multiple of the extra-small cube (1.35 m).
-## Ramps are the exception: height is half a cube so the slope is a jump.
+## Every edge is an odd multiple of the extra-small cube (1.35 m) so a
+## centre-snapped piece lands on the painted grid. Ramps are the exception:
+## height is half a cube so the slope is a jump.
 
 const CELL := 1.35
 const _SIZES := ["extra_small", "small", "medium", "large", "extra_large"]
-const _CELLS: Array[float] = [1.0, 2.0, 3.0, 5.0, 7.0]
+const _CELLS: Array[float] = [1.0, 3.0, 5.0, 7.0, 9.0]
 
 
 func test_every_obstacle_glb_has_static_collision() -> void:
@@ -86,8 +87,8 @@ func test_a_medium_cube_and_a_large_cube_meet_flush() -> void:
 	var large := _mesh_aabb(_spawn("res://assets/obstacles/cube_large.glb"))
 	large.position.x += medium.size.x
 	assert_almost_eq(medium.end.x, large.position.x, 0.01)
-	assert_almost_eq(medium.size.x, CELL * 3.0, 0.01)
-	assert_almost_eq(large.size.x, CELL * 5.0, 0.01)
+	assert_almost_eq(medium.size.x, CELL * 5.0, 0.01)
+	assert_almost_eq(large.size.x, CELL * 7.0, 0.01)
 
 
 func test_every_type_uses_the_same_size_cube() -> void:
@@ -140,11 +141,11 @@ func test_a_wall_meets_the_same_size_cube() -> void:
 		assert_almost_eq(cube.size.y, wall.size.y, 0.01, "%s height" % size)
 
 
-func test_the_large_escalator_is_two_by_five_by_ten_cells() -> void:
+func test_the_large_escalator_is_three_by_seven_by_nine_cells() -> void:
 	var box := _mesh_aabb(_spawn("res://assets/obstacles/escalator_large.glb"))
-	assert_almost_eq(box.size.x, CELL * 2.0, 0.02)
-	assert_almost_eq(box.size.y, CELL * 5.0, 0.02)
-	assert_almost_eq(box.size.z, CELL * 10.0, 0.02)
+	assert_almost_eq(box.size.x, CELL * 3.0, 0.02)
+	assert_almost_eq(box.size.y, CELL * 7.0, 0.02)
+	assert_almost_eq(box.size.z, CELL * 9.0, 0.02)
 
 
 func test_a_ladder_has_rungs_you_can_latch() -> void:

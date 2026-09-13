@@ -35,54 +35,120 @@ func test_the_suit_is_built_of_neon_parts() -> void:
 	var visuals := suit.get_node_or_null("Visuals") as Node3D
 	assert_not_null(visuals, "MechVisuals.build is attached in _ready")
 	assert_not_null(visuals.find_child("Hatch", true, false))
-	assert_not_null(visuals.get_node_or_null("Stairs"))
+	assert_null(visuals.get_node_or_null("Stairs"), "boarding is from the ground")
+	assert_null(suit.get_node_or_null("StairRamp"))
 	assert_not_null(visuals.find_child("LeftArm", true, false))
 	assert_not_null(visuals.find_child("RightArm", true, false))
 	assert_not_null(visuals.find_child("Chassis", true, false), "blender plates ride the godot rig")
 	assert_not_null(visuals.find_child("LeftPod", true, false))
 	assert_not_null(visuals.find_child("RightPod", true, false))
-	assert_gte(visuals.get_node("Stairs").get_child_count(), 16, "a run of steps plus the balcony")
 	var meshes := suit.find_children("*", "MeshInstance3D", true, false)
-	assert_gte(meshes.size(), 40, "plates, arms, vents and a walkable stair")
+	assert_gte(meshes.size(), 25, "plates, arms, vents")
 	var hatch := visuals.find_child("Hatch", true, false) as Node3D
 	assert_lt(hatch.rotation.x, deg_to_rad(-45.0), "parked hatch starts open")
-	assert_true(visuals.get_node("Stairs").visible)
 	suit.try_close(pilot)
 	assert_gt(hatch.rotation.x, deg_to_rad(-20.0), "sealing folds the hatch")
-	assert_false(visuals.get_node("Stairs").visible, "the stair drops away once you are in")
-	assert_true((suit.get_node("StairRamp") as CollisionShape3D).disabled)
 	var hull := visuals.find_child("Chassis", true, false) as MeshInstance3D
+	assert_eq(hull.layers & MechVisuals.BODY_LAYER, MechVisuals.BODY_LAYER)
 	var mat := hull.get_active_material(0) as StandardMaterial3D
 	assert_not_null(mat)
 	assert_lte(mat.emission_energy_multiplier, Palette.GLOW_SOFT)
 
 
-func test_the_pilot_looks_out_past_the_visor() -> void:
+func test_the_pilot_sits_behind_the_helmet() -> void:
 	var eye := suit.get_node("PilotView") as Node3D
 	var visor := suit.find_child("Visor", true, false) as Node3D
+	var head := suit.find_child("Head", true, false) as Node3D
 	assert_not_null(eye)
 	assert_not_null(visor)
-	for child in visor.get_children():
-		var mesh := child as Node3D
-		assert_lt(eye.position.z, mesh.position.z, "camera sits in front of the visor rim")
+	assert_gt(eye.position.z, 1.0, "behind the body so the swinging arms stay on camera")
+	assert_gt(eye.global_position.z, visor.global_position.z)
+	if head != null:
+		assert_gt(eye.global_position.y, head.global_position.y, "looks over the helmet")
 
 
-func test_l1_pulls_a_chase_cam_behind_the_suit() -> void:
-	var chase := suit.chase_view_transform()
-	assert_gt(chase.origin.y, 8.0)
-	assert_gt(chase.origin.z, 10.0, "yaw 0 faces -Z, so chase sits on +Z")
+func test_l1_does_not_pull_a_chase_cam() -> void:
+	suit.try_close(pilot)
+	pilot.look.cart_chase = true
+	var view := pilot.look.view_transform(pilot)
+	var cockpit := suit.pilot_view_transform(0.0)
+	assert_almost_eq(view.origin.x, cockpit.origin.x, 0.05)
+	assert_almost_eq(view.origin.z, cockpit.origin.z, 0.05, "L1 no longer pops the chase cam")
+
+
+func test_l2_scopes_past_the_visor() -> void:
+	suit.try_close(pilot)
+	var cockpit := suit.pilot_view_transform(0.0)
+	var scoped := suit.scope_view_transform(0.0)
+	assert_lt(scoped.origin.z, cockpit.origin.z, "ADS sits in front of the helmet")
+	pilot.aiming = true
+	var view := pilot.look.view_transform(pilot)
+	assert_almost_eq(view.origin.z, scoped.origin.z, 0.05)
+	assert_eq(pilot.view_cull_mask() & MechVisuals.BODY_LAYER, 0, "the suit drops out of the visor")
+	pilot.aiming = false
+	assert_ne(pilot.view_cull_mask() & MechVisuals.BODY_LAYER, 0)
+
+
+func test_the_suit_is_a_quarter_of_the_old_giant() -> void:
+	assert_almost_eq(MechVisuals.SCALE, 1.0, 0.001)
+	var hull := suit.get_node("Hull") as CollisionShape3D
+	var box := hull.shape as BoxShape3D
+	assert_almost_eq(box.size.y, 3.8, 0.05)
+	assert_lt(MechVisuals.HEIGHT, 6.0)
 
 
 func test_a_stride_swings_the_arms_opposite_the_legs() -> void:
 	var body := suit.get_node("Visuals") as MechVisuals
-	body.pose(0.0)
-	var arm_rest: float = body.arms[0].rotation.x
-	var leg_rest: float = body.legs[0].rotation.x
-	body.animate(0.2, 1.0)
-	assert_ne(body.arms[0].rotation.x, arm_rest)
-	assert_ne(body.legs[0].rotation.x, leg_rest)
+	body.stride(0.0, 0.0, true, true)
+	var arm_back: float = body.arms[0].rotation.x
+	var leg_back: float = body.legs[0].rotation.x
+	body.stride(0.0, 1.0, true, true)
+	assert_gt(absf(body.arms[0].rotation.x - arm_back), deg_to_rad(90.0))
+	assert_gt(absf(body.legs[0].rotation.x - leg_back), deg_to_rad(80.0))
 	assert_almost_eq(body.arms[0].rotation.x, body.legs[1].rotation.x, 0.2)
 	assert_ne(signf(body.arms[0].rotation.x), signf(body.legs[0].rotation.x))
+
+
+func test_a_stopped_suit_stands_upright() -> void:
+	var body := suit.get_node("Visuals") as MechVisuals
+	body.stride(0.0, 1.0, true, true)
+	assert_ne(body.legs[0].rotation.x, 0.0)
+	body.stride(1.0, 1.0, true, false)
+	assert_almost_eq(body.legs[0].rotation.x, 0.0, 0.05)
+	assert_almost_eq(body.arms[0].rotation.x, 0.0, 0.05)
+	assert_almost_eq(body.torso.rotation.x, 0.0, 0.05)
+	assert_almost_eq(body.torso.rotation.y, 0.0, 0.05)
+
+
+func test_a_tap_walks_one_step_distance() -> void:
+	suit.try_close(pilot)
+	suit.step_distance = 2.5
+	var start := suit.global_position
+	assert_true(suit.try_step(Vector2(0.0, -1.0)))
+	assert_true(suit.is_stepping())
+	for _i in 40:
+		suit._physics_process(1.0 / 60.0)
+	var moved := Vector2(
+		suit.global_position.x - start.x, suit.global_position.z - start.z
+	).length()
+	assert_almost_eq(moved, 2.5, 0.4, "one tap is one locked stride")
+	assert_false(suit.is_stepping(), "the suit plants instead of gliding on")
+
+
+func test_step_distance_is_tunable() -> void:
+	assert_gt(suit.step_distance, 0.0)
+	suit.try_close(pilot)
+	suit.step_distance = 4.0
+	assert_true(suit.try_step(Vector2(0.0, -1.0)))
+	assert_almost_eq(suit.global_position.distance_to(suit._step_to), 4.0, 0.05)
+
+
+func test_a_player_on_the_ground_can_seal_the_suit() -> void:
+	pilot.global_position = suit.global_position + Vector3(2.0, 0.9, 0.0)
+	assert_true(suit.can_close(pilot), "walk up and board, no stair")
+	suit.try_close(pilot)
+	assert_true(suit.closed)
+	assert_true(pilot.is_in_mech())
 
 
 func test_circle_in_the_cockpit_seals_the_suit() -> void:
@@ -137,6 +203,63 @@ func test_shoulders_alternate_and_the_mag_holds_eight() -> void:
 	assert_eq(combat.mag, 8)
 
 
+func test_the_eighth_shot_reloads_and_shells_never_run_out() -> void:
+	var combat := MechCombat.new()
+	var view := Transform3D.IDENTITY
+	for _i in MechCombat.MAG_SIZE:
+		combat.cooldown = 0.0
+		assert_true(combat.try_fire(suit, view, foe))
+	assert_eq(combat.mag, 0)
+	assert_true(combat.is_reloading())
+	assert_false(combat.try_fire(suit, view, foe), "empty until the mag is back")
+	combat.tick(MechCombat.RELOAD)
+	assert_eq(combat.mag, MechCombat.MAG_SIZE)
+	assert_true(combat.try_fire(suit, view, foe))
+	assert_eq(combat.mag, MechCombat.MAG_SIZE - 1)
+
+
+func test_l1_strafes_left_and_glows_on_the_right() -> void:
+	suit.try_close(pilot)
+	var pad := CpuInput.new(pilot.input_prefix, false)
+	pilot.input = pad
+	pad.hold("melee")
+	var stick := suit._stick()
+	assert_lt(stick.x, -0.9, "L1 is a left strafe")
+	assert_almost_eq(stick.y, 0.0, 0.01)
+	suit._tick_visuals(0.0)
+	assert_true(_strafe_glow("RightStrafeGlow").visible)
+	assert_false(_strafe_glow("LeftStrafeGlow").visible)
+
+
+func test_r1_strafes_right_and_glows_on_the_left() -> void:
+	suit.try_close(pilot)
+	var pad := CpuInput.new(pilot.input_prefix, false)
+	pilot.input = pad
+	pad.hold("shield")
+	var stick := suit._stick()
+	assert_gt(stick.x, 0.9, "R1 is a right strafe")
+	suit._tick_visuals(0.0)
+	assert_true(_strafe_glow("LeftStrafeGlow").visible)
+	assert_false(_strafe_glow("RightStrafeGlow").visible)
+
+
+func test_stick_sidestep_does_not_light_the_strafe_glow() -> void:
+	suit.try_close(pilot)
+	var pad := CpuInput.new(pilot.input_prefix, false)
+	pilot.input = pad
+	pad.move = Vector2(-1.0, 0.0)
+	var stick := suit._stick()
+	assert_lt(stick.x, -0.9)
+	assert_almost_eq(suit.sync_strafe, 0.0, 0.01)
+	suit._tick_visuals(0.0)
+	assert_false(_strafe_glow("LeftStrafeGlow").visible)
+	assert_false(_strafe_glow("RightStrafeGlow").visible)
+
+
+func _strafe_glow(node_name: String) -> Node3D:
+	return suit.get_node("Visuals").get_node(node_name) as Node3D
+
+
 func test_shoulder_rockets_meet_the_crosshair() -> void:
 	var view := Transform3D(Basis.IDENTITY, Vector3(0.0, 4.0, 0.0))
 	var origin := Vector3(-4.5, 3.7, 0.2)
@@ -166,7 +289,6 @@ func test_closed_sync_folds_the_hatch_for_watchers() -> void:
 	suit.closed = true
 	suit._tick_visuals(0.0)
 	assert_gt(hatch.rotation.x, deg_to_rad(-20.0), "the replicated closed flag folds the hatch")
-	assert_false(suit.get_node("Visuals").get_node("Stairs").visible)
 
 
 func test_a_parked_suit_still_publishes_its_pose() -> void:
@@ -198,7 +320,7 @@ func test_a_watched_suit_glides_to_the_replicated_pose() -> void:
 	)
 
 
-func test_a_wire_update_folds_the_stair_and_moves_the_suit() -> void:
+func test_a_wire_update_seals_and_moves_the_suit() -> void:
 	NetSession._active = true
 	suit.set_multiplayer_authority(99)
 	suit._park_if_watched()
@@ -211,7 +333,6 @@ func test_a_wire_update_folds_the_stair_and_moves_the_suit() -> void:
 	)
 	suit._process(0.05)
 	assert_true(suit.closed)
-	assert_false(suit.get_node("Visuals").get_node("Stairs").visible)
 	assert_gt(suit.global_position.distance_to(Vector3.ZERO), 8.0)
 
 
@@ -236,7 +357,12 @@ func test_a_hole_pad_plants_an_open_suit() -> void:
 	var fresh := MechSuit.plant_on_hole(empty, hole)
 	assert_not_null(fresh)
 	assert_ne(fresh, suit)
-	assert_almost_eq(fresh.global_position.x, 8.0, 0.1)
+	assert_almost_eq(fresh.global_position.x, hole.mech_stand().x, 0.1)
+	assert_almost_eq(fresh.global_position.z, hole.mech_stand().z, 0.1)
+	assert_almost_eq(
+		fresh.global_position.y, hole.mech_stand().y + MechSuit.STAND_LIFT, 0.05,
+		"soles sit above the turf"
+	)
 	assert_false(fresh.closed)
 
 

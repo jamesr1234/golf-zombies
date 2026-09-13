@@ -69,7 +69,7 @@ static func build(data: HoleData) -> Node3D:
 		for car in _race_cars(data):
 			root.add_child(car)
 	root.add_child(_tee_sign(data))
-	if not ArenaHole.applies(data):
+	if data.has_practice() and not ArenaHole.applies(data):
 		root.add_child(PracticeGreen.create(data))
 	for barrier in _barriers(data):
 		root.add_child(barrier)

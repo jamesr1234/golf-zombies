@@ -36,6 +36,8 @@ match, and owns every node unless authority was reassigned. Clients send input.
 - Do not add a dedicated-server mode. GodotSteam server builds have no
   MultiplayerPeer support.
 - Do not add host migration. If the host leaves, the match ends.
+- Voice is Godot `AudioStreamMicrophone` capture plus unreliable RPCs on
+  `VoiceChat`. Do not call Steam Voice APIs.
 
 ## Authority
 

@@ -1,6 +1,7 @@
 class_name MechCombat
 extends RefCounted
-## Shoulder rockets and the stomp. Mag of eight, then Square to reload.
+## Shoulder rockets and the stomp. Mag of eight, then it reloads itself.
+## Shells never run out.
 
 const MAG_SIZE := 8
 const RELOAD := 2.4
@@ -62,6 +63,8 @@ func try_fire(suit: Node3D, view: Transform3D, shooter: Player) -> bool:
 			suit, origin, fly, rocket.damage, rocket.blast_radius, rocket.max_range
 		)
 	Sfx.play("rocket_fire", suit)
+	if mag <= 0:
+		try_reload()
 	return true
 
 

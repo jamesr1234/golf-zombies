@@ -50,6 +50,13 @@ func test_attach_does_not_return_a_stripped_loose_led() -> void:
 	assert_false(_Leds.is_led(leds.get_parent()))
 
 
+func test_a_ramp_with_mixed_faces_still_gets_leds() -> void:
+	var node: Node3D = _spawn("res://assets/obstacles/ramp_small.glb")
+	var leds := _Leds.attach(node)
+	assert_not_null(leds)
+	assert_gt(_edge_count(leds), 0)
+
+
 func test_a_tunnel_outlines_each_slab() -> void:
 	var node: Node3D = _spawn("res://assets/obstacles/tunnel_small.glb")
 	_Leds.attach(node)

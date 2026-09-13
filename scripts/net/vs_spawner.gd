@@ -183,7 +183,7 @@ func plant_hole_mech(hole: HoleData) -> MechSuit:
 		for child in mechs_root.get_children():
 			if child is MechSuit:
 				return child
-	return spawn_mech(hole.mech_pad + Vector3.UP * 0.05, hole.mech_yaw, 1)
+	return spawn_mech(hole.mech_stand(), hole.mech_face(), 1)
 
 
 func _spawn_mech(data: Variant) -> Node:
@@ -192,7 +192,7 @@ func _spawn_mech(data: Variant) -> Node:
 	var owner_peer := int(info.get("owner_peer", 0))
 	mech.name = "Mech%d" % owner_peer
 	mech.owner_peer = owner_peer
-	var at: Vector3 = info.get("at", Vector3.ZERO)
+	var at: Vector3 = MechSuit.stand_point(info.get("at", Vector3.ZERO))
 	var yaw := deg_to_rad(float(info.get("yaw", 0.0)))
 	var pose := Transform3D(Basis.from_euler(Vector3(0.0, yaw, 0.0)), at)
 	mech.transform = pose

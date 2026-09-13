@@ -172,6 +172,18 @@ func test_ladder_charges_start_empty_and_decrement_on_place() -> void:
 	assert_false(score.try_place_ladder())
 
 
+func test_mech_charges_start_empty_and_decrement_on_place() -> void:
+	assert_eq(score.mech_charges, 0)
+	assert_false(score.try_place_mech())
+	score.add_mech_charges(1)
+	assert_eq(score.mech_charges, 1)
+	score.add_mech_charges(0)
+	assert_eq(score.mech_charges, 1)
+	assert_true(score.try_place_mech())
+	assert_eq(score.mech_charges, 0)
+	assert_false(score.try_place_mech())
+
+
 func test_ladder_charges_survive_holing_out() -> void:
 	score.add_ladder_charges(2)
 	score.add_stroke(3)
@@ -213,3 +225,14 @@ func test_the_clubhouse_waits_until_every_third_hole() -> void:
 	assert_eq(house, [3, 6, 9, 12])
 	card.hole_index = 11
 	assert_false(card.visits_clubhouse(), "the last hole ends the run")
+
+
+func test_only_clubhouse_holes_have_a_practice_tee() -> void:
+	assert_true(GameState.has_practice_tee(0))
+	assert_false(GameState.has_practice_tee(1))
+	assert_false(GameState.has_practice_tee(2))
+	assert_true(GameState.has_practice_tee(3))
+	assert_true(GameState.has_practice_tee(6))
+	assert_true(GameState.has_practice_tee(9))
+	assert_false(GameState.has_practice_tee(10))
+	assert_false(GameState.has_practice_tee(11))

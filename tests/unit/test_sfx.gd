@@ -6,6 +6,10 @@ func before_each() -> void:
 	Sfx.clear_log()
 
 
+func after_each() -> void:
+	AudioServer.set_bus_mute(AudioServer.get_bus_index("Master"), false)
+
+
 func test_every_named_cue_builds_a_short_wave() -> void:
 	var names := Sfx.cues()
 	assert_gt(names.size(), 40, "the bank should cover the actions in the game")
@@ -131,3 +135,13 @@ func test_a_purchase_rings_the_register() -> void:
 	assert_eq(Sfx.last_cue, "purchase")
 	assert_false(shop.buy("ammo", score, weapons))
 	assert_eq(Sfx.last_cue, "ui_deny")
+
+
+func test_mute_audio_silences_the_master_bus() -> void:
+	var flow := MatchFlow.new()
+	assert_false(AudioServer.is_bus_mute(AudioServer.get_bus_index("Master")))
+	flow.mute_audio = true
+	assert_true(AudioServer.is_bus_mute(AudioServer.get_bus_index("Master")))
+	flow.mute_audio = false
+	assert_false(AudioServer.is_bus_mute(AudioServer.get_bus_index("Master")))
+	flow.free()

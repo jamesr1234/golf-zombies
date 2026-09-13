@@ -8,7 +8,7 @@ extends Object
 const LIVE_ROOT := "user://holes"
 const TEST_ROOT := "user://holes_test"
 const SUFFIX := ".json"
-const VERSION := 1
+const VERSION := 2
 const PARTS := "parts"
 ## Live saves sit in LIVE_ROOT. Tests flip this so a GUT run can never wipe a
 ## hole someone actually made.
@@ -179,6 +179,13 @@ static func structure_parts(path: String) -> Array[Dictionary]:
 			CustomHole.NO_GATE,
 			CustomHole.to_vector(entry[CustomHole.END]) if entry.has(CustomHole.END) else CustomHole.NO_END
 		))
+	if int(body.get("version", 1)) < VERSION:
+		PieceLadder.remap_centers(out)
+		var mid := centroid(out)
+		for part in out:
+			part[CustomHole.POSITION] = part[CustomHole.POSITION] - mid
+			if CustomHole.has_end(part):
+				part[CustomHole.END] = part[CustomHole.END] - mid
 	return out
 
 

@@ -18,7 +18,7 @@
 script = ExtResource("1_root")
 
 [node name="MechPad" type="Marker3D" parent="." unique_id=1447865065]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -19.293434, -0.4404421, 7.1928024)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7, 0, -1)
 
 [node name="1st obstacle" type="Node3D" parent="." unique_id=45715542]
 

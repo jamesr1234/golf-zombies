@@ -178,6 +178,41 @@ func test_the_practice_green_has_side_walls() -> void:
 	)
 
 
+func test_an_open_tee_end_lets_the_cart_in() -> void:
+	var data := HoleGenerator.generate(0, SEED)
+	data.open_tee_end = true
+	var root := HoleBuilder.build(data)
+	add_child_autofree(root)
+	await wait_physics_frames(2)
+	var along := data.along_tee()
+	var right := along.cross(Vector3.UP).normalized()
+	var from := data.practice_tee - along * 8.0 + right * 8.0 + Vector3.UP * 2.0
+	var to := data.practice_tee + along * 2.0 + right * 8.0 + Vector3.UP * 2.0
+	var ray := PhysicsRayQueryParameters3D.create(from, to)
+	ray.collision_mask = Layers.FORCEFIELD
+	assert_true(
+		root.get_world_3d().direct_space_state.intersect_ray(ray).is_empty(),
+		"a cart-wide arrival cannot hit a clubhouse door cap"
+	)
+
+
+func test_the_clubhouse_cap_still_blocks_beside_the_door() -> void:
+	var data := HoleGenerator.generate(0, SEED)
+	var root := HoleBuilder.build(data)
+	add_child_autofree(root)
+	await wait_physics_frames(2)
+	var along := data.along_tee()
+	var right := along.cross(Vector3.UP).normalized()
+	var from := data.practice_tee - along * 8.0 + right * 8.0 + Vector3.UP * 2.0
+	var to := data.practice_tee + along * 2.0 + right * 8.0 + Vector3.UP * 2.0
+	var ray := PhysicsRayQueryParameters3D.create(from, to)
+	ray.collision_mask = Layers.FORCEFIELD
+	assert_false(
+		root.get_world_3d().direct_space_state.intersect_ray(ray).is_empty(),
+		"the hall door still has wings when the clubhouse is in play"
+	)
+
+
 func test_a_fast_cart_cannot_hop_the_lip_into_the_rough() -> void:
 	var data := HoleGenerator.generate(0, SEED)
 	var root := HoleBuilder.build(data)
@@ -225,6 +260,48 @@ func test_hole_ten_cannot_sprint_off_the_strip() -> void:
 		body.move_and_slide()
 	var lateral := absf((body.global_position - data.tee).dot(right))
 	assert_lt(lateral, half + 0.8, "a sprint cannot leave the wide lip")
+
+
+func test_a_short_path_opens_exit_lips_on_the_tarmac() -> void:
+	var data := HoleGenerator.generate(0, SEED)
+	var root := HoleBuilder.build(data)
+	add_child_autofree(root)
+	var along := data.cup - data.tee
+	along.y = 0.0
+	var path := CartPath.build(
+		data.cup, along.normalized(), data.bounds, data.height, root, data.green_radius,
+		false, false, true
+	)
+	root.add_child(path)
+	CartPath.open_across(root, path.centerline, data.height)
+	await wait_physics_frames(2)
+	var space := root.get_world_3d().direct_space_state
+	var skip: Array[RID] = []
+	for child in path.get_children():
+		if child is CollisionObject3D:
+			skip.append((child as CollisionObject3D).get_rid())
+	var blocked := 0
+	for i in range(1, path.centerline.size()):
+		var q := PhysicsRayQueryParameters3D.create(
+			path.centerline[i - 1] + Vector3.UP * 1.1,
+			path.centerline[i] + Vector3.UP * 1.1
+		)
+		q.collision_mask = Layers.FORCEFIELD | Layers.BARRIER
+		q.exclude = skip
+		var hit := space.intersect_ray(q)
+		if hit.is_empty():
+			continue
+		var col: Node = hit.get("collider")
+		if col != null and (col.is_in_group(_Field.GROUP) or (col.collision_layer & Layers.BARRIER) != 0):
+			blocked += 1
+	assert_eq(blocked, 0, "the drive off the green cannot hit the old hole's lips or fence")
+	for point in path.centerline:
+		if not data.bounds.has_point(Vector2(point.x, point.z)):
+			continue
+		assert_almost_eq(
+			data.height.height_at(point.x, point.z), HeightField.DECK, 0.4,
+			"the tarmac has to stay on the fairway deck, not a mound"
+		)
 
 
 func _hole(index: int) -> Node3D:

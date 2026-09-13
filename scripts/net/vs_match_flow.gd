@@ -36,6 +36,12 @@ var _team_scores: Dictionary = {}
 var _banner := 0
 var _clock_broadcast := 0.0
 
+## Silence every gameplay AudioStreamPlayer (SFX and music) on the Master bus.
+@export var mute_audio := false:
+	set(value):
+		mute_audio = value
+		_apply_mute()
+
 @onready var course: VsCourse = $"../VsCourse"
 @onready var spawner_ai: SpawnDirector = $"../SpawnDirector"
 @onready var zombies: Node3D = $"../Zombies"
@@ -43,6 +49,7 @@ var _clock_broadcast := 0.0
 
 
 func _ready() -> void:
+	_apply_mute()
 	course_seed = NetSession.course_seed
 	spawner_ai.container = zombies
 	spawner_ai.net_factory = vs_spawner
@@ -61,6 +68,10 @@ func _ready() -> void:
 	await _wait_for_pawns()
 	bind_spawned()
 	begin()
+
+
+func _apply_mute() -> void:
+	GameSettings.mute_master(mute_audio)
 
 
 func bind_spawned() -> void:
@@ -88,7 +99,34 @@ func begin() -> void:
 	if started:
 		return
 	started = true
-	start_hole(0)
+	_begin_in_clubhouse()
+
+
+func _begin_in_clubhouse() -> void:
+	phase = Phase.SHOP
+	course.close_shop(_players)
+	hole = course.rebuild(0, course_seed)
+	if multiplayer.is_server():
+		vs_spawner.plant_hole_mech(hole)
+	for card in _scores.values():
+		(card as PlayerScore).advance_to(0)
+	_ensure_team_cards()
+	for card in _team_scores.values():
+		(card as TeamScore).advance_to(0)
+	course.begin_in_clubhouse(_players, _carts)
+	if multiplayer.is_server():
+		course.place_balls(_balls)
+	if not ArenaHole.applies(hole):
+		course.aim_practice(_sessions())
+	_sync_local_score()
+	_reset_clock()
+	spawner_ai.clear_zombies()
+	spawner_ai.plant_mazes(course.hole_node)
+	_sync_loadouts()
+	scorecard_changed.emit()
+	_broadcast_scores()
+	_flash_message("Clubhouse", "Shop, then walk out the back to hole 1.")
+	_Music.enter_clubhouse()
 
 
 func start_hole(index: int) -> void:
@@ -213,7 +251,25 @@ func can_strike(player: Player) -> bool:
 	var card := team_score_for(player)
 	if card == null or card.done_this_hole:
 		return false
-	return player.seat_index() == card.striker_seat()
+	if player.seat_index() == card.striker_seat():
+		return true
+	return _covers_cpu_striker(player, card)
+
+
+## A lone human is otherwise locked out of every other stroke. Two humans
+## still alternate; this only covers a CPU partner's turn.
+func _covers_cpu_striker(player: Player, card: TeamScore) -> bool:
+	if player.is_cpu():
+		return false
+	if CoopVs.partner_seat(player.seat_index()) != card.striker_seat():
+		return false
+	var mate := player.partner
+	if mate != null:
+		return mate.is_cpu() or mate.cpu_filled
+	for other in _players:
+		if other != null and other.seat_index() == card.striker_seat():
+			return other.is_cpu() or other.cpu_filled
+	return false
 
 
 func is_striker(player: Player) -> bool:
@@ -312,12 +368,6 @@ func cart_for(who: Node3D) -> GolfCart:
 	var riding := _riding_cart(who)
 	if riding != null:
 		return riding
-	if GameSettings.is_coop_vs() and course != null:
-		var player := who as Player
-		if player != null:
-			var team_cart := course.cart_for_seat(CoopVs.cart_slot(player.seat_index()), _carts)
-			if team_cart != null:
-				return team_cart
 	var best: GolfCart
 	var best_d := 999.0
 	for cart in _carts:
@@ -327,7 +377,13 @@ func cart_for(who: Node3D) -> GolfCart:
 		if d < best_d:
 			best_d = d
 			best = cart
-	return best
+	if best != null:
+		return best
+	if GameSettings.is_coop_vs() and course != null:
+		var player := who as Player
+		if player != null:
+			return course.cart_for_seat(CoopVs.cart_slot(player.seat_index()), _carts)
+	return null
 
 
 func can_retrieve_ball(who: Node3D) -> bool:
@@ -592,8 +648,6 @@ func buy_shop_item(item_id: String, buyer: Player = null) -> bool:
 		_broadcast_scores()
 		_broadcast_loadout(buyer)
 		_broadcast_look(buyer)
-		if item_id == "mech":
-			MechSuit.spawn_near(buyer)
 		_WorldFx.announce_sfx(self, "purchase")
 	return ok
 
@@ -925,7 +979,7 @@ func _on_hazard(kind: String, player: Player) -> void:
 	var owned := _ball_for(player.peer_id)
 	if is_practice():
 		if owned != null and hole != null:
-			owned.place_at(hole.practice_tee)
+			owned.place_at(hole.arrival_point())
 		return
 	if kind == "water":
 		return
@@ -1621,6 +1675,7 @@ func _apply_scores(payload: Dictionary, clock: float, phase_value: int, teams: D
 		card.barrier_charges = int(row.get("barrier", card.barrier_charges))
 		card.ladder_charges = int(row.get("ladder", card.ladder_charges))
 		card.mech_bought = bool(row.get("mech", card.mech_bought))
+		card.mech_charges = int(row.get("mech_charges", card.mech_charges))
 		card.glide_bought = bool(row.get("glide", card.glide_bought))
 		var packed: PackedInt32Array = row.get("results", PackedInt32Array())
 		if packed.size() == card.results.size():
@@ -1656,6 +1711,7 @@ func _broadcast_scores() -> void:
 			"barrier": card.barrier_charges,
 			"ladder": card.ladder_charges,
 			"mech": card.mech_bought,
+			"mech_charges": card.mech_charges,
 			"glide": card.glide_bought,
 		}
 	var teams := {}

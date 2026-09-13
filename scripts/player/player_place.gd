@@ -1,6 +1,6 @@
 class_name PlayerPlace
 extends RefCounted
-## Hex-barrier and lean-ladder aiming ghosts. Player keeps the RPC that asks
+## Hex-barrier, lean-ladder, and mech aiming ghosts. Player keeps the RPC that asks
 ## the host to spawn, so authority stays on the CharacterBody3D.
 
 const _HexBarrier := preload("res://scripts/player/hex_barrier.gd")
@@ -10,6 +10,7 @@ const PLACE_WATER := 0.3
 
 var ghost: _HexBarrier
 var ladder_ghost: _LeanLadder
+var mech_ghost: MechVisuals
 var at := Vector3.ZERO
 var ok := false
 var kind := "fort"
@@ -18,7 +19,7 @@ var yaw := 0.0
 
 
 func has_charges(player: Player) -> bool:
-	return has_barriers(player) or has_ladders(player)
+	return has_barriers(player) or has_ladders(player) or has_mechs(player)
 
 
 func has_barriers(player: Player) -> bool:
@@ -29,6 +30,11 @@ func has_barriers(player: Player) -> bool:
 func has_ladders(player: Player) -> bool:
 	var card = player.wallet()
 	return card != null and card.ladder_charges > 0
+
+
+func has_mechs(player: Player) -> bool:
+	var card = player.wallet()
+	return card != null and card.mech_charges > 0
 
 
 func begin(player: Player) -> void:
@@ -45,6 +51,7 @@ func cancel(player: Player) -> void:
 	if ladder_ghost != null:
 		ladder_ghost.queue_free()
 		ladder_ghost = null
+	_free_mech()
 	ok = false
 	if player.state == Player.State.PLACING:
 		player.state = Player.State.NORMAL
@@ -59,6 +66,13 @@ func confirm(player: Player) -> void:
 			cancel(player)
 			return
 		host_place_ladder(player, at, yaw, length)
+		return
+	if kind == "mech":
+		if NetSession.defers_world():
+			player._request_place_mech.rpc_id(1, at, player.look_yaw())
+			cancel(player)
+			return
+		host_place_mech(player, at, player.look_yaw())
 		return
 	if NetSession.defers_world():
 		player._request_place.rpc_id(1, at, player.look_yaw())
@@ -76,6 +90,16 @@ func host_place(player: Player, point: Vector3, yaw_deg: float) -> void:
 	var parent := _hole(player)
 	_HexBarrier.spawn(parent, point, yaw_deg)
 	_WorldFx.announce_barrier(player, point, yaw_deg)
+	cancel(player)
+
+
+func host_place_mech(player: Player, point: Vector3, yaw_deg: float) -> void:
+	if not has_mechs(player):
+		return
+	if not player.wallet().try_place_mech():
+		cancel(player)
+		return
+	MechSuit.drop(player, point, yaw_deg)
 	cancel(player)
 
 
@@ -107,6 +131,11 @@ func tick(player: Player) -> void:
 		yaw = float(wall["yaw"])
 		ok = not in_water(player, at)
 		_show_ladder(player, ok, yaw)
+	elif bool(floor.get("ok", false)) and has_mechs(player):
+		kind = "mech"
+		at = floor["point"]
+		ok = not in_water(player, at)
+		_show_mech(player, ok)
 	elif bool(floor.get("ok", false)) and has_barriers(player):
 		kind = "fort"
 		at = floor["point"]
@@ -118,7 +147,7 @@ func tick(player: Player) -> void:
 
 
 func look_at(player: Player) -> Vector3:
-	if ghost != null or ladder_ghost != null:
+	if ghost != null or ladder_ghost != null or mech_ghost != null:
 		return at
 	return (
 		player.global_position
@@ -171,6 +200,7 @@ func _hole(player: Player) -> Node:
 
 func _show_hex(player: Player, valid: bool) -> void:
 	_free_ladder()
+	_free_mech()
 	if ghost == null:
 		ghost = _HexBarrier.preview()
 		player.add_child(ghost)
@@ -181,6 +211,7 @@ func _show_hex(player: Player, valid: bool) -> void:
 
 func _show_ladder(player: Player, valid: bool, yaw_deg: float) -> void:
 	_free_hex()
+	_free_mech()
 	if ladder_ghost == null:
 		ladder_ghost = _LeanLadder.preview()
 		player.add_child(ladder_ghost)
@@ -189,11 +220,24 @@ func _show_ladder(player: Player, valid: bool, yaw_deg: float) -> void:
 	ladder_ghost.set_ghost_visible(valid)
 
 
+func _show_mech(player: Player, valid: bool) -> void:
+	_free_hex()
+	_free_ladder()
+	if mech_ghost == null:
+		mech_ghost = MechVisuals.preview()
+		player.add_child(mech_ghost)
+	mech_ghost.global_position = MechSuit.stand_point(at)
+	mech_ghost.rotation.y = deg_to_rad(player.look_yaw())
+	mech_ghost.visible = valid
+
+
 func _hide_ghosts() -> void:
 	if ghost != null:
 		ghost.set_ghost_visible(false)
 	if ladder_ghost != null:
 		ladder_ghost.set_ghost_visible(false)
+	if mech_ghost != null:
+		mech_ghost.visible = false
 
 
 func _free_hex() -> void:
@@ -206,3 +250,9 @@ func _free_ladder() -> void:
 	if ladder_ghost != null:
 		ladder_ghost.queue_free()
 		ladder_ghost = null
+
+
+func _free_mech() -> void:
+	if mech_ghost != null:
+		mech_ghost.queue_free()
+		mech_ghost = null

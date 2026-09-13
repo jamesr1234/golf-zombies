@@ -64,6 +64,32 @@ func place_players(players: Array[Player]) -> void:
 		place_player(player, n)
 
 
+func begin_in_clubhouse(players: Array[Player], carts: Array[GolfCart]) -> void:
+	_discard_clubhouse()
+	shop = Shop.new()
+	clubhouse = Clubhouse.create(Vector3.ZERO, 0.0)
+	hole_root.add_child(clubhouse)
+	_place_clubhouse_at_exit()
+	place_carts(carts)
+	place_players_in_hall(players)
+
+
+func place_players_in_hall(players: Array[Player]) -> void:
+	if clubhouse == null or not is_instance_valid(clubhouse):
+		return
+	var snaps := ClubhouseBuild.hall_spawns(maxi(1, players.size()))
+	var house_yaw := clubhouse.rotation.y
+	for i in players.size():
+		var player := players[i]
+		if player == null:
+			continue
+		if NetSession.is_active() and not player.is_multiplayer_authority():
+			continue
+		var local: Vector3 = snaps[i]["local"]
+		var yaw := house_yaw + float(snaps[i]["yaw"])
+		player.spawn_at(clubhouse.to_global(local), rad_to_deg(yaw))
+
+
 func place_player(player: Player, count: int) -> void:
 	if hole == null or player == null:
 		return
@@ -79,7 +105,7 @@ func player_pose(seat: int, count: int) -> Dictionary:
 	var forward := along_hole()
 	var lateral := forward.cross(Vector3.UP).normalized()
 	var yaw := rad_to_deg(atan2(-forward.x, -forward.z))
-	var origin := hole.cup if ArenaHole.applies(hole) else hole.practice_tee
+	var origin := hole.cup if ArenaHole.applies(hole) else hole.arrival_point()
 	var spot := origin + forward * 1.8 + lateral * tee_offset(seat, n)
 	return {"at": hole.lift(spot) + Vector3.UP * 0.2, "yaw": yaw}
 
@@ -93,7 +119,7 @@ static func tee_offset(seat: int, count: int) -> float:
 
 
 func place_balls(balls: Array[GolfBall]) -> void:
-	_seat_balls(balls, hole.practice_tee)
+	_seat_balls(balls, hole.arrival_point())
 
 
 ## Circle on the tee: every ball lands on the box at once, spaced so they
@@ -143,7 +169,8 @@ func place_carts(carts: Array[GolfCart]) -> void:
 		var slot := cart_slot(carts[i], i)
 		var spot := cart_spot(origin, forward, lateral, slot, CART_BACK)
 		carts[i].place_at(hole.lift(spot) + Vector3.UP * 0.4, yaw)
-	var lot := get_parent().get_node_or_null("VehicleLot") as VehicleLot
+	var parent := get_parent()
+	var lot := parent.get_node_or_null("VehicleLot") as VehicleLot if parent != null else null
 	if lot != null and not carts.is_empty():
 		lot.park_with(carts[0])
 
@@ -204,6 +231,9 @@ func aim_practice(sessions: Array) -> void:
 		var golf := session as GolfController
 		if golf == null or golf.ball == null:
 			continue
+		golf.ball.bounds = hole.bounds
+		if not hole.has_practice():
+			continue
 		golf.release()
 		golf.setup(golf.ball, hole.practice_cup, PracticeGreen.span())
 
@@ -246,6 +276,7 @@ func begin_transit(
 		spread, cheap, short
 	)
 	hole_node.add_child(cart_path)
+	CartPath.open_across(hole_node, cart_path.centerline, hole.height)
 	_clubhouse_wait = -1.0
 	if not short:
 		if spread:
@@ -412,20 +443,28 @@ func plant_next() -> void:
 	if not cart_path.short and (clubhouse == null or not is_instance_valid(clubhouse)):
 		return
 	var data := HoleStore.layout(_plant_index, _plant_seed)
-	var node := HoleBuilder.build(data)
+	var incoming := cart_path.heading
 	var target := cart_path.tee
 	if clubhouse != null and is_instance_valid(clubhouse):
-		var along := data.along_tee()
-		target = clubhouse.global_position + along * (
+		incoming = -clubhouse.global_transform.basis.z
+		incoming.y = 0.0
+		if incoming.length_squared() < 0.0001:
+			incoming = Vector3.FORWARD
+		else:
+			incoming = incoming.normalized()
+		target = clubhouse.global_position + incoming * (
 			ClubhouseBuild.DEPTH * 0.5 + ClubhouseBuild.EXIT_GAP
 		)
-	var offset := HoleData.align_offset(data.practice_tee, target)
-	node.position = offset
-	data.shift(offset)
+		data.open_tee_end = false
+	else:
+		data.open_tee_end = true
+	data.pave_for_path(cart_path.centerline, incoming, target)
+	var node := HoleBuilder.build(data)
+	data.face_arrival(node, incoming, target)
 	hole_root.add_child(node)
 	MechSuit.plant_on_hole(node, data)
 	if cart_path != null:
-		CartPath.open_across(node, cart_path.centerline)
+		CartPath.open_across(node, cart_path.centerline, data.height)
 	HoleBuilder.bake_navigation(node)
 	next_hole = data
 	next_hole_node = node
@@ -481,7 +520,7 @@ func attach_next_hole(index: int, seed: int, players: Array[Player], carts: Arra
 
 func _place_clubhouse_at_exit() -> void:
 	var forward := along_hole()
-	clubhouse.global_position = ClubhouseBuild.at_exit(hole.practice_tee, forward)
+	clubhouse.global_position = ClubhouseBuild.at_exit(hole.arrival_point(), forward)
 	clubhouse.rotation.y = deg_to_rad(ClubhouseBuild.yaw_at_exit(forward))
 
 

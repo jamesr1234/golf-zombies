@@ -47,7 +47,8 @@ static func build(custom: CustomHole, base_seed := 0, index := FairwayPiece.INDE
 		Surface.Type.GREEN, data.cup,
 		Vector2(data.green_radius * 2.0, data.green_radius * 2.0), 0.0, true
 	))
-	HoleGenerator.add_practice_green(data, opening)
+	if GameState.has_practice_tee(index):
+		HoleGenerator.add_practice_green(data, opening)
 
 	data.bounds = HoleGenerator.bounds_of(data)
 	HoleGenerator.add_exit_fairway(data)

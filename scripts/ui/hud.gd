@@ -11,6 +11,7 @@ const UNDERWATER_TINT := Color(0.02, 0.18, 0.42, 0.4)
 const REVIVE_TINT := Palette.LIME
 const BLEED_TINT := Palette.MAGENTA
 const DRUNK_SHADER := preload("res://assets/shaders/drunk_vision.gdshader")
+const _MechReticle := preload("res://scripts/ui/mech_reticle.gd")
 const CALLOUT_TIME := 1.35
 const SWEET_CALLOUT := "Nice shot!"
 
@@ -22,11 +23,12 @@ const SWEET_CALLOUT := "Nice shot!"
 @onready var health_bar: ProgressBar = $Root/HealthBar
 @onready var status_bar: ProgressBar = $Root/StatusBar
 @onready var crosshair: Control = $Root/Crosshair
+var mech_reticle: Control
 @onready var vignette: ColorRect = $Root/Vignette
 @onready var swing_meter: SwingMeterUi = $Root/SwingMeter
 @onready var message: Control = $Root/Message
-@onready var message_title: Label = $Root/Message/Panel/Lines/Title
-@onready var message_body: Label = $Root/Message/Panel/Lines/Body
+@onready var message_title: Label = $Root/Message/Title
+@onready var message_body: Label = $Root/Message/Body
 @onready var shop_panel: Control = $Root/Shop
 @onready var shop_title: Label = $Root/Shop/Panel/Lines/Title
 @onready var shop_body: Label = $Root/Shop/Panel/Lines/Body
@@ -63,6 +65,12 @@ func _ready() -> void:
 	_drunk.visible = false
 	$Root.add_child(_drunk)
 	$Root.move_child(_drunk, 0)
+	mech_reticle = _MechReticle.new()
+	mech_reticle.name = "MechReticle"
+	mech_reticle.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mech_reticle.set_anchors_preset(Control.PRESET_FULL_RECT)
+	mech_reticle.visible = false
+	$Root.add_child(mech_reticle)
 
 
 func cover_black() -> void:
@@ -171,6 +179,9 @@ func _update_weapon() -> void:
 			if player.place.kind == "ladder":
 				gear = "Ladder"
 				held = card.ladder_charges
+			elif player.place.kind == "mech":
+				gear = "Mech"
+				held = card.mech_charges
 			else:
 				held = card.barrier_charges
 		var weapon := player.weapon
@@ -220,12 +231,11 @@ func _update_weapon() -> void:
 
 func _update_golf() -> void:
 	var golfing := player.is_golfing()
-	crosshair.visible = (
-		not golfing and player.health.is_alive()
-		and not player.shopping and not player.talking and not player.wants_map()
-		and not player.is_swimming() and not player.is_placing()
-		and not player.is_poker_seated()
-	)
+	crosshair.visible = shows_gun_crosshair(player)
+	if mech_reticle != null:
+		mech_reticle.visible = shows_mech_reticle(player)
+		if mech_reticle.visible:
+			mech_reticle.queue_redraw()
 	swing_meter.visible = golfing
 	if player.golf != null:
 		_listen_sweet(player.golf)
@@ -264,6 +274,25 @@ func _on_sweet_struck() -> void:
 
 static func golf_club_text(putting: bool) -> String:
 	return "Putter" if putting else ""
+
+
+static func shows_gun_crosshair(player: Player) -> bool:
+	if player == null or not player.health.is_alive():
+		return false
+	if player.is_in_mech():
+		return false
+	return (
+		not player.is_golfing() and not player.shopping and not player.talking
+		and not player.wants_map() and not player.is_swimming()
+		and not player.is_placing() and not player.is_poker_seated()
+	)
+
+
+static func shows_mech_reticle(player: Player) -> bool:
+	return (
+		player != null and player.is_in_mech() and player.aiming
+		and not player.is_golfing() and player.health.is_alive()
+	)
 
 
 ## Parked on the full clock during warm-up, so you can see what you are about to

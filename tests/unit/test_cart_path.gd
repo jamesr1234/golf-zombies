@@ -321,7 +321,7 @@ func test_the_path_has_blue_turbo_lines() -> void:
 		nearest = minf(nearest, pad.global_position.distance_to(mid))
 		assert_true(pad.is_in_group("transit_boost"))
 	assert_lt(nearest, CartPath.PATH_WIDTH * 0.4, "stripes sit in the lane, not in the trees")
-	assert_gt(_Boost.SPEED, 40.0)
+	assert_almost_eq(_Boost.SPEED, 112.0 * 0.75 * 0.75, 0.01)
 
 
 func test_the_next_tee_is_a_drive_past_the_cup() -> void:
@@ -474,6 +474,31 @@ func test_the_cart_can_drive_from_the_green_onto_the_path() -> void:
 	)
 
 
+func test_setpiece_exits_stay_cart_grade() -> void:
+	for index in [1, 2]:
+		var data := HoleGenerator.generate(index, SEED)
+		var along := data.along_cup()
+		var start := CartPath._start_point(
+			data.cup, along, data.bounds, data.height, data.green_radius
+		)
+		var steepest := 0.0
+		var prev_h := data.cup.y
+		var prev_xz := Vector2(data.cup.x, data.cup.z)
+		for i in 24:
+			var t := float(i + 1) / 24.0
+			var at := data.cup.lerp(start, t)
+			var h := data.height.height_at(at.x, at.z)
+			var run := prev_xz.distance_to(Vector2(at.x, at.z))
+			if run > 0.2:
+				steepest = maxf(steepest, absf(atan((h - prev_h) / run)))
+			prev_h = h
+			prev_xz = Vector2(at.x, at.z)
+		assert_lt(
+			steepest, deg_to_rad(GolfCart.FLOOR_MAX_DEG),
+			"hole %d has to leave the green without a wall of rough" % (index + 1)
+		)
+
+
 func test_the_far_fence_opens_a_gate() -> void:
 	var data := HoleGenerator.generate(0, SEED)
 	var hole := HoleBuilder.build(data)
@@ -520,7 +545,7 @@ func test_large_windmills_stand_in_the_middle_of_the_circuit() -> void:
 	assert_gte(mills.size(), 2, "the clubhouse drive needs more than one mill")
 	assert_eq(_Windmill.PILLAR_COUNT, 4)
 	assert_gt(_Windmill.PILLAR_LEN, CartPath.PATH_WIDTH * 0.45, "sails have to sweep the lane")
-	assert_gt(_Windmill.TOWER_H, 7.0, "they should read as towers, not posts")
+	assert_gt(_Windmill.HUB_Y, 6.0, "the rotor floats high enough to read as a mill")
 	for mill in mills:
 		var along := CartPathTrack.along(path.centerline, mill.position)
 		assert_gt(along, 80.0, "not in the gate")
@@ -535,13 +560,24 @@ func test_every_windmill_mesh_sits_on_a_physics_body() -> void:
 	var mill := _Windmill.create(Vector3.ZERO, Vector3.FORWARD)
 	add_child_autofree(mill)
 	var meshes := mill.find_children("*", "MeshInstance3D", true, false)
-	assert_gt(meshes.size(), 6, "mast, nacelle, cap, hub, and four sails")
+	assert_gt(meshes.size(), 6, "nacelle, hub, and four sails")
 	for mesh in meshes:
 		var body := _physics_owner(mesh)
 		assert_not_null(body, "%s has to be a collision object" % mill.get_path_to(mesh))
 		assert_gt(body.collision_layer & Layers.PROP, 0, "balls and carts have to hit it")
 	var rotor := mill.get_node("Rotor") as AnimatableBody3D
 	assert_not_null(rotor, "spinning sails need a moving body")
+
+
+func test_a_windmill_floats_without_a_mast() -> void:
+	var mill := _Windmill.create(Vector3.ZERO, Vector3.FORWARD)
+	add_child_autofree(mill)
+	assert_null(mill.get_node_or_null("MastHit"), "the post must not fling you")
+	var rotor := mill.get_node("Rotor") as AnimatableBody3D
+	assert_eq(rotor.find_children("*", "Area3D", true, false).size(), _Windmill.PILLAR_COUNT)
+	for child in mill.get_children():
+		if child is PhysicsBody3D:
+			assert_gt(child.position.y, 4.0, "only the floating head and sails collide")
 
 
 func test_a_windmill_pillar_throws_you_off_then_explodes_a_second_later() -> void:
@@ -554,6 +590,7 @@ func test_a_windmill_pillar_throws_you_off_then_explodes_a_second_later() -> voi
 	assert_true(path.is_flung(cart))
 	assert_true(cart.is_flung())
 	assert_eq(cart.drive_speed, 0.0)
+	assert_gt(cart.velocity.y, 40.0, "the mill has to throw the cart into the sky")
 	assert_gt(Vector2(cart.velocity.x, cart.velocity.z).length(), 28.0)
 	var shove := cart.velocity
 	shove.y = 0.0
@@ -566,7 +603,27 @@ func test_a_windmill_pillar_throws_you_off_then_explodes_a_second_later() -> voi
 	assert_false(path.is_flung(cart))
 	assert_false(cart.is_flung())
 	assert_lt(_lane_offset(path, cart.position), 1.5, "back on the path after the blast")
+	var mill_along := CartPathTrack.along(path.centerline, mill.position)
+	var cart_along := CartPathTrack.along(path.centerline, cart.position)
+	assert_almost_eq(
+		cart_along, maxf(0.0, mill_along - _Windmill.FLING_BACK), 4.0,
+		"a mill hit has to drop you two lane-widths behind the sails"
+	)
 	cart.free()
+
+
+func test_a_mill_hit_respawns_twice_as_far_back_as_a_tree_crash() -> void:
+	var path := _path()
+	var mill: Node3D = _path_mills(path)[0]
+	var mill_along := CartPathTrack.along(path.centerline, mill.position)
+	var beside := path.reset_from(mill.position)
+	var behind := path.reset_from(mill.position, _Windmill.FLING_BACK)
+	var beside_along := CartPathTrack.along(path.centerline, beside["position"])
+	var behind_along := CartPathTrack.along(path.centerline, behind["position"])
+	assert_almost_eq(beside_along, mill_along, 2.0)
+	assert_almost_eq(behind_along, mill_along - _Windmill.FLING_BACK, 2.0)
+	assert_almost_eq(_Windmill.FLING_BACK, CartPath.PATH_WIDTH * 2.0, 0.001)
+	assert_gt(_Windmill.FLING_LIFT, _Windmill.FLING_SPEED, "up, not across")
 
 
 func test_a_fling_does_not_explode_the_instant_you_leave_the_path() -> void:

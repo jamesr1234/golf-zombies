@@ -64,8 +64,8 @@ func test_the_maze_has_exactly_two_gates() -> void:
 			north += 1
 		elif gate.y == size - 1:
 			south += 1
-	assert_eq(north, 2)
-	assert_eq(south, 2)
+	assert_eq(north, 3)
+	assert_eq(south, 3)
 
 
 func test_the_maze_is_sealed_except_the_gates() -> void:
@@ -213,16 +213,16 @@ func _maze_blocked(root: Node3D) -> Dictionary:
 		var oz := int(roundf(node.position.z / CELL))
 		var rotated := node.transform.basis.x.z < -0.5
 		if kind == "wall_small" and rotated:
-			for dz in 2:
+			for dz in 3:
 				blocked[Vector2i(ox - 1, -oz + dz)] = true
 		elif kind == "wall_small":
-			for dx in 2:
+			for dx in 3:
 				blocked[Vector2i(ox + dx, -oz)] = true
 		elif kind == "pillar_small" or kind == "cube_extra_small":
 			blocked[Vector2i(ox, -oz)] = true
 		elif kind == "arch_small":
 			blocked[Vector2i(ox, -oz)] = true
-			blocked[Vector2i(ox + 3, -oz)] = true
+			blocked[Vector2i(ox + 4, -oz)] = true
 	return blocked
 
 

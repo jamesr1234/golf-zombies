@@ -73,6 +73,12 @@ static func reset() -> void:
 	creator_hole = null
 
 
+static func mute_master(muted: bool) -> void:
+	var bus := AudioServer.get_bus_index("Master")
+	if bus >= 0:
+		AudioServer.set_bus_mute(bus, muted)
+
+
 static func is_custom() -> bool:
 	return custom_hole != null
 

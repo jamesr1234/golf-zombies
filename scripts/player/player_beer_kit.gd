@@ -161,6 +161,4 @@ func wants_drunk_fx(player: Player) -> bool:
 		return false
 	if player.is_driving() and player.is_chase_cam():
 		return false
-	if player.is_in_mech() and player.is_chase_cam():
-		return false
 	return true

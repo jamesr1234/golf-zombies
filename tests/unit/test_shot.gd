@@ -210,8 +210,93 @@ func test_a_full_swing_loses_speed_in_the_rough_and_sand() -> void:
 	)
 
 
+func test_a_collar_chip_lands_just_short_of_the_cup() -> void:
+	var collar := ChipScale.putting_collar()
+	assert_almost_eq(collar, Shot.default_green_span() * 0.5 + ChipScale.COLLAR_FRINGE, 0.001)
+	var desired := ChipScale.chip_max_carry(collar)
+	assert_almost_eq(desired, collar - ChipScale.CHIP_SHORT, 0.001)
+	var carry := _carry_xz(_chip_flight(1.0, 0.0, collar))
+	assert_almost_eq(carry, desired, 1.5)
+	assert_lt(carry, collar, "a stuffed meter has to die short so it can roll in")
+	assert_gt(carry, collar - 2.0)
+	var bunker := ChipScale.chip_max_carry(5.0)
+	assert_almost_eq(bunker, 5.0 - ChipScale.CHIP_SHORT, 0.001)
+	var forged := ChipScale.chip_max_carry(collar, 0.0, ClubKit.by_id(ClubKit.FORGED_ID))
+	assert_almost_eq(forged, desired, 0.01, "upgrades cannot stretch a collar chip past the cup")
+
+
+func test_a_higher_collar_chip_goes_a_little_further() -> void:
+	var collar := ChipScale.putting_collar()
+	var stock := ChipScale.chip_max_carry(collar)
+	var flop := ChipScale.chip_max_carry(collar, Shot.LOFT_BIAS_MAX)
+	var punch := ChipScale.chip_max_carry(collar, Shot.LOFT_BIAS_MIN)
+	assert_gt(flop, stock, "a high chip has to carry a bit further because it will not roll")
+	assert_almost_eq(punch, stock, 0.001, "a punch does not get extra near-hole carry")
+	assert_lt(flop, stock * 1.2)
+	assert_lt(flop, ClubKit.starter().scaled_carry() * 0.15, "a flop is still a chip, not a drive")
+	assert_almost_eq(_carry_xz(_chip_flight(1.0, Shot.LOFT_BIAS_MAX, collar)), flop, 1.5)
+
+
+func test_a_mid_approach_overshoots_so_the_hole_needs_a_partial() -> void:
+	var collar := ChipScale.putting_collar()
+	var mid := 50.0
+	var max_at_mid := ChipScale.chip_max_carry(mid)
+	assert_gt(max_at_mid, mid, "a stuffed meter from mid-range has to fly past the cup")
+	var hole_high := mid / max_at_mid
+	var collar_high := collar / ChipScale.chip_max_carry(collar)
+	assert_lt(hole_high, 1.0)
+	assert_lt(hole_high, collar_high, "further back has to take a smaller partial than the collar")
+	assert_almost_eq(_carry_xz(_chip_flight(1.0, 0.0, mid)), max_at_mid, 2.0)
+
+
+func test_a_drive_length_swing_stays_a_full_drive() -> void:
+	var far := ClubKit.starter().scaled_carry()
+	assert_almost_eq(ChipScale.chip_max_carry(far), Shot.carry_to_height(0.0), 0.01)
+	assert_almost_eq(ChipScale.chip_speed_scale(far), 1.0, 0.001)
+	var raw := Shot.velocity(0.0, 0.0, 1.0, Surface.Type.FAIRWAY, false)
+	var scaled := ChipScale.scale_launch(raw, far)
+	assert_almost_eq(scaled.length(), raw.length(), 0.001)
+
+
+func test_chip_scale_is_linear_with_hole_distance() -> void:
+	var collar := ChipScale.putting_collar()
+	var far := ClubKit.starter().scaled_carry()
+	var mid := (collar + far) * 0.5
+	var full := Shot.carry_to_height(0.0)
+	assert_almost_eq(ChipScale.chip_max_carry(collar), collar - ChipScale.CHIP_SHORT, 0.001)
+	assert_almost_eq(ChipScale.chip_max_carry(far), full, 0.01)
+	assert_almost_eq(
+		ChipScale.chip_max_carry(mid), lerpf(mid - ChipScale.CHIP_SHORT, full, 0.5), 0.01
+	)
+
+
+func test_chip_scale_leaves_putts_and_unspecified_distance_alone() -> void:
+	assert_almost_eq(ChipScale.chip_speed_scale(0.0), 1.0, 0.001)
+	var putt := Shot.velocity(0.0, 0.0, 1.0, Surface.Type.GREEN, true)
+	assert_almost_eq(putt.length(), Shot.putt_max_speed(), 0.001)
+	assert_almost_eq(putt.y, 0.0, 0.001)
+	var expected := (
+		Shot.MAX_SPEED * Shot.MAX_SPEED * sin(2.0 * deg_to_rad(Shot.LAUNCH_DEG)) / Shot.GRAVITY
+	)
+	assert_almost_eq(Shot.max_carry(), expected, 0.001)
+	var swing := Shot.velocity(0.0, 0.0, 1.0, Surface.Type.FAIRWAY, false)
+	assert_almost_eq(swing.length(), Shot.MAX_SPEED * sqrt(Shot.DISTANCE_SCALE), 0.001)
+	assert_almost_eq(
+		ChipScale.scale_launch(swing, 0.0).length(), swing.length(), 0.001
+	)
+
+
 func test_no_patch_is_the_rough() -> void:
 	assert_eq(Surface.dominant([]), Surface.Type.ROUGH)
+
+
+func _chip_flight(power: float, loft_bias: float, hole_dist: float) -> PackedVector3Array:
+	return ChipScale.scale_flight(
+		Shot.flight_points(
+			Vector3.ZERO, 0.0, power, loft_bias, false, null, 0.0, Surface.Type.FAIRWAY
+		),
+		hole_dist, loft_bias
+	)
 
 
 func _peak_y(points: PackedVector3Array) -> float:

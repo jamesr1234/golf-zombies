@@ -5,8 +5,8 @@ extends Area3D
 
 const _SCRIPT := preload("res://scripts/course/cart_path_boost.gd")
 
-const SPEED := 112.0 * 0.75
-const PLAYER_SPEED := 24.0 * 0.75
+const SPEED := 112.0 * 0.75 * 0.75
+const PLAYER_SPEED := 24.0 * 0.75 * 0.75
 const ACCEL := 92.0
 const WIDTH := 3.4
 const DETECT_HEIGHT := 2.8

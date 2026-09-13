@@ -23,7 +23,7 @@ func leave(flow: MatchFlow) -> void:
 		player.close_shop()
 		player.stop_talk()
 	flow._refresh_team()
-	flow._rally_cpus()
+	flow._sync_cpu_presence()
 	if not ArenaHole.applies(flow.hole):
 		if flow.cart_girl == null or not is_instance_valid(flow.cart_girl):
 			flow._place_cart_girl()
@@ -52,6 +52,7 @@ func arrive(flow: MatchFlow) -> void:
 	else:
 		attach_next_hole(flow)
 	flow._reveal_fade()
+	flow._sync_cpu_presence()
 	flow.scorecard_changed.emit()
 	_Music.enter_clubhouse()
 
@@ -59,6 +60,7 @@ func arrive(flow: MatchFlow) -> void:
 func begin_transit(flow: MatchFlow) -> void:
 	flow._close_shop()
 	flow.phase = MatchFlow.Phase.TRANSIT
+	flow._sync_cpu_presence()
 	var next_index := flow.score.hole_index if flow.plant_index < 0 else flow.plant_index
 	if ArenaHole.applies_index(next_index):
 		plant_arena_beside(flow)
@@ -72,6 +74,7 @@ func begin_transit(flow: MatchFlow) -> void:
 		flow.hole.green_radius, false, false, short
 	)
 	flow._hole_node.add_child(flow.cart_path)
+	CartPath.open_across(flow._hole_node, flow.cart_path.centerline, flow.hole.height)
 	if not short:
 		open_clubhouse(flow)
 		_hold_clubhouse(flow)
@@ -114,6 +117,8 @@ func board_cart(flow: MatchFlow) -> void:
 	var humans: Array[Player] = []
 	var cpus: Array[Player] = []
 	for player in flow._players:
+		if player == null or not player.is_on_course():
+			continue
 		if player.is_cpu():
 			cpus.append(player)
 		else:
@@ -177,20 +182,29 @@ func plant_next(flow: MatchFlow) -> void:
 		CustomLayout.build(GameSettings.custom_hole, flow.course_seed) if GameSettings.is_custom()
 		else HoleStore.layout(index, flow.course_seed)
 	)
-	var node := HoleBuilder.build(data)
-	var target := flow.cart_path.tee if flow.cart_path != null else flow.hole.cup
+	var incoming := Vector3.FORWARD
+	var target := flow.hole.cup
+	if flow.cart_path != null:
+		incoming = flow.cart_path.heading
+		target = flow.cart_path.tee
 	if flow.clubhouse != null and is_instance_valid(flow.clubhouse):
-		var along := data.along_tee()
-		target = flow.clubhouse.global_position + along * (
+		incoming = _exit_heading(flow.clubhouse)
+		target = flow.clubhouse.global_position + incoming * (
 			ClubhouseBuild.DEPTH * 0.5 + ClubhouseBuild.EXIT_GAP
 		)
-	var offset := HoleData.align_offset(data.practice_tee, target)
-	node.position = offset
-	data.shift(offset)
+		data.open_tee_end = false
+	else:
+		data.open_tee_end = true
+	var line: Array[Vector3] = []
+	if flow.cart_path != null:
+		line = flow.cart_path.centerline
+	data.pave_for_path(line, incoming, target)
+	var node := HoleBuilder.build(data)
+	data.face_arrival(node, incoming, target)
 	flow.hole_root.add_child(node)
 	MechSuit.plant_on_hole(node, data)
 	if flow.cart_path != null:
-		CartPath.open_across(node, flow.cart_path.centerline)
+		CartPath.open_across(node, flow.cart_path.centerline, data.height)
 	HoleBuilder.bake_navigation(node)
 	flow.next_hole = data
 	flow.next_hole_node = node
@@ -206,6 +220,7 @@ func adopt_planted(flow: MatchFlow) -> void:
 	flow._hole_node = flow.next_hole_node
 	flow.next_hole = null
 	flow.next_hole_node = null
+	flow._sync_ball_bounds()
 	flow.cart_path = null
 	flow.cart_girl = null
 	if old != null and is_instance_valid(old):
@@ -219,6 +234,14 @@ func adopt_planted(flow: MatchFlow) -> void:
 	flow.spawner.clear_zombies()
 	flow.spawner.plant_mazes(flow._hole_node)
 	flow._sync_loadouts()
+
+
+func _exit_heading(house: Clubhouse) -> Vector3:
+	var incoming := -house.global_transform.basis.z
+	incoming.y = 0.0
+	if incoming.length_squared() < 0.0001:
+		return Vector3.FORWARD
+	return incoming.normalized()
 
 
 func _hold_clubhouse(flow: MatchFlow) -> void:
@@ -258,7 +281,7 @@ func attach_next_hole(flow: MatchFlow) -> void:
 
 func place_at_exit(flow: MatchFlow) -> void:
 	var forward := flow._along_hole()
-	flow.clubhouse.global_position = ClubhouseBuild.at_exit(flow.hole.practice_tee, forward)
+	flow.clubhouse.global_position = ClubhouseBuild.at_exit(flow.hole.arrival_point(), forward)
 	flow.clubhouse.rotation.y = deg_to_rad(ClubhouseBuild.yaw_at_exit(forward))
 
 
@@ -268,6 +291,8 @@ func capture_in_clubhouse(flow: MatchFlow) -> Array[Dictionary]:
 		return snaps
 	var house_yaw := flow.clubhouse.rotation.y
 	for player in flow._players:
+		if player == null or player.brain != null:
+			continue
 		snaps.append({
 			"local": flow.clubhouse.to_local(player.global_position),
 			"yaw": player.rotation.y - house_yaw,
@@ -280,11 +305,16 @@ func restore_in_clubhouse(flow: MatchFlow, snaps: Array[Dictionary]) -> void:
 		return
 	flow._refresh_team()
 	var house_yaw := flow.clubhouse.rotation.y
-	for i in mini(flow._players.size(), snaps.size()):
+	var i := 0
+	for player in flow._players:
+		if player == null or player.brain != null:
+			continue
+		if i >= snaps.size():
+			break
 		var local: Vector3 = snaps[i]["local"]
 		var yaw := house_yaw + float(snaps[i]["yaw"])
 		if not flow.clubhouse.covers_local(local):
-			var side := -1.0 if i == 0 else 1.0
-			local = Vector3(side * 1.4, 1.2, ClubhouseBuild.DEPTH * 0.5 - 2.8)
+			local = Vector3(-1.4 if i == 0 else 1.4, 1.2, ClubhouseBuild.DEPTH * 0.5 - 2.8)
 			yaw = house_yaw
-		flow._players[i].spawn_at(flow.clubhouse.to_global(local), rad_to_deg(yaw))
+		player.spawn_at(flow.clubhouse.to_global(local), rad_to_deg(yaw))
+		i += 1

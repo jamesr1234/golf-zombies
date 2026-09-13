@@ -148,6 +148,40 @@ func test_one_ball_offset_per_team() -> void:
 	assert_eq(VsCourse.cart_index_for_seat(2), 1)
 
 
+func test_any_team_can_take_the_nearest_cart() -> void:
+	GameSettings.mode = GameSettings.Mode.ONLINE_COOP_VS
+	NetSession.seats = {1: 0, 12: 2}
+	var flow := VsMatchFlow.new()
+	var course := VsCourse.new()
+	flow.course = course
+	var own: GolfCart = preload("res://scenes/vehicles/golf_cart.tscn").instantiate()
+	var other: GolfCart = preload("res://scenes/vehicles/golf_cart.tscn").instantiate()
+	own.name = "Cart0"
+	other.name = "Cart1"
+	add_child_autofree(own)
+	add_child_autofree(other)
+	own.set_physics_process(false)
+	other.set_physics_process(false)
+	own.global_position = Vector3(80.0, 0.0, 0.0)
+	other.global_position = Vector3.ZERO
+	flow._carts = [own, other]
+	var player := _pawn(1, Vector3(1.0, 0.0, 0.0))
+	player.set_physics_process(false)
+	player.set_process(false)
+	player.flow = flow
+	await wait_physics_frames(1)
+	assert_eq(flow.cart_for(player), other, "walk up to any cart and it is yours")
+	assert_eq(player.active_cart(), other)
+	assert_true(other.can_board(player))
+	other.board(player)
+	assert_true(other.is_riding(player))
+	other.eject(player)
+	player.global_position = Vector3(40.0, 0.0, 0.0)
+	assert_eq(flow.cart_for(player), own, "far from every cart, still walk toward yours")
+	flow.free()
+	course.free()
+
+
 func test_cart_tint_uses_the_team_color() -> void:
 	var cart: GolfCart = preload("res://scenes/vehicles/golf_cart.tscn").instantiate()
 	add_child_autofree(cart)
@@ -253,6 +287,42 @@ func test_cpu_waits_when_it_is_not_their_turn() -> void:
 	assert_false(flow.can_strike(cpu))
 	card.advance_turn()
 	assert_true(flow.can_strike(cpu))
+	flow.free()
+
+
+func test_a_human_can_take_the_cpu_partners_turn() -> void:
+	GameSettings.mode = GameSettings.Mode.ONLINE_COOP_VS
+	NetSession.seats = {1: 0, -1: 1}
+	var flow := VsMatchFlow.new()
+	flow.phase = VsMatchFlow.Phase.PLAYING
+	var card := TeamScore.new()
+	card.team = 0
+	flow._team_scores[0] = card
+	var human := _pawn(1, Vector3.ZERO)
+	var cpu := _pawn(-1, Vector3.ZERO)
+	cpu.cpu_filled = true
+	human.partner = cpu
+	cpu.partner = human
+	human.flow = flow
+	cpu.flow = flow
+	flow._players = [human, cpu]
+	assert_true(flow.can_strike(human), "slot A tees first")
+	assert_false(flow.can_strike(cpu))
+	flow._on_ball_rest(Vector3.ZERO, human)
+	assert_eq(card.striker_slot, 1)
+	assert_true(flow.can_strike(cpu), "CPU is on the clock")
+	assert_true(flow.can_strike(human), "a lone human is not locked out of the second shot")
+	var ball: GolfBall = preload("res://scenes/golf/ball.tscn").instantiate()
+	add_child_autofree(ball)
+	ball.team = 0
+	ball.owner_peer = 1
+	ball.place_at(Vector3.ZERO)
+	var golf := GolfSession.new()
+	ball.add_child(golf)
+	golf.setup(ball, Vector3(0.0, 0.0, -20.0))
+	human.global_position = Vector3(1.0, 0.0, 0.0)
+	assert_true(golf.can_claim(human), "walk up and take the CPU's turn")
+	assert_true(golf.can_claim(cpu))
 	flow.free()
 
 

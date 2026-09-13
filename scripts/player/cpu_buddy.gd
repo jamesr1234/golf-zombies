@@ -4,6 +4,7 @@ extends RefCounted
 ## Does not golf unless the human holds interact to send them at the ball.
 ## Plants a shield when the human golfs, draws a sniper, or takes a tower hit.
 
+const _ChipScale := preload("res://scripts/golf/chip_scale.gd")
 const FOLLOW_STOP := 2.8
 const FOLLOW_SPRINT := 8.0
 ## Warp if the partner has gone through a doorway or driven off without us.
@@ -121,7 +122,9 @@ static func wanted_power(
 	var dist := Vector2(from.x, from.z).distance_to(Vector2(to.x, to.z))
 	if putting:
 		return clampf(dist / maxf(4.0, Shot.putt_run(clubs, green_span)), 0.08, 0.85)
-	return clampf(dist / maxf(1.0, clubs.scaled_carry()), 0.12, 0.92)
+	return clampf(
+		dist / maxf(1.0, _ChipScale.chip_max_carry(dist, 0.0, clubs, green_span)), 0.12, 0.92
+	)
 
 
 func _club_kit() -> ClubKit:

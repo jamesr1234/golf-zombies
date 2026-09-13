@@ -27,17 +27,24 @@ const TEE_READY_RANGE := 4.0
 @export var course_seed := 20260816
 ## 1-based. Raise this to skip ahead when playtesting later holes.
 @export var starting_hole := 1
-## Spawn in the hall on that hole so shops and wall art can be checked in-game.
-@export var start_in_clubhouse := false
+## Spawn in the hall so the round starts at the shop. Turn off to tee off.
+@export var start_in_clubhouse := true
 ## Playtest wallet so shops can be checked without holing out.
 @export var starting_money := 0
 ## Spawn on the clubhouse circuit so the drive can be checked without holing out.
 @export var start_on_cart_path := false
+## Spawn on the long drive after a 3rd/6th/9th hole-out, clubhouse already waiting.
+@export var start_to_clubhouse := false
 ## Playtest: stand on the green with the ball in the cup, ready to pick it up.
 @export var start_at_cup := false
 ## Hole 1 playtest: the CPU boards as driver and throttles up right away so the
 ## human can grapple onto a moving cart.
 @export var cpu_drives_at_start := false
+## Silence every gameplay AudioStreamPlayer (SFX and music) on the Master bus.
+@export var mute_audio := false:
+	set(value):
+		mute_audio = value
+		_apply_mute()
 
 var score: GameState
 var hole: HoleData
@@ -71,6 +78,7 @@ var clubhouse_flow = _ClubhouseFlow.new()
 
 
 func _ready() -> void:
+	_apply_mute()
 	score = GameState.new(_pars())
 	var world := get_parent()
 	for node in get_tree().get_nodes_in_group("players"):
@@ -92,6 +100,10 @@ func _ready() -> void:
 	ball.entered_hazard.connect(_on_hazard)
 	ball.holed.connect(_on_holed)
 	golf.stroke_taken.connect(_on_stroke_taken)
+
+
+func _apply_mute() -> void:
+	GameSettings.mute_master(mute_audio)
 
 
 func _process(delta: float) -> void:
@@ -133,16 +145,24 @@ func begin() -> void:
 	if started:
 		return
 	started = true
-	var index := clampi(starting_hole, 1, score.pars.size()) - 1
-	score.hole_index = index
 	if starting_money > 0:
 		score.credit(starting_money)
-	if start_on_cart_path:
+	# A hole picked in the creator is a card of one. The world scene's cup /
+	# clubhouse / cart-path playtest flags stay for the generated course.
+	if GameSettings.is_custom():
+		score.hole_index = 0
+		start_hole(0)
+		return
+	var index := clampi(starting_hole, 1, score.pars.size()) - 1
+	score.hole_index = index
+	if start_to_clubhouse:
+		_begin_to_clubhouse(index)
+	elif start_on_cart_path:
 		_begin_on_cart_path(index)
-	elif start_in_clubhouse:
-		_begin_in_clubhouse(index)
 	elif start_at_cup:
 		_begin_at_cup(index)
+	elif start_in_clubhouse:
+		_begin_in_clubhouse(index)
 	else:
 		start_hole(index)
 
@@ -278,8 +298,6 @@ func buy_shop_item(item_id: String, buyer: Player = null) -> bool:
 	var ok := shop.buy(item_id, score, weapons(), buyer, cart)
 	if ok:
 		golf.club_kit = score.club_kit()
-		if item_id == "mech":
-			MechSuit.spawn_near(buyer)
 		scorecard_changed.emit()
 	return ok
 
@@ -338,14 +356,8 @@ func _begin_in_clubhouse(index: int) -> void:
 	_place_clubhouse_at_exit()
 	_place_cart()
 	_aim_at_practice()
-	var snaps: Array[Dictionary] = []
-	for i in _players.size():
-		var side := -1.0 if i == 0 else 1.0
-		snaps.append({
-			"local": Vector3(side * 1.4, 1.2, ClubhouseBuild.DEPTH * 0.5 - 2.8),
-			"yaw": PI,
-		})
-	_restore_in_clubhouse(snaps)
+	_restore_in_clubhouse(ClubhouseBuild.hall_spawns(_players.size()))
+	_sync_cpu_presence()
 	spawner.clear_zombies()
 	spawner.plant_mazes(_hole_node)
 	_sync_loadouts()
@@ -354,7 +366,7 @@ func _begin_in_clubhouse(index: int) -> void:
 	scorecard_changed.emit()
 	_flash_message(
 		"Clubhouse",
-		"Playtest spawn. Shop, then walk out the back to hole %d." % [index + 1]
+		"Shop, then walk out the back to hole %d." % [index + 1]
 	)
 	_Music.enter_clubhouse()
 
@@ -383,6 +395,23 @@ func _begin_on_cart_path(index: int) -> void:
 	_Music.play_level()
 
 
+func _begin_to_clubhouse(index: int) -> void:
+	index = _to_clubhouse_index(index)
+	score.hole_index = index
+	_begin_on_cart_path(index)
+
+
+## The long shop drive only opens after a 3rd, 6th, or 9th hole. A later hole
+## that is not one of those snaps back to hole three so the flag still works.
+func _to_clubhouse_index(index: int) -> int:
+	var fallback := GameState.CLUBHOUSE_EVERY - 1
+	if index >= score.pars.size() - 1:
+		return fallback
+	if GameState.visits_clubhouse_after(index + 1):
+		return index
+	return fallback
+
+
 func start_hole(index: int) -> void:
 	# Every hole is generated around the origin, so the old one has to leave the
 	# physics space before the new one arrives or the ball reads a stale lie.
@@ -403,6 +432,7 @@ func start_hole(index: int) -> void:
 		_board_tee_race_car()
 	elif cpu_drives_at_start and not ArenaHole.applies(hole):
 		_board_cpu_driver()
+	_sync_cpu_presence(false)
 	spawner.clear_zombies()
 	spawner.plant_mazes(_hole_node)
 	_sync_loadouts()
@@ -418,7 +448,7 @@ func start_hole(index: int) -> void:
 
 func _warmup_copy(index: int) -> String:
 	if hole != null and hole.custom != null:
-		return "Warm up on the practice green.\nStep onto the tee and interact when you are ready."
+		return _tee_copy()
 	if index == 1:
 		return "The hill blocks the drive.\nTake the cart through the culvert."
 	if index == 2:
@@ -429,7 +459,13 @@ func _warmup_copy(index: int) -> String:
 		return RaceHole.WARMUP
 	if ArenaHole.applies_index(index):
 		return ArenaHole.WARMUP
-	return "Warm up on the practice green.\nStep onto the tee and interact when you are ready."
+	return _tee_copy()
+
+
+func _tee_copy() -> String:
+	if hole != null and hole.has_practice():
+		return "Warm up on the practice green.\nStep onto the tee and interact when you are ready."
+	return "Step onto the tee and interact when you are ready."
 
 
 func _rebuild_hole(index: int) -> void:
@@ -589,6 +625,30 @@ func _rebuild_hole(index: int) -> void:
 		_dbg8.close()
 	# #endregion
 	ball.bounds = hole.bounds
+	# #region agent log
+	var _dbg_bd := FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-f5be46.log", FileAccess.READ_WRITE)
+	if _dbg_bd == null:
+		_dbg_bd = FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-f5be46.log", FileAccess.WRITE)
+	else:
+		_dbg_bd.seek_end()
+	if _dbg_bd != null:
+		var _hb := hole.bounds
+		var _tee := hole.tee
+		_dbg_bd.store_line(JSON.stringify({
+			"sessionId": "f5be46",
+			"hypothesisId": "C",
+			"location": "match_flow.gd:_rebuild_hole",
+			"message": "assigned ball.bounds from rebuilt hole",
+			"data": {
+				"hole_index": hole.index,
+				"tee": [_tee.x, _tee.y, _tee.z],
+				"hole_bounds": [_hb.position.x, _hb.position.y, _hb.size.x, _hb.size.y],
+				"tee_in_bounds": _hb.has_point(Vector2(_tee.x, _tee.z)),
+			},
+			"timestamp": Time.get_ticks_msec(),
+		}))
+		_dbg_bd.close()
+	# #endregion
 	golf.club_kit = score.club_kit()
 
 
@@ -615,6 +675,7 @@ func start_play() -> void:
 			doors.snap(false)
 	phase = Phase.PLAYING
 	golf.release()
+	_sync_ball_bounds()
 	if not ArenaHole.applies(hole):
 		ball.place_at(hole.tee)
 		golf.setup(ball, hole.cup, hole.green_span())
@@ -690,7 +751,7 @@ func _place_players() -> void:
 	var forward := _along_hole()
 	var lateral := forward.cross(Vector3.UP).normalized()
 	var yaw := rad_to_deg(atan2(-forward.x, -forward.z))
-	var origin := hole.cup if ArenaHole.applies(hole) else hole.practice_tee
+	var origin := hole.cup if ArenaHole.applies(hole) else hole.arrival_point()
 	for i in _players.size():
 		var side := -1.0 if i == 0 else 1.0
 		var spot := origin + forward * 1.8 + lateral * side * PLAYER_TEE_SPREAD
@@ -763,6 +824,39 @@ func _on_ball_rest(_position: Vector3) -> void:
 
 
 func _on_hazard(kind: String) -> void:
+	# #region agent log
+	var _dbg_hz := FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-f5be46.log", FileAccess.READ_WRITE)
+	if _dbg_hz == null:
+		_dbg_hz = FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-f5be46.log", FileAccess.WRITE)
+	else:
+		_dbg_hz.seek_end()
+	if _dbg_hz != null:
+		var _bp := Vector3.ZERO if ball == null else ball.global_position
+		var _ls := Vector3.ZERO if ball == null else ball.last_safe_position
+		var _bb := Rect2() if ball == null else ball.bounds
+		var _hb := Rect2() if hole == null else hole.bounds
+		_dbg_hz.store_line(JSON.stringify({
+			"sessionId": "f5be46",
+			"hypothesisId": "A",
+			"location": "match_flow.gd:_on_hazard",
+			"message": "penalty hazard fired",
+			"data": {
+				"kind": kind,
+				"phase": phase,
+				"hole_index": -1 if hole == null else hole.index,
+				"strokes": -1 if score == null else score.strokes,
+				"ball_pos": [_bp.x, _bp.y, _bp.z],
+				"last_safe": [_ls.x, _ls.y, _ls.z],
+				"under_world": _bp.y < GolfBall.UNDER_THE_WORLD,
+				"off_ball_bounds": not _bb.has_point(Vector2(_bp.x, _bp.z)),
+				"off_hole_bounds": hole != null and not _hb.has_point(Vector2(_bp.x, _bp.z)),
+				"ball_bounds": [_bb.position.x, _bb.position.y, _bb.size.x, _bb.size.y],
+				"hole_bounds": [_hb.position.x, _hb.position.y, _hb.size.x, _hb.size.y],
+			},
+			"timestamp": Time.get_ticks_msec(),
+		}))
+		_dbg_hz.close()
+	# #endregion
 	if finished:
 		return
 	# A warm-up shot that finds trouble just comes back to the practice mat.
@@ -794,6 +888,7 @@ func _complete_hole(from_cup: bool) -> void:
 	if finished or phase != Phase.PLAYING:
 		return
 	phase = Phase.RETRIEVE
+	_sync_cpu_presence()
 	score.cap_at_limit()
 	var strokes := score.strokes
 	var par := score.par()
@@ -892,6 +987,7 @@ func arrive_on_planted_hole() -> void:
 	skip_preview(false)
 	clubhouse_flow.adopt_planted(self)
 	phase = Phase.PREP
+	_sync_cpu_presence()
 	if not ArenaHole.applies(hole):
 		_aim_at_practice()
 		_place_cart_girl()
@@ -1033,18 +1129,30 @@ func _near_path_tee(who: Node3D) -> bool:
 	return offset.length() <= TEE_ARRIVE_RANGE
 
 
+## Planted holes skip `_rebuild_hole`, so the ball still has the last hole's
+## out-of-bounds until we copy this one over.
+func _sync_ball_bounds() -> void:
+	if ball == null or hole == null:
+		return
+	ball.bounds = hole.bounds
+
+
 func _aim_at_practice() -> void:
 	if ball == null or hole == null:
 		return
+	_sync_ball_bounds()
 	golf.release()
-	ball.place_at(hole.practice_tee)
-	golf.setup(ball, hole.practice_cup, PracticeGreen.span())
+	if hole.has_practice():
+		ball.place_at(hole.practice_tee)
+		golf.setup(ball, hole.practice_cup, PracticeGreen.span())
+		return
+	ball.place_at(hole.tee)
 
 
 func _reset_practice_ball() -> void:
 	golf.release()
 	if hole != null:
-		ball.place_at(hole.practice_tee)
+		ball.place_at(hole.arrival_point())
 
 
 func _begin_transit() -> void:
@@ -1101,7 +1209,7 @@ func _rally_cpus() -> void:
 		return
 	var n := 0
 	for player in _players:
-		if player == null or not player.is_cpu():
+		if player == null or player.brain == null or not player.is_on_course():
 			continue
 		var side := -1.0 if n == 0 else 1.0
 		n += 1
@@ -1115,6 +1223,21 @@ func _rally_cpus() -> void:
 			host.global_position + right * side * 1.4,
 			rad_to_deg(host.rotation.y)
 		)
+
+
+## The solo buddy shops with you only by getting in the way. Park them off the
+## course in the clubhouse and after a hole-out; bring them back on the hole.
+func _sync_cpu_presence(rally := true) -> void:
+	var present := not finished and (phase == Phase.PREP or phase == Phase.PLAYING)
+	var appearing := false
+	for player in _players:
+		if player == null or player.brain == null:
+			continue
+		if present and not player.is_on_course():
+			appearing = true
+		player.set_on_course(present)
+	if appearing and rally:
+		_rally_cpus()
 
 
 func _cover_fade() -> void:
@@ -1163,7 +1286,7 @@ func _update_clubhouse_music() -> void:
 		return
 	var dist := INF
 	for player in _players:
-		if player == null or not is_instance_valid(player):
+		if player == null or not is_instance_valid(player) or not player.is_on_course():
 			continue
 		dist = minf(dist, _flat_to_clubhouse(player.global_position))
 	if dist < INF:
@@ -1174,6 +1297,8 @@ func _check_team_wipe() -> void:
 	if finished:
 		return
 	for player in _players:
+		if player.brain != null and not player.is_on_course():
+			continue
 		if player.health.is_alive():
 			return
 	if ArenaHole.applies(hole) and (phase == Phase.PLAYING or phase == Phase.PREP):

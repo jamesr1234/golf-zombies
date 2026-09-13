@@ -195,7 +195,13 @@ func test_hole_one_does_not_embed_a_mech() -> void:
 func test_hole_one_harvests_a_mech_pad() -> void:
 	var hole := HoleGenerator.generate(0, 20260816)
 	assert_true(hole.has_mech_pad(), "Computer 2 has to receive a host-spawned suit on hole 1")
-	assert_lt(hole.mech_pad.x, -8.0, "the pad sits beside the mill desk, not on the tee")
+	assert_lt(hole.mech_pad.distance_to(hole.tee), 10.0, "beside the play tee")
+	assert_gt(
+		hole.mech_pad.distance_to(hole.practice_tee), 15.0,
+		"not on the practice green"
+	)
+	var left := Vector3.UP.cross(hole.along_tee()).normalized()
+	assert_gt((hole.mech_pad - hole.tee).dot(left), 5.0, "left when facing the hole")
 
 
 func test_zombie_spawn_markers_are_harvested() -> void:

@@ -57,6 +57,25 @@ func test_starting_play_tees_both_balls_apart() -> void:
 	course.free()
 
 
+func test_practice_aim_copies_the_current_holes_bounds() -> void:
+	var course := VsCourse.new()
+	course.hole = HoleGenerator.generate(1, 20260816)
+	assert_false(course.hole.has_practice(), "hole 2 has no warm-up green")
+	var ball := GolfBall.new()
+	ball.bounds = Rect2(9000.0, 9000.0, 1.0, 1.0)
+	add_child_autofree(ball)
+	var golf := GolfController.new()
+	golf.ball = ball
+	add_child_autofree(golf)
+	course.aim_practice([golf])
+	assert_eq(ball.bounds, course.hole.bounds)
+	assert_true(
+		ball.bounds.has_point(Vector2(course.hole.tee.x, course.hole.tee.z)),
+		"the tee cannot start out of bounds"
+	)
+	course.free()
+
+
 func test_four_carts_park_two_on_each_side_of_the_tee() -> void:
 	var left := [VsCourse.cart_offset(0), VsCourse.cart_offset(1)]
 	var right := [VsCourse.cart_offset(2), VsCourse.cart_offset(3)]
@@ -155,6 +174,53 @@ func test_placed_carts_sit_beside_the_tee_not_on_it() -> void:
 	assert_eq(back, 4)
 	for cart in carts:
 		cart.free()
+	course.free()
+
+
+func test_vs_opens_inside_the_clubhouse() -> void:
+	var world := Node3D.new()
+	add_child_autofree(world)
+	var hole_root := Node3D.new()
+	hole_root.name = "HoleRoot"
+	world.add_child(hole_root)
+	var course := VsCourse.new()
+	world.add_child(course)
+	await wait_physics_frames(1)
+	course.rebuild(0, 20260816)
+	var who: Player = preload("res://scenes/players/player.tscn").instantiate()
+	who.set_physics_process(false)
+	who.set_process(false)
+	world.add_child(who)
+	course.begin_in_clubhouse([who], [])
+	assert_not_null(course.clubhouse)
+	assert_not_null(course.shop)
+	assert_true(course.clubhouse.inside(who), "VS starts in the hall, not on the tee")
+	assert_lt(
+		course.clubhouse.exit_point().distance_to(course.hole.practice_tee),
+		course.clubhouse.door_point().distance_to(course.hole.practice_tee),
+		"the back door still opens onto the practice green"
+	)
+	course.free()
+
+
+func test_a_short_transit_faces_the_planted_hole_at_the_path() -> void:
+	var world := Node3D.new()
+	add_child_autofree(world)
+	var hole_root := Node3D.new()
+	hole_root.name = "HoleRoot"
+	world.add_child(hole_root)
+	var course := VsCourse.new()
+	world.add_child(course)
+	await wait_physics_frames(1)
+	course.rebuild(0, 20260816)
+	course.begin_transit([], [], true, 1, 20260816)
+	assert_not_null(course.cart_path)
+	assert_true(course.cart_path.short)
+	assert_not_null(course.next_hole, "the next hole is already on the path")
+	assert_gt(
+		course.next_hole.along_tee().dot(course.cart_path.heading), 0.95,
+		"the planted hole faces the incoming path"
+	)
 	course.free()
 
 

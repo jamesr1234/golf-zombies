@@ -33,16 +33,16 @@ func blocked_cells() -> Dictionary:
 		var oz := int(roundf(node.position.z / CELL))
 		var rotated := node.transform.basis.x.z < -0.5
 		if kind == "wall_small" and rotated:
-			for dz in 2:
+			for dz in 3:
 				_blocked[Vector2i(ox - 1, -oz + dz)] = true
 		elif kind == "wall_small":
-			for dx in 2:
+			for dx in 3:
 				_blocked[Vector2i(ox + dx, -oz)] = true
 		elif kind == "pillar_small" or kind == "cube_extra_small":
 			_blocked[Vector2i(ox, -oz)] = true
 		elif kind == "arch_small":
 			_blocked[Vector2i(ox, -oz)] = true
-			_blocked[Vector2i(ox + 3, -oz)] = true
+			_blocked[Vector2i(ox + 4, -oz)] = true
 	return _blocked
 
 

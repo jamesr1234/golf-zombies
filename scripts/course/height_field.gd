@@ -24,6 +24,8 @@ const DECK := 0.0
 ## The landing strip stays playable. Off it, the rough can actually rise and fall.
 const NOISE_OFF_FAIRWAY := 3.8
 const HILL_BLEND := 14.0
+## Cart-path half-width plus a shoulder, so hills cannot sit under the tarmac.
+const LANE_HALF := 14.5
 
 enum Profile { DOWNHILL, UPHILL, VALLEY, RIDGE, ROLLING }
 
@@ -37,13 +39,17 @@ var max_height := 0.0
 ## World XZ the visual mesh should leave alone, so a later heightmap (the
 ## clubhouse woods) never redraws the hole the player is standing on.
 var hide := Rect2()
+## Parent-node yaw. Samples stay local; queries come in world XZ.
+var yaw := 0.0
+var world_offset := Vector2.ZERO
 
 
 func height_at(x: float, z: float) -> float:
 	if width < 2 or depth < 2:
 		return 0.0
-	var fx := clampf((x - origin.x) / cell, 0.0, float(width - 1) - 0.0001)
-	var fz := clampf((z - origin.y) / cell, 0.0, float(depth - 1) - 0.0001)
+	var local := _to_local(x, z)
+	var fx := clampf((local.x - origin.x) / cell, 0.0, float(width - 1) - 0.0001)
+	var fz := clampf((local.y - origin.y) / cell, 0.0, float(depth - 1) - 0.0001)
 	var x0 := int(fx)
 	var z0 := int(fz)
 	return lerpf(
@@ -58,9 +64,19 @@ func lift(point: Vector3) -> Vector3:
 
 
 func shift(offset: Vector3) -> void:
-	origin += Vector2(offset.x, offset.z)
+	var delta := Vector2(offset.x, offset.z)
+	if absf(yaw) > 0.0001:
+		world_offset += delta
+	else:
+		origin += delta
 	if hide.size != Vector2.ZERO:
-		hide.position += Vector2(offset.x, offset.z)
+		hide.position += delta
+
+
+func rotate_y(radians: float) -> void:
+	if absf(radians) < 0.0001:
+		return
+	yaw += radians
 
 
 func make_body() -> StaticBody3D:
@@ -74,7 +90,22 @@ func make_body() -> StaticBody3D:
 	body.add_child(mesh_node)
 	var center := origin + Vector2(float(width - 1), float(depth - 1)) * cell * 0.5
 	body.position = Vector3(center.x, 0.0, center.y)
+	body.name = "Ground"
 	return body
+
+
+## Rebuild collision and mesh after a later pave, so a cart path is not a hill.
+func refresh_body(body: StaticBody3D) -> void:
+	if body == null:
+		return
+	for child in body.get_children():
+		body.remove_child(child)
+		child.free()
+	body.add_child(_heightmap_collision())
+	var mesh_node := MeshInstance3D.new()
+	mesh_node.mesh = _visual_mesh()
+	mesh_node.material_override = MeshFactory.grid_material(Surface.LOOK[Surface.Type.ROUGH])
+	body.add_child(mesh_node)
 
 
 ## Triangle-mesh collision catches capsules on every cell edge and makes walkers
@@ -177,9 +208,12 @@ static func generate(data: HoleData, rng: RandomNumberGenerator) -> HeightField:
 	field._raise_jumps(data)
 	if not MountainHole.applies(data) and not CulvertHole.applies(data):
 		field._pave_exit(data)
-	field._pave_clubhouse(data)
+	if data.has_practice():
+		field._pave_clubhouse(data)
 	MountainHole.clip(field, data)
 	CulvertHole.clip(field, data)
+	if MountainHole.applies(data) or CulvertHole.applies(data):
+		field._pave_exit(data, LANE_HALF)
 	field._measure()
 	return field
 
@@ -254,15 +288,52 @@ func _raise_jumps(data: HoleData) -> void:
 		_Ramp.raise_ground(self, jump)
 
 
+## Flatten a polyline (cart path, in the field's current space) to `deck`.
+func pave_lane(centerline: Array[Vector3], half: float, deck: float) -> void:
+	if centerline.size() < 2 or width < 2 or depth < 2:
+		return
+	for z in depth:
+		for x in width:
+			var world := _from_local(origin.x + float(x) * cell, origin.y + float(z) * cell)
+			if CartPathTrack.distance_to(centerline, Vector3(world.x, 0.0, world.y)) > half:
+				continue
+			samples[z * width + x] = deck
+
+
+## Flat apron behind the practice tee so the last path straight is still deck.
+func pave_apron(from: Vector3, back: Vector3, span: float, half: float, deck: float) -> void:
+	back.y = 0.0
+	if back.length_squared() < 0.0001 or span <= 0.0:
+		return
+	back = back.normalized()
+	var pad := maxf(half, span) + cell
+	var x0 := maxi(0, int(floor((from.x - pad - origin.x) / cell)))
+	var z0 := maxi(0, int(floor((from.z - pad - origin.y) / cell)))
+	var x1 := mini(width - 1, int(ceil((from.x + pad - origin.x) / cell)))
+	var z1 := mini(depth - 1, int(ceil((from.z + pad - origin.y) / cell)))
+	for z in range(z0, z1 + 1):
+		for x in range(x0, x1 + 1):
+			var wx := origin.x + float(x) * cell
+			var wz := origin.y + float(z) * cell
+			var local := Vector3(wx, 0.0, wz) - Vector3(from.x, 0.0, from.z)
+			var along_m := local.dot(back)
+			if along_m < 0.0 or along_m > span:
+				continue
+			if (local - back * along_m).length() > half:
+				continue
+			samples[z * width + x] = deck
+
+
 ## Flat cart lane from just past the green to the fence, so the drive off the
 ## hole is not a climb through the rough.
-func _pave_exit(data: HoleData) -> void:
+func _pave_exit(data: HoleData, half := -1.0) -> void:
 	var along := data.along_cup()
 	along.y = 0.0
 	if along.length_squared() < 0.0001:
 		return
 	along = along.normalized()
-	var half := maxf(data.fairway_width() * 0.5, CourseTrees.EXIT_HALF)
+	if half < 0.0:
+		half = maxf(data.fairway_width() * 0.5, CourseTrees.EXIT_HALF)
 	var deck := height_at(data.cup.x, data.cup.z)
 	var end := HoleGenerator.exit_end(data)
 	var span := Vector2(end.x - data.cup.x, end.z - data.cup.z).length()
@@ -390,11 +461,12 @@ static func _flatten(h: float, point: Vector3, data: HoleData) -> float:
 		h = DECK
 	else:
 		h = lerpf(h, DECK, 1.0 - clampf((tee_d - 10.0) / 8.0, 0.0, 1.0))
-	var practice_d := point.distance_to(data.practice_center())
-	if practice_d < PracticeGreen.FLAT:
-		h = DECK
-	else:
-		h = lerpf(h, DECK, 1.0 - clampf((practice_d - PracticeGreen.FLAT) / 6.0, 0.0, 1.0))
+	if data.has_practice():
+		var practice_d := point.distance_to(data.practice_center())
+		if practice_d < PracticeGreen.FLAT:
+			h = DECK
+		else:
+			h = lerpf(h, DECK, 1.0 - clampf((practice_d - PracticeGreen.FLAT) / 6.0, 0.0, 1.0))
 	var green_d := point.distance_to(data.cup)
 	var green_flat := data.green_radius + HoleGenerator.FRINGE_WIDTH
 	if green_d < green_flat:
@@ -402,6 +474,20 @@ static func _flatten(h: float, point: Vector3, data: HoleData) -> float:
 	else:
 		h = lerpf(h, DECK, 1.0 - clampf((green_d - green_flat) / 6.0, 0.0, 1.0))
 	return h
+
+
+func _to_local(x: float, z: float) -> Vector2:
+	var point := Vector3(x - world_offset.x, 0.0, z - world_offset.y)
+	if absf(yaw) > 0.0001:
+		point = point.rotated(Vector3.UP, -yaw)
+	return Vector2(point.x, point.z)
+
+
+func _from_local(x: float, z: float) -> Vector2:
+	var point := Vector3(x, 0.0, z)
+	if absf(yaw) > 0.0001:
+		point = point.rotated(Vector3.UP, yaw)
+	return Vector2(point.x, point.z) + world_offset
 
 
 func _sample(x: int, z: int) -> float:

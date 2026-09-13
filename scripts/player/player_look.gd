@@ -26,7 +26,7 @@ var yaw := 0.0
 var pitch := 0.0
 var mouse_delta := Vector2.ZERO
 var view_kick := 0.0
-## Driver and mech: L1 pulls the camera out behind the vehicle.
+## Driver only: L1 pulls the camera out behind the cart.
 var cart_chase := false
 var cheer_left := 0.0
 
@@ -47,8 +47,6 @@ func tick(player: Player, delta: float) -> void:
 			cart_chase = not cart_chase
 		mouse_delta = Vector2.ZERO
 		return
-	if player.is_in_mech() and player.input.just_pressed("melee"):
-		cart_chase = not cart_chase
 	if player.is_celebrating():
 		mouse_delta = Vector2.ZERO
 		return
@@ -102,9 +100,7 @@ func view_transform(player: Player) -> Transform3D:
 	if player.state == Player.State.GOLFING and player.golf != null:
 		return player.golf.get_camera_transform()
 	if player.is_in_mech() and player.mech != null:
-		if cart_chase:
-			return player.mech.chase_view_transform()
-		return drunk_view(player, player.mech.pilot_view_transform(pitch))
+		return drunk_view(player, player.mech.look_view(pitch, player.aiming))
 	if player.is_driving():
 		if cart_chase:
 			return player.cart.chase_view_transform()
@@ -141,11 +137,9 @@ func view_fov(player: Player) -> float:
 	if player.is_celebrating():
 		return CHEER_FOV
 	if player.is_in_mech():
-		if cart_chase:
-			return MechSuit.CHASE_FOV + bump
 		if player.aiming:
 			return ADS_FOV + bump
-		return BASE_FOV + bump
+		return MechSuit.PILOT_FOV + bump
 	if player.is_driving():
 		return (GolfCart.CHASE_FOV if cart_chase else DRIVER_FOV) + bump
 	if player.is_shielding():

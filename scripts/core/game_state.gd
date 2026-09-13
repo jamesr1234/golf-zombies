@@ -41,6 +41,8 @@ var barrier_charges := 0
 var ladder_charges := 0
 ## One mech per round. The placed suit lasts only the hole it was bought on.
 var mech_bought := false
+## Drop charges from a shop buy. Gear aims the suit like a hex fort.
+var mech_charges := 0
 ## Wings you jump off a drop with. One buy, then both players keep them.
 var glide_bought := false
 var club_id := ClubKit.STARTER_ID
@@ -109,6 +111,11 @@ func visits_clubhouse() -> bool:
 
 static func visits_clubhouse_after(next_index: int) -> bool:
 	return next_index > 0 and next_index % CLUBHOUSE_EVERY == 0
+
+
+## Warm-up green only after a clubhouse: the opening hole, then 4, 7, and 10.
+static func has_practice_tee(index: int) -> bool:
+	return index >= 0 and index % CLUBHOUSE_EVERY == 0
 
 
 func total_strokes() -> int:
@@ -184,6 +191,19 @@ func try_place_ladder() -> bool:
 	if ladder_charges <= 0:
 		return false
 	ladder_charges -= 1
+	return true
+
+
+func add_mech_charges(amount: int) -> void:
+	if amount <= 0:
+		return
+	mech_charges += amount
+
+
+func try_place_mech() -> bool:
+	if mech_charges <= 0:
+		return false
+	mech_charges -= 1
 	return true
 
 

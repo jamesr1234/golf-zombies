@@ -84,6 +84,20 @@ static func yaw_at_exit(forward: Vector3) -> float:
 	return rad_to_deg(atan2(-along.x, -along.z))
 
 
+## Local hall spots just inside the front doors, spread across the aisle.
+static func hall_spawns(count: int) -> Array[Dictionary]:
+	var snaps: Array[Dictionary] = []
+	var n := maxi(1, count)
+	var gap := 2.8 if n <= 2 else 1.4
+	for i in n:
+		var side := (float(i) - float(n - 1) * 0.5) * gap
+		snaps.append({
+			"local": Vector3(side, 1.2, DEPTH * 0.5 - 2.8),
+			"yaw": PI,
+		})
+	return snaps
+
+
 ## Hall origin beside a staging tee, doors facing the pad.
 static func at_tee(tee: Vector3, heading: Vector3) -> Vector3:
 	return tee + heading_xz(heading).cross(Vector3.UP).normalized() * TEE_SIDE

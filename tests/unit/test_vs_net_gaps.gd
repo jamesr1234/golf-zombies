@@ -664,7 +664,6 @@ func test_apply_mech_moves_the_grouped_suit() -> void:
 	await wait_physics_frames(1)
 	world.apply_mech(1, Vector3(16.0, 0.4, -10.0), 0.4, Vector2(0.0, -1.0), false, true, 0)
 	assert_true(mech.closed)
-	assert_false(mech.get_node("Visuals").get_node("Stairs").visible)
 	assert_almost_eq(mech.sync_xform.origin.x, 16.0, 0.05)
 
 

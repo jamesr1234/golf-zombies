@@ -234,10 +234,15 @@ static func _edges(mesh_node: MeshInstance3D, xf: Transform3D, boxes: Array[AABB
 	var faces: Array = []
 	for surface in mesh_node.mesh.get_surface_count():
 		var arrs := mesh_node.mesh.surface_get_arrays(surface)
+		if arrs.is_empty() or arrs[Mesh.ARRAY_VERTEX] == null:
+			continue
 		var points: PackedVector3Array = arrs[Mesh.ARRAY_VERTEX]
-		var idx: PackedInt32Array = arrs[Mesh.ARRAY_INDEX]
+		if points.is_empty():
+			continue
+		var idx := PackedInt32Array()
+		if arrs[Mesh.ARRAY_INDEX] != null:
+			idx = arrs[Mesh.ARRAY_INDEX]
 		if idx.is_empty():
-			idx = PackedInt32Array()
 			for vi in points.size():
 				idx.append(vi)
 		var i := 0

@@ -111,9 +111,11 @@ static func clip(field: HeightField, data: HoleData) -> void:
 
 static func keeps(data: HoleData, point: Vector3, half := -1.0) -> bool:
 	var lip := half if half >= 0.0 else _strip_half(data) + LIP
-	if ClubhouseBuild.covers_exit_ground(data.practice_tee, data.cup - data.tee, point, 6.0):
+	if data.has_practice() and ClubhouseBuild.covers_exit_ground(
+		data.practice_tee, data.cup - data.tee, point, 6.0
+	):
 		return true
-	if point.distance_to(data.practice_center()) < PracticeGreen.FLAT + 2.0:
+	if data.has_practice() and point.distance_to(data.practice_center()) < PracticeGreen.FLAT + 2.0:
 		return true
 	if point.distance_to(data.tee) < 11.0:
 		return true

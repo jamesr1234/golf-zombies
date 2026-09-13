@@ -4,6 +4,18 @@ extends GutTest
 const _Elevator := preload("res://scripts/shop/clubhouse_elevator.gd")
 
 
+func test_hall_spawns_spread_inside_the_front_doors() -> void:
+	var pair := ClubhouseBuild.hall_spawns(2)
+	assert_eq(pair.size(), 2)
+	assert_almost_eq(pair[0]["local"].x, -1.4, 0.001)
+	assert_almost_eq(pair[1]["local"].x, 1.4, 0.001)
+	assert_almost_eq(pair[0]["local"].z, ClubhouseBuild.DEPTH * 0.5 - 2.8, 0.001)
+	assert_almost_eq(float(pair[0]["yaw"]), PI, 0.001)
+	var field := ClubhouseBuild.hall_spawns(8)
+	assert_eq(field.size(), 8)
+	assert_lt(field[7]["local"].x - field[0]["local"].x, ClubhouseBuild.WIDTH - 4.0)
+
+
 func test_shops_live_in_their_own_rooms() -> void:
 	var house := Clubhouse.create(Vector3.ZERO, 0.0)
 	add_child_autofree(house)

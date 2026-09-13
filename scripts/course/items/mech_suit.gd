@@ -5,24 +5,28 @@ extends CharacterBody3D
 
 const SCENE := preload("res://scenes/course/items/mech_suit.tscn")
 const _WorldFx := preload("res://scripts/net/world_fx.gd")
-const WALK := 16.0
-const SPRINT := 24.0
 const JUMP := 10.0
-const ACCEL := 14.0
+const STEP_TIME := 0.28
+const SPRINT_STEP_TIME := 0.18
+const STEP_PLANT := 0.1
+const STEP_STICK := 0.35
 const MAX_HP := 8
-const EXIT_SIDE := 12.0
+const EXIT_SIDE := 3.0
 const GOLF_RANGE := 18.0
-const GOLF_SIDE := 6.0
+const GOLF_SIDE := 1.5
 const STANCE_YAW := 0.0
 const FLOOR_SNAP := 0.45
 const FLOOR_MAX_DEG := 55.0
 const PITCH_LIMIT := 85.0
-const CHASE_DISTANCE := 28.0
-const CHASE_HEIGHT := 14.0
-const CHASE_LOOK_HEIGHT := 10.0
-const CHASE_LOOK_AHEAD := 6.0
+const CHASE_DISTANCE := 7.0
+const CHASE_HEIGHT := 3.5
+const CHASE_LOOK_HEIGHT := 2.5
+const CHASE_LOOK_AHEAD := 1.5
 const CHASE_FOV := 88.0
-const BOARD_REACH := 2.4
+const PILOT_FOV := 102.0
+const BOARD_REACH := 3.2
+## Feet sit a hair above the heightmap so the soles do not clip the turf.
+const STAND_LIFT := 0.28
 
 var owner_player: Player
 var owner_peer := 0
@@ -38,7 +42,17 @@ var _want_reload := false
 var _drawn_closed := false
 var _wire_left := 0.0
 var _predicting := false
+var _step_left := 0.0
+var _step_dur := 0.0
+var _step_t := 0.0
+var _step_to := Vector3.ZERO
+var _step_moving := false
+var _left_swing := false
+var _plant_left := 0.0
+var _queued := Vector2.ZERO
 
+## Meters the suit lunges on one tap. Hold the stick to keep stomping.
+@export_range(0.5, 12.0, 0.1) var step_distance := 3.5
 @export var closed := false
 @export var hp := MAX_HP
 @export var sync_stick := Vector2.ZERO
@@ -47,6 +61,7 @@ var _predicting := false
 @export var sync_pitch := 0.0
 @export var sync_mag := MechCombat.MAG_SIZE
 @export var sync_reload := false
+@export var sync_strafe := 0.0
 @export var sync_xform := Transform3D.IDENTITY:
 	set(value):
 		sync_xform = value
@@ -89,16 +104,20 @@ static func spawn_near(buyer: Player) -> MechSuit:
 	if buyer == null:
 		return null
 	var pose := MechPlacer.place(buyer)
-	var at: Vector3 = pose["at"]
-	var yaw := float(pose["yaw"])
+	return drop(buyer, pose["at"], float(pose["yaw"]))
+
+
+static func drop(buyer: Player, at: Vector3, yaw_deg: float) -> MechSuit:
+	if buyer == null:
+		return null
 	if NetSession.is_active():
 		var spawner := _vs_spawner(buyer)
 		if spawner != null:
-			var mech := spawner.spawn_mech(at, yaw, buyer.peer_id)
+			var mech := spawner.spawn_mech(at, yaw_deg, buyer.peer_id)
 			if mech != null:
 				mech.bind_owner(buyer)
 			return mech
-	return spawn(_parent_of(buyer), at, yaw, buyer)
+	return spawn(_parent_of(buyer), at, yaw_deg, buyer)
 
 
 static func _vs_spawner(buyer: Player) -> VsSpawner:
@@ -112,7 +131,7 @@ static func spawn(parent: Node, at: Vector3, yaw_deg: float, buyer: Player = nul
 		return null
 	var mech: MechSuit = SCENE.instantiate()
 	parent.add_child(mech)
-	mech.global_position = at
+	mech.global_position = stand_point(at)
 	mech.rotation.y = deg_to_rad(yaw_deg)
 	mech.bind_owner(buyer)
 	Sfx.play("place_barrier", mech)
@@ -126,7 +145,7 @@ static func plant_on_hole(parent: Node, hole: HoleData) -> MechSuit:
 		for node in parent.get_tree().get_nodes_in_group("mechs"):
 			if node is MechSuit and parent.is_ancestor_of(node):
 				return node as MechSuit
-	return spawn(parent, hole.mech_pad + Vector3.UP * 0.05, hole.mech_yaw)
+	return spawn(parent, hole.mech_stand(), hole.mech_face())
 
 
 static func release_all(tree: SceneTree) -> void:
@@ -191,7 +210,7 @@ func wreck() -> void:
 	var at := global_position + Vector3.UP * MechVisuals.HEIGHT * 0.45
 	release_pilot()
 	var root := get_tree().get_first_node_in_group("fx_root") if is_inside_tree() else null
-	HitFx.blast(root, at, 12.0, Palette.MECH)
+	HitFx.blast(root, at, 4.0, Palette.MECH)
 	Sfx.play("rocket_explode", self)
 	queue_free()
 
@@ -227,6 +246,10 @@ func allies() -> Array:
 		if pilot.partner != null and not list.has(pilot.partner):
 			list.append(pilot.partner)
 	return list
+
+
+static func stand_point(at: Vector3) -> Vector3:
+	return at + Vector3.UP * STAND_LIFT
 
 
 func stand_at(at: Vector3, yaw_deg: float) -> void:
@@ -275,9 +298,20 @@ func golf_stance_point(lie: Vector3, aim_yaw_deg: float) -> Vector3:
 
 
 func pilot_view_transform(pitch_deg: float) -> Transform3D:
-	if view == null:
-		return global_transform
-	var xform := view.global_transform
+	return _eye_view(MechVisuals.view_local(), pitch_deg)
+
+
+func scope_view_transform(pitch_deg: float) -> Transform3D:
+	return _eye_view(MechVisuals.scope_local(), pitch_deg)
+
+
+func look_view(pitch_deg: float, scoped: bool) -> Transform3D:
+	return scope_view_transform(pitch_deg) if scoped else pilot_view_transform(pitch_deg)
+
+
+func _eye_view(local: Vector3, pitch_deg: float) -> Transform3D:
+	var xform := global_transform
+	xform.origin += global_transform.basis * local
 	xform.basis = Basis.from_euler(Vector3(deg_to_rad(pitch_deg), rotation.y, 0.0))
 	return xform
 
@@ -307,6 +341,7 @@ func _physics_process(delta: float) -> void:
 	sync_mag = combat.mag
 	sync_reload = combat.is_reloading()
 	if not closed:
+		sync_strafe = 0.0
 		velocity = Vector3.ZERO
 		_tick_visuals(delta)
 		sync_xform = global_transform
@@ -401,14 +436,13 @@ func _tick_visuals(delta: float) -> void:
 	if _drawn_closed != closed:
 		_drawn_closed = closed
 		_apply_closed()
-	var pace := 0.0
+	if _watching() and not _predicting:
+		_watch_stride(delta)
 	if closed:
-		if _predicting or not _watching():
-			pace = Vector2(velocity.x, velocity.z).length() / SPRINT
-		else:
-			var stick := sync_stick.length()
-			pace = stick if sync_sprint else stick * (WALK / SPRINT)
-	_visuals.animate(delta, pace)
+		_visuals.stride(delta, _step_t, _left_swing, _step_moving)
+	else:
+		_visuals.stride(delta, 0.0, _left_swing, false)
+	_visuals.show_strafe(sync_strafe if closed else 0.0)
 
 
 func _drive(delta: float) -> void:
@@ -418,23 +452,118 @@ func _drive(delta: float) -> void:
 		velocity = Vector3.ZERO
 		_want_fire = false
 		_want_reload = false
+		sync_strafe = 0.0
+		_clear_step()
 		return
-	var stick := _stick()
-	var wish := (transform.basis * Vector3(stick.x, 0.0, stick.y))
-	wish.y = 0.0
-	var speed := SPRINT if _sprinting() else WALK
-	if wish.length_squared() > 0.0001:
-		wish = wish.normalized() * minf(1.0, stick.length()) * speed
 	if not is_on_floor():
 		velocity += get_gravity() * delta
 	if _jumped() and is_on_floor():
 		velocity.y = JUMP
 		Sfx.play("jump", self)
-	velocity.x = move_toward(velocity.x, wish.x, ACCEL * delta)
-	velocity.z = move_toward(velocity.z, wish.z, ACCEL * delta)
+	if is_stepping():
+		_advance_step(delta)
+	elif _plant_left > 0.0:
+		_plant_left -= delta
+		velocity.x = 0.0
+		velocity.z = 0.0
+		_queue_step(_stick())
+	elif try_step(_stick()):
+		_advance_step(delta)
+	else:
+		velocity.x = 0.0
+		velocity.z = 0.0
 	move_and_slide()
 	_aim()
 	_fight()
+
+
+func is_stepping() -> bool:
+	return _step_left > 0.0
+
+
+func try_step(stick: Vector2) -> bool:
+	_queue_step(stick)
+	if is_stepping() or _plant_left > 0.0:
+		return false
+	var dir := stick if stick.length() >= STEP_STICK else _queued
+	_queued = Vector2.ZERO
+	if dir.length() < STEP_STICK:
+		return false
+	return _begin_step(dir)
+
+
+func _begin_step(stick: Vector2) -> bool:
+	var wish := transform.basis * Vector3(stick.x, 0.0, stick.y)
+	wish.y = 0.0
+	if wish.length_squared() < 0.0001:
+		return false
+	_step_to = global_position + wish.normalized() * step_distance
+	_step_dur = SPRINT_STEP_TIME if _sprinting() else STEP_TIME
+	_step_left = _step_dur
+	_step_t = 0.0
+	_left_swing = not _left_swing
+	_step_moving = true
+	return true
+
+
+func _advance_step(delta: float) -> void:
+	var remain := _step_to - global_position
+	remain.y = 0.0
+	if _step_left <= delta or remain.length() <= 0.02:
+		velocity.x = remain.x / maxf(delta, 0.001)
+		velocity.z = remain.z / maxf(delta, 0.001)
+		_step_t = 1.0
+		_step_left = 0.0
+		_step_moving = false
+		_plant_left = STEP_PLANT
+		return
+	var speed := remain.length() / _step_left
+	var toward := remain / remain.length()
+	velocity.x = toward.x * speed
+	velocity.z = toward.z * speed
+	_step_t = clampf(1.0 - _step_left / maxf(_step_dur, 0.001), 0.0, 1.0)
+	_step_left -= delta
+
+
+func _queue_step(stick: Vector2) -> void:
+	if stick.length() >= STEP_STICK:
+		_queued = stick
+
+
+func _clear_step() -> void:
+	_step_left = 0.0
+	_step_t = 0.0
+	_step_moving = false
+	_plant_left = 0.0
+	_queued = Vector2.ZERO
+
+
+func _watch_stride(delta: float) -> void:
+	if not closed:
+		_clear_step()
+		return
+	if sync_stick.length() < STEP_STICK:
+		_step_moving = false
+		return
+	if is_stepping():
+		_step_t = clampf(_step_t + delta / maxf(_step_dur, 0.001), 0.0, 1.0)
+		_step_left -= delta
+		if _step_left > 0.0:
+			return
+		_step_t = 1.0
+		_step_left = 0.0
+		_step_moving = false
+		_plant_left = STEP_PLANT
+		return
+	if _plant_left > 0.0:
+		_plant_left -= delta
+		if _plant_left > 0.0:
+			return
+	_step_dur = SPRINT_STEP_TIME if sync_sprint else STEP_TIME
+	_step_left = _step_dur
+	_step_t = 0.0
+	_left_swing = not _left_swing
+	_step_moving = true
 
 
 func _aim() -> void:
@@ -470,7 +599,7 @@ func _fight() -> void:
 	if reload:
 		combat.try_reload()
 	if fire:
-		combat.try_fire(self, pilot_view_transform(sync_pitch), pilot)
+		combat.try_fire(self, look_view(sync_pitch, pilot.aiming), pilot)
 
 
 func _reads_local_input() -> bool:
@@ -482,9 +611,23 @@ func _reads_local_input() -> bool:
 
 
 func _stick() -> Vector2:
+	var stick := sync_stick
 	if _reads_local_input():
-		return pilot.input.move_vector()
-	return sync_stick
+		stick = pilot.input.move_vector()
+	var strafe := _strafe()
+	if absf(strafe) > 0.01:
+		stick.x += strafe
+		if stick.length() > 1.0:
+			stick = stick.normalized()
+	return stick
+
+
+func _strafe() -> float:
+	if pilot != null and _reads_local_input() and not pilot.is_golfing():
+		var left := 1.0 if pilot.input.pressed("melee") else 0.0
+		var right := 1.0 if pilot.input.pressed("shield") else 0.0
+		sync_strafe = right - left
+	return sync_strafe
 
 
 func _sprinting() -> bool:
@@ -512,11 +655,13 @@ func _seat_pilot() -> void:
 
 
 func _in_cockpit(player: Player) -> bool:
-	if cockpit == null or player == null:
+	if player == null:
 		return false
-	return cockpit.overlaps_body(player) or player.global_position.distance_to(
-		cockpit.global_position
-	) <= BOARD_REACH
+	var to := player.global_position - global_position
+	to.y = 0.0
+	if to.length() <= BOARD_REACH:
+		return true
+	return cockpit != null and cockpit.overlaps_body(player)
 
 
 func _do_close(player: Player) -> void:
@@ -541,7 +686,6 @@ func _apply_closed() -> void:
 	if _visuals == null:
 		return
 	MechVisuals.set_closed(_visuals, closed)
-	MechVisuals.set_stairs_solid(self, not closed)
 
 
 func _broadcast_pilot() -> void:
@@ -554,10 +698,11 @@ func _peer_of(player: Player) -> int:
 
 
 func apply_pilot_report(
-	stick: Vector2, sprint: bool, yaw: float, pitch: float, jumped: bool
+	stick: Vector2, sprint: bool, yaw: float, pitch: float, jumped: bool, strafe := 0.0
 ) -> void:
 	sync_stick = stick
 	sync_sprint = sprint
+	sync_strafe = strafe
 	_net_yaw = yaw
 	sync_pitch = clampf(pitch, -PITCH_LIMIT, PITCH_LIMIT)
 	if jumped:
@@ -596,11 +741,11 @@ func _replicate_pilot(peer_id: int) -> void:
 
 @rpc("any_peer", "unreliable")
 func report_pilot(
-	stick: Vector2, sprint: bool, yaw: float, pitch: float, jumped: bool
+	stick: Vector2, sprint: bool, yaw: float, pitch: float, jumped: bool, strafe := 0.0
 ) -> void:
 	if not _accept_pilot_rpc():
 		return
-	apply_pilot_report(stick, sprint, yaw, pitch, jumped)
+	apply_pilot_report(stick, sprint, yaw, pitch, jumped, strafe)
 
 
 @rpc("any_peer", "reliable")

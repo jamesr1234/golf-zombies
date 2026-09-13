@@ -1,8 +1,8 @@
 class_name PracticeGreen
 extends Object
-## Warm-up hole behind every tee, on the line of the drive. Putting here is free:
-## the hole itself does not start, and the swarm does not arrive, until someone
-## steps on the tee.
+## Warm-up hole behind the tee after a clubhouse. Putting here is free: the hole
+## itself does not start, and the swarm does not arrive, until someone steps on
+## the tee.
 
 ## A short par-three of a green sitting between the clubhouse exit and the tee.
 const WIDTH := 14.0

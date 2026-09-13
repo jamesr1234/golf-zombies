@@ -272,6 +272,16 @@ func test_a_custom_hole_keeps_the_width_it_was_built_with() -> void:
 	assert_gt(wide.fairway_width(), HoleGenerator.fairway_width(hole.par(), FairwayPiece.INDEX))
 
 
+func test_a_custom_hole_only_gets_a_practice_tee_after_a_clubhouse() -> void:
+	var hole := CustomHole.create("Warm Up")
+	var opening := CustomLayout.build(hole)
+	assert_true(opening.has_practice(), "playtest and hole 1 open behind the tee")
+	var mid := CustomLayout.build(hole, 0, 1)
+	assert_false(mid.has_practice(), "a hole-2 slot has no warm-up green")
+	var after_shop := CustomLayout.build(hole, 0, 3)
+	assert_true(after_shop.has_practice(), "hole 4 follows the clubhouse")
+
+
 ## The fairway has to be the flat deck obstacle blocks snap onto, exactly as it
 ## is on a generated hole.
 func test_the_middle_of_the_fairway_is_flat() -> void:
@@ -289,6 +299,21 @@ func test_a_placement_off_the_strip_is_dropped() -> void:
 	assert_false(hole.covers(hole.placements[1][CustomHole.POSITION]))
 	hole.prune_placements()
 	assert_eq(hole.placements.size(), 1)
+
+
+func test_erasing_a_hole_keeps_its_name_and_width() -> void:
+	var hole := CustomHole.create("Wipe Me")
+	hole.fairway_size = FairwayPiece.Width.LARGE
+	hole.append_piece(FairwayPiece.index_of("straight"))
+	hole.add_placement(CUBE, Vector3(0.0, 0.0, -20.0))
+	var id := hole.id
+	var start := FairwayPiece.starter()
+	hole.erase()
+	assert_eq(hole.id, id)
+	assert_eq(hole.title, "Wipe Me")
+	assert_eq(hole.fairway_size, FairwayPiece.Width.LARGE)
+	assert_eq(Array(hole.pieces), Array(start))
+	assert_eq(hole.placements.size(), 0)
 
 
 func test_dropping_the_last_piece_takes_its_props_with_it() -> void:

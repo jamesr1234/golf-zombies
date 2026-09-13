@@ -56,27 +56,67 @@ func test_redo_puts_the_last_take_back() -> void:
 	var history := CreatorHistory.new()
 	var tool := FairwayTool.new(hole)
 	tool.pick(FairwayPiece.index_of("straight"))
+	var empty := hole.to_dict()
 	assert_true(tool.place())
+	history.record(empty)
 	var with_piece := hole.pieces.size()
-	var before := hole.to_dict()
-	assert_true(tool.undo())
+	assert_true(history.undo(hole))
 	assert_lt(hole.pieces.size(), with_piece)
-	history.stash(before)
 	assert_true(history.redo(hole))
 	assert_eq(hole.pieces.size(), with_piece)
-	assert_false(history.can_redo(), "one take-back, one redo")
+	assert_false(history.can_redo(), "the redo side is empty after walking forward")
+	assert_true(history.can_undo(), "the take-back is still on the undo side")
 
 
 func test_redo_puts_an_erased_piece_back() -> void:
 	var hole := CustomHole.create("Erase Redo")
-	hole.add_placement(CUBE, Vector3(0.0, 0.0, -20.0))
 	var history := CreatorHistory.new()
-	history.stash(hole.to_dict())
-	hole.remove_placement(0)
+	var empty := hole.to_dict()
+	hole.add_placement(CUBE, Vector3(0.0, 0.0, -20.0))
+	history.record(empty)
+	assert_true(history.undo(hole))
 	assert_eq(hole.placements.size(), 0)
 	assert_true(history.redo(hole))
 	assert_eq(hole.placements.size(), 1)
 	assert_eq(String(hole.placements[0][CustomHole.PATH]), CUBE)
+
+
+func test_history_walks_every_change() -> void:
+	var hole := CustomHole.create("Stack")
+	var history := CreatorHistory.new()
+	var tool := FairwayTool.new(hole)
+	tool.pick(FairwayPiece.index_of("straight"))
+	var sizes: Array[int] = [hole.pieces.size()]
+	for _i in 3:
+		var before := hole.to_dict()
+		assert_true(tool.place())
+		history.record(before)
+		sizes.append(hole.pieces.size())
+	for i in range(3, 0, -1):
+		assert_true(history.undo(hole))
+		assert_eq(hole.pieces.size(), sizes[i - 1])
+	assert_false(history.can_undo())
+	for i in 3:
+		assert_true(history.redo(hole))
+		assert_eq(hole.pieces.size(), sizes[i + 1])
+	assert_false(history.can_redo())
+
+
+func test_a_new_change_drops_the_redo_side() -> void:
+	var hole := CustomHole.create("Branch")
+	var history := CreatorHistory.new()
+	var tool := FairwayTool.new(hole)
+	tool.pick(FairwayPiece.index_of("straight"))
+	var first := hole.to_dict()
+	assert_true(tool.place())
+	history.record(first)
+	assert_true(history.undo(hole))
+	var branched := hole.to_dict()
+	tool.pick(FairwayPiece.index_of("gentle_left"))
+	assert_true(tool.place())
+	history.record(branched)
+	assert_false(history.can_redo(), "a new place cannot jump back onto the dropped hole")
+	assert_true(history.can_undo())
 
 
 func test_the_fairway_tool_lays_pieces_and_takes_them_back() -> void:
@@ -641,6 +681,46 @@ func test_an_existing_hole_skips_the_width_pick() -> void:
 	assert_eq(creator.hole.fairway_size, FairwayPiece.Width.SMALL)
 
 
+func test_the_creator_opens_behind_the_tee() -> void:
+	GameSettings.edit_custom(CustomHole.create("Tee Start"))
+	var creator: CreatorMode = load("res://scenes/creator/hole_creator.tscn").instantiate()
+	add_child_autofree(creator)
+	await wait_frames(1)
+	var data := creator._world.data
+	assert_not_null(data)
+	var expected := data.tee - data.along_tee() * 26.0 + Vector3.UP * CreatorCamera.LIFT
+	assert_almost_eq(creator._camera.global_position.distance_to(expected), 0.0, 0.2)
+
+
+## Play and playtest both load world.tscn, which may be parked on a later cup
+## for generated-course checks. A hole chosen in the creator still starts on
+## the practice green of that hole.
+func test_a_creator_hole_starts_at_the_tee() -> void:
+	var hole := CustomHole.create("From Creator")
+	GameSettings.play_custom(hole)
+	var world: Node3D = load("res://scenes/world.tscn").instantiate()
+	add_child_autofree(world)
+	var flow := world.get_node("MatchFlow") as MatchFlow
+	var who := world.get_node("Players/Player1") as Player
+	flow.start_at_cup = true
+	flow.starting_hole = 4
+	flow.start_in_clubhouse = false
+	flow.start_on_cart_path = false
+	flow.start_to_clubhouse = false
+	flow.cpu_drives_at_start = false
+	flow.begin()
+	await wait_physics_frames(6)
+	assert_eq(flow.phase, MatchFlow.Phase.PREP)
+	assert_eq(flow.score.hole_index, 0)
+	assert_eq(flow.score.pars.size(), 1)
+	var to_practice := who.global_position - flow.hole.practice_tee
+	to_practice.y = 0.0
+	assert_lt(to_practice.length(), 8.0, "you start behind the tee, not at the cup")
+	var to_cup := who.global_position - flow.hole.cup
+	to_cup.y = 0.0
+	assert_gt(to_cup.length(), 20.0, "the cup is down the hole")
+
+
 ## A player-made hole is a card of one, so holing out ends the round instead of
 ## sending you on to a hole that was never built.
 func test_a_custom_round_is_a_card_of_one_hole() -> void:
@@ -663,10 +743,11 @@ func test_no_command_key_is_already_flying_the_camera() -> void:
 	var flying: Array[Key] = [KEY_W, KEY_A, KEY_S, KEY_D, KEY_SPACE, KEY_Z, KEY_SHIFT]
 	assert_gt(creator._pad._keys.size(), 0)
 	for key in creator._pad._keys:
-		if key == KEY_S:
+		if key == KEY_S or key == KEY_Z:
 			continue
 		assert_false(flying.has(key), "key %d also moves the camera" % key)
 	assert_true(creator._pad._keys.has(KEY_S), "ctrl+S still saves")
+	assert_true(creator._pad._keys.has(KEY_Z), "ctrl+Z still undoes")
 
 
 ## The camera flies on the sticks, Triangle (up) and Cross (down). A command
@@ -686,7 +767,8 @@ func test_the_pad_reaches_every_command() -> void:
 	await wait_frames(1)
 	for command in ["confirm", "cancel", "step_piece", "step_shelf", "side", "cycle_tool",
 			"draw_weapon_line", "ask_group", "ask_save", "playtest", "overview",
-			"toggle_menu", "toggle_yaw_snap", "context", "snap_surface", "redo_change"]:
+			"toggle_menu", "toggle_help", "toggle_yaw_snap", "context", "snap_surface",
+			"undo_change", "redo_change", "erase_hole"]:
 		assert_true(creator.has_method(command), command)
 	creator.toggle_menu()
 	assert_true(creator.menu_is_open())
@@ -721,6 +803,95 @@ func test_closing_the_name_field_does_not_need_a_viewport() -> void:
 	assert_false(ui.is_typing())
 	remove_child(ui)
 	ui._mark_handled()
+
+
+func test_the_creator_walks_history_back_and_forward() -> void:
+	var creator: CreatorMode = load("res://scenes/creator/hole_creator.tscn").instantiate()
+	add_child_autofree(creator)
+	await wait_frames(1)
+	creator._fairway.pick(FairwayPiece.index_of("straight"))
+	var start := creator.hole.pieces.size()
+	creator.confirm()
+	creator.confirm()
+	creator.confirm()
+	assert_eq(creator.hole.pieces.size(), start + 3)
+	creator.undo_change()
+	creator.undo_change()
+	assert_eq(creator.hole.pieces.size(), start + 1)
+	creator.redo_change()
+	assert_eq(creator.hole.pieces.size(), start + 2)
+	creator.undo_change()
+	creator.undo_change()
+	assert_eq(creator.hole.pieces.size(), start)
+	assert_false(creator._history.can_undo())
+	creator.undo_change()
+	assert_eq(creator.hole.pieces.size(), start, "an empty stack stays put")
+	creator.redo_change()
+	creator.redo_change()
+	creator.redo_change()
+	assert_eq(creator.hole.pieces.size(), start + 3)
+	assert_false(creator._history.can_redo())
+
+
+func test_releasing_l1_without_a_chord_still_cycles_the_tool() -> void:
+	var creator: CreatorMode = load("res://scenes/creator/hole_creator.tscn").instantiate()
+	add_child_autofree(creator)
+	await wait_frames(1)
+	assert_eq(creator.tool, CreatorMode.Tool.FAIRWAY)
+	creator._pad._mark_l1(true)
+	assert_eq(creator.tool, CreatorMode.Tool.FAIRWAY, "the hold is only the modifier")
+	creator._pad._mark_l1(false)
+	assert_eq(creator.tool, CreatorMode.Tool.GROUP, "a tap still walks back a tool")
+	creator._pad.apply_history_hold(true, true, false, 0.016)
+	creator._pad._mark_l1(true)
+	creator._pad._mark_l1(false)
+	assert_eq(creator.tool, CreatorMode.Tool.GROUP, "L1+Circle does not also change tools")
+
+
+func test_l1_circle_and_triangle_walk_history() -> void:
+	var creator: CreatorMode = load("res://scenes/creator/hole_creator.tscn").instantiate()
+	add_child_autofree(creator)
+	await wait_frames(1)
+	creator._fairway.pick(FairwayPiece.index_of("straight"))
+	creator.confirm()
+	creator.confirm()
+	var after := creator.hole.pieces.size()
+	assert_false(creator._pad.apply_history_hold(false, true, false, 0.016))
+	assert_eq(creator.hole.pieces.size(), after, "Circle alone still holds, it does not undo")
+	assert_true(creator._pad.apply_history_hold(true, true, false, 0.016))
+	assert_eq(creator.hole.pieces.size(), after - 1)
+	assert_true(creator._pad.apply_history_hold(true, false, true, 0.016))
+	assert_eq(creator.hole.pieces.size(), after)
+	assert_true(creator._pad.apply_history_hold(true, true, false, 0.016))
+	assert_true(creator._pad.apply_history_hold(true, true, false, 0.016), "held L1+Circle keeps stepping")
+	assert_eq(creator.hole.pieces.size(), after - 1, "the first hold wait has not elapsed")
+	assert_true(creator._pad.apply_history_hold(true, true, false, CreatorPad.CHORD_FIRST))
+	assert_eq(creator.hole.pieces.size(), after - 2)
+
+
+func test_the_hints_name_the_history_chords() -> void:
+	assert_true(CreatorPad.HINT.contains("CTRL+Z UNDO"))
+	assert_true(CreatorPad.HINT.contains("CTRL+Y REDO"))
+	assert_true(CreatorPad.HINT.contains("H HELP"))
+	assert_true(CreatorPad.PAD_HINT.contains("L1+CIRCLE UNDO"))
+	assert_true(CreatorPad.PAD_HINT.contains("L1+TRIANGLE REDO"))
+	assert_true(CreatorPad.PAD_HINT.contains("L1+R1 HELP"))
+
+
+func test_a_bare_z_does_not_undo() -> void:
+	var creator: CreatorMode = load("res://scenes/creator/hole_creator.tscn").instantiate()
+	add_child_autofree(creator)
+	await wait_frames(1)
+	creator._fairway.pick(FairwayPiece.index_of("straight"))
+	creator.confirm()
+	var after := creator.hole.pieces.size()
+	var bare := InputEventKey.new()
+	bare.physical_keycode = KEY_Z
+	creator._pad.on_key(bare)
+	assert_eq(creator.hole.pieces.size(), after)
+	bare.ctrl_pressed = true
+	creator._pad.on_key(bare)
+	assert_eq(creator.hole.pieces.size(), after - 1)
 
 
 func test_a_bare_s_does_not_open_the_save_prompt() -> void:
@@ -824,12 +995,60 @@ func test_circle_does_the_tool_in_hand() -> void:
 	assert_true(creator._place.is_gating(), "place Circle draws a weapon line")
 
 
-func test_the_hints_stay_on() -> void:
+func test_the_pause_menu_asks_before_erasing_the_hole() -> void:
+	var hole := CustomHole.create("Keep Going")
+	hole.append_piece(FairwayPiece.index_of("straight"))
+	hole.add_placement(CUBE, Vector3(0.0, 0.0, -20.0))
+	var pieces := hole.pieces.size()
+	GameSettings.edit_custom(hole)
+	var creator: CreatorMode = load("res://scenes/creator/hole_creator.tscn").instantiate()
+	add_child_autofree(creator)
+	await wait_frames(1)
+	var erase_at := _menu_row(creator._ui, "Erase hole")
+	assert_gte(erase_at, 0, "the pause menu has to offer erase")
+	creator.toggle_menu()
+	assert_true(creator.menu_is_open())
+	creator._ui._menu_pick = erase_at
+	creator.pick_menu()
+	assert_false(creator.menu_is_open())
+	assert_true(creator._ui.confirming())
+	assert_eq(creator._ui._confirm.prompt(), HudStyle.chrome(CreatorConfirm.PROMPT))
+	creator._ui._confirm._open = true
+	creator._ui._confirm._pick = 1
+	creator._ui._confirm.confirm()
+	assert_false(creator._ui.confirming())
+	assert_eq(creator.hole.pieces.size(), pieces, "backing out leaves the hole as it was")
+	assert_eq(creator.hole.placements.size(), 1)
+
+
+func test_confirming_erase_wipes_the_hole() -> void:
+	var hole := CustomHole.create("Start Over")
+	hole.fairway_size = FairwayPiece.Width.MEDIUM
+	hole.append_piece(FairwayPiece.index_of("straight"))
+	hole.add_placement(CUBE, Vector3(0.0, 0.0, -20.0))
+	GameSettings.edit_custom(hole)
+	var creator: CreatorMode = load("res://scenes/creator/hole_creator.tscn").instantiate()
+	add_child_autofree(creator)
+	await wait_frames(1)
+	creator._ui.ask_erase()
+	creator._ui._confirm._open = true
+	creator._ui._confirm._pick = 0
+	creator._ui._confirm.confirm()
+	assert_false(creator._ui.confirming())
+	assert_eq(Array(creator.hole.pieces), Array(FairwayPiece.starter()))
+	assert_eq(creator.hole.placements.size(), 0)
+	assert_eq(creator.hole.title, "Start Over")
+	assert_eq(creator.hole.fairway_size, FairwayPiece.Width.MEDIUM)
+	assert_eq(creator._ui._flash.text, HudStyle.chrome("HOLE ERASED"))
+	creator.undo_change()
+	assert_eq(creator.hole.pieces.size(), FairwayPiece.starter().size() + 1)
+	assert_eq(creator.hole.placements.size(), 1)
+
+
+func test_the_hole_readout_stays_on() -> void:
 	var ui := CreatorUi.create()
 	add_child_autofree(ui)
 	await wait_frames(1)
-	assert_true(ui._key_hint.visible)
-	assert_true(ui._pad_hint.visible)
 	assert_true(ui._stat.visible)
 
 
@@ -864,6 +1083,97 @@ func test_the_browser_lists_what_was_saved() -> void:
 	assert_eq(browser.rows.size(), 1)
 	assert_false(browser.picking_new())
 	assert_eq(String(browser.rows[browser.picked - 1]["title"]), "Alpha")
+
+
+func test_help_starts_closed_and_toggles() -> void:
+	var creator: CreatorMode = load("res://scenes/creator/hole_creator.tscn").instantiate()
+	add_child_autofree(creator)
+	await wait_frames(1)
+	assert_false(creator.help_is_open())
+	assert_false(creator._ui.help_is_visible())
+	creator.toggle_help()
+	assert_true(creator.help_is_open())
+	assert_true(creator._ui.help_is_visible())
+	creator.toggle_help()
+	assert_false(creator.help_is_open())
+	assert_false(creator._ui.help_is_visible())
+
+
+func test_h_toggles_help_and_triangle_does_not() -> void:
+	var creator: CreatorMode = load("res://scenes/creator/hole_creator.tscn").instantiate()
+	add_child_autofree(creator)
+	await wait_frames(1)
+	assert_false(CreatorPad.BUTTONS.has("talk"), "Share is not the help bind")
+	assert_false(CreatorPad.BUTTONS.has("revive"), "Triangle still climbs, it is not help")
+	assert_true(creator._pad._keys.has(KEY_H))
+	var key := InputEventKey.new()
+	key.physical_keycode = KEY_H
+	creator._pad.on_key(key)
+	assert_true(creator.help_is_open())
+	creator.toggle_menu()
+	await wait_frames(1)
+	assert_true(creator.help_is_open(), "the wanted state stays while the menu is up")
+	assert_false(creator._ui.help_is_visible(), "the list hides so the menu can be read")
+
+
+func test_l1_and_r1_together_toggle_help() -> void:
+	var creator: CreatorMode = load("res://scenes/creator/hole_creator.tscn").instantiate()
+	add_child_autofree(creator)
+	await wait_frames(1)
+	assert_eq(creator.tool, CreatorMode.Tool.FAIRWAY)
+	assert_false(creator._pad.apply_help_chord(true, false, false, true))
+	assert_false(creator.help_is_open(), "R1 alone still walks the tool, it is not help")
+	assert_false(creator._pad.apply_help_chord(false, true, true, false))
+	assert_false(creator.help_is_open(), "L1 alone is still the previous-tool tap")
+	assert_true(creator._pad.apply_help_chord(true, true, false, true))
+	assert_true(creator.help_is_open())
+	creator._pad._mark_l1(false)
+	assert_eq(creator.tool, CreatorMode.Tool.FAIRWAY, "L1+R1 does not also change tools")
+	assert_true(creator._pad.apply_help_chord(true, true, true, false))
+	assert_false(creator.help_is_open(), "the other shoulder can close it")
+
+
+func test_help_rows_cover_the_live_pad_commands() -> void:
+	var help_script := load("res://scripts/creator/creator_help.gd")
+	var labels: PackedStringArray = help_script.labels()
+	for needle in [
+		"Place / confirm", "Take back", "Undo", "Redo", "Climb", "Drop",
+		"Previous / next tool", "This list"
+	]:
+		assert_true(labels.has(needle), needle)
+	for row in help_script.ROWS:
+		for icon in row["icons"]:
+			var path := "res://assets/ui/pad/pad_%s.png" % String(icon)
+			assert_true(ResourceLoader.exists(path), path)
+
+
+func test_help_rows_fit_inside_the_panel() -> void:
+	var help := CreatorHelp.create()
+	add_child_autofree(help)
+	help.toggle()
+	await wait_frames(2)
+	var box := help.get_global_rect()
+	assert_lte(box.size.x, CreatorHelp.PANEL_WIDTH + 1.0)
+	assert_gt(help.get_child_count(), 0)
+	var column := help.get_child(0) as Control
+	assert_not_null(column)
+	for child in column.get_children():
+		var row := child as Control
+		assert_not_null(row)
+		var inside := box.grow(-4.0)
+		assert_true(
+			inside.intersects(row.get_global_rect()),
+			"%s sits inside the pad list" % row.name
+		)
+		assert_lte(row.get_combined_minimum_size().x, CreatorHelp.PANEL_WIDTH)
+
+
+func _menu_row(ui: CreatorUi, label: String) -> int:
+	var want := HudStyle.chrome(label)
+	for i in ui._menu_rows.size():
+		if ui._menu_rows[i].text == want:
+			return i
+	return -1
 
 
 func _pick_spawn(tool: PlaceTool) -> void:

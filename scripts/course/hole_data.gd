@@ -9,10 +9,10 @@ var index := 0
 var par := 4
 var tee := Vector3.ZERO
 var cup := Vector3.ZERO
-## Warm-up green behind the tee, on the line of the hole. Free to putt before
-## the hole is started.
+## Warm-up green behind the tee, only on holes that follow a clubhouse.
 var practice_tee := Vector3.ZERO
 var practice_cup := Vector3.ZERO
+var practice := false
 var green_radius := DEFAULT_GREEN_RADIUS
 var centerline: Array[Vector3] = []
 ## Each entry: {type, position, size (Vector2 extents on XZ), yaw, round}
@@ -49,6 +49,8 @@ var bounds := Rect2()
 var custom: CustomHole
 ## Sampled ground. Null only before generation finishes.
 var height: HeightField
+## Cart arrival skips the clubhouse-door cap so the path can enter the strip.
+var open_tee_end := false
 
 
 ## Custom holes keep the hole-1 strip even when they sit in another slot, so a
@@ -83,6 +85,23 @@ func has_cart_pad() -> bool:
 
 func has_mech_pad() -> bool:
 	return mech_pad != Vector3.INF
+
+
+## Just off the left edge of the hitting tee, facing the hole. Overlay markers
+## only say a suit belongs here; this is where it stands.
+func mech_stand() -> Vector3:
+	var along := along_tee()
+	var left := Vector3.UP.cross(along)
+	if left.length_squared() < 0.0001:
+		left = Vector3.LEFT
+	else:
+		left = left.normalized()
+	return lift(tee + left * 7.0 + along * 1.0)
+
+
+func mech_face() -> float:
+	var along := along_tee()
+	return rad_to_deg(atan2(-along.x, -along.z))
 
 
 func has_soccer_goal() -> bool:
@@ -131,6 +150,83 @@ func shift(offset: Vector3) -> void:
 		height.shift(flat)
 
 
+## Spin every XZ point around the origin so a planted hole can face the path.
+func rotate_y(radians: float) -> void:
+	if absf(radians) < 0.0001:
+		return
+	tee = _spun(tee, radians)
+	cup = _spun(cup, radians)
+	practice_tee = _spun(practice_tee, radians)
+	practice_cup = _spun(practice_cup, radians)
+	_spin_points(centerline, radians)
+	_spin_points(spawn_points, radians)
+	_spin_if_set("mountain", radians)
+	_spin_if_set("culvert", radians)
+	_spin_if_set("cart_pad", radians)
+	_spin_if_set("mech_pad", radians)
+	_spin_if_set("race_hoop", radians)
+	var deg := rad_to_deg(radians)
+	cart_yaw += deg
+	mech_yaw += deg
+	race_hoop_yaw += deg
+	for patch in patches:
+		patch["position"] = _spun(patch.get("position", Vector3.ZERO), radians)
+		patch["yaw"] = float(patch.get("yaw", 0.0)) + deg
+	for prop in props:
+		prop["position"] = _spun(prop.get("position", Vector3.ZERO), radians)
+		prop["yaw"] = float(prop.get("yaw", 0.0)) + deg
+	for jump in jumps:
+		jump["position"] = _spun(jump.get("position", Vector3.ZERO), radians)
+		jump["yaw"] = float(jump.get("yaw", 0.0)) + deg
+	for boost in boosts:
+		boost["from"] = _spun(boost.get("from", Vector3.ZERO), radians)
+		boost["to"] = _spun(boost.get("to", Vector3.ZERO), radians)
+	for pack in spawn_packs:
+		pack["position"] = _spun(pack.get("position", Vector3.ZERO), radians)
+	bounds = HoleGenerator.bounds_of(self)
+	if height != null:
+		height.rotate_y(radians)
+
+
+## Face `incoming` and slide the arrival (practice tee, or the tee) onto
+## `target`. Node and data share the same yaw so overlays stay lined up.
+func face_arrival(node: Node3D, incoming: Vector3, target: Vector3) -> void:
+	var yaw := arrival_yaw(incoming)
+	if node != null:
+		node.rotation.y = yaw
+	rotate_y(yaw)
+	var offset := align_offset(arrival_point(), target)
+	if node != null:
+		node.position = offset
+	shift(offset)
+
+
+## Flatten the cart lane on the local heightmap before the hole mesh is built.
+func pave_for_path(centerline: Array[Vector3], incoming: Vector3, target: Vector3) -> void:
+	if height == null:
+		return
+	var yaw := arrival_yaw(incoming)
+	var at := _spun(arrival_point(), yaw)
+	var offset := align_offset(at, target)
+	var local: Array[Vector3] = []
+	for point in centerline:
+		local.append((point - offset).rotated(Vector3.UP, -yaw))
+	height.pave_lane(local, HeightField.LANE_HALF, HeightField.DECK)
+	height.pave_apron(
+		arrival_point(), -along_tee(), HoleGenerator.BOUNDS_MARGIN, HeightField.LANE_HALF,
+		HeightField.DECK
+	)
+
+
+func arrival_yaw(incoming: Vector3) -> float:
+	incoming.y = 0.0
+	if incoming.length_squared() < 0.0001:
+		incoming = Vector3.FORWARD
+	else:
+		incoming = incoming.normalized()
+	return along_tee().signed_angle_to(incoming, Vector3.UP)
+
+
 func _shift_if_set(field: String, flat: Vector3) -> void:
 	var at: Vector3 = get(field)
 	if at == Vector3.INF:
@@ -153,6 +249,24 @@ static func align_offset(from: Vector3, toward: Vector3) -> Vector3:
 	return Vector3(toward.x - from.x, 0.0, toward.z - from.z)
 
 
+func _spin_if_set(field: String, radians: float) -> void:
+	var at: Vector3 = get(field)
+	if at == Vector3.INF:
+		return
+	set(field, _spun(at, radians))
+
+
+func _spin_points(points: Array[Vector3], radians: float) -> void:
+	for i in points.size():
+		points[i] = _spun(points[i], radians)
+
+
+static func _spun(point: Variant, radians: float) -> Vector3:
+	if point is Vector3:
+		return (point as Vector3).rotated(Vector3.UP, radians)
+	return Vector3.ZERO
+
+
 func length() -> float:
 	var total := 0.0
 	for i in range(1, centerline.size()):
@@ -162,6 +276,14 @@ func length() -> float:
 
 func tee_to_cup() -> float:
 	return tee.distance_to(cup)
+
+
+func has_practice() -> bool:
+	return practice
+
+
+func arrival_point() -> Vector3:
+	return practice_tee if has_practice() else tee
 
 
 func practice_center() -> Vector3:

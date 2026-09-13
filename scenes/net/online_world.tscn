@@ -137,6 +137,7 @@ script = ExtResource("10_spawn")
 
 [node name="VsMatchFlow" type="Node" parent="."]
 script = ExtResource("8_flow")
+mute_audio = false
 
 [node name="WorldFx" type="Node" parent="."]
 script = ExtResource("15_fx")

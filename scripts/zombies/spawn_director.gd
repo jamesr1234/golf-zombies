@@ -177,6 +177,9 @@ func _spawn() -> void:
 
 func _anyone_golfing() -> bool:
 	for node in get_tree().get_nodes_in_group("players"):
+		var player := node as Player
+		if player != null and not player.is_on_course():
+			continue
 		if node.has_method("is_golfing") and node.is_golfing():
 			return true
 	return golf != null and golf.golfer != null
@@ -231,9 +234,14 @@ func _nearest_player_distance(point: Vector3, players: Array) -> float:
 	if players.is_empty():
 		return INF
 	var closest := INF
+	var any := false
 	for node in players:
+		var player := node as Player
+		if player != null and not player.is_on_course():
+			continue
+		any = true
 		closest = minf(closest, point.distance_to((node as Node3D).global_position))
-	return closest
+	return closest if any else INF
 
 
 func _farthest_points(players: Array) -> Array[Vector3]:

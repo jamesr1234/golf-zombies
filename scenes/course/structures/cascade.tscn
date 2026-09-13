@@ -14,19 +14,19 @@
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 
 [node name="steps_medium" parent="." instance=ExtResource("2_steps_medium")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.75, 0, -1.35)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.45, 0, -1.35)
 
 [node name="steps_small" parent="." instance=ExtResource("3_steps_small")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.8, 0, -1.35)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.2, 0, -1.35)
 
 [node name="platform_small" parent="." instance=ExtResource("4_platform_small")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.5, 2.7, -1.35)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20.25, 4.05, -1.35)
 
 [node name="ramp_small" parent="." instance=ExtResource("5_ramp_small")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.5, 2.7, -1.35)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20.25, 4.05, -1.35)
 
 [node name="cube_extra_small" parent="." instance=ExtResource("6_cube_extra_small")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14.85, 4.05, -2.7)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 21.6, 6.75, -2.7)
 
 [node name="wall_medium" parent="." instance=ExtResource("7_wall_medium")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -6.75)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -9.45)

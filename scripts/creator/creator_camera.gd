@@ -83,13 +83,23 @@ func fly(delta: float) -> void:
 	var basis := global_transform.basis
 	var step := travel(basis, wish)
 	# Triangle / Space climb. Cross / Z drop. R3 is rotation snap, not descend.
-	if Input.is_physical_key_pressed(KEY_SPACE) or PadInput.pressed("revive"):
+	# L1+Triangle is redo, so climb lets go while the modifier is down.
+	var climb := PadInput.pressed("revive") and not PadInput.pressed("melee")
+	if Input.is_physical_key_pressed(KEY_SPACE) or climb:
 		step += Vector3.UP
-	if Input.is_physical_key_pressed(KEY_Z) or PadInput.pressed("jump"):
+	var drop := Input.is_physical_key_pressed(KEY_Z) and not _command_mod()
+	if drop or PadInput.pressed("jump"):
 		step += Vector3.DOWN
 	# L3 is surface snap, so boost stays on Shift.
 	var speed := SPEED * (BOOST if Input.is_physical_key_pressed(KEY_SHIFT) else 1.0)
 	global_position += step.limit_length(1.0) * speed * delta
+
+
+func _command_mod() -> bool:
+	return (
+		Input.is_physical_key_pressed(KEY_CTRL)
+		or Input.is_physical_key_pressed(KEY_META)
+	)
 
 
 func _turn(delta: float) -> void:

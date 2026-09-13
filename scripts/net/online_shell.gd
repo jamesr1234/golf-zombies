@@ -26,6 +26,8 @@ var _cpu_on := false
 var _ghost: InputGhost
 var _brain: VsCpu
 var _cpu_banner: Label
+var _voice_banner: Label
+var _mute_btn: Button
 
 
 func _enter_tree() -> void:
@@ -52,6 +54,23 @@ func _ready() -> void:
 	_cpu_banner.offset_bottom = 48.0
 	_cpu_banner.label_settings = HudStyle.readout(Palette.LIME, 18)
 	overlay.get_parent().add_child(_cpu_banner)
+	_voice_banner = Label.new()
+	_voice_banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_voice_banner.offset_left = 18.0
+	_voice_banner.offset_right = 420.0
+	_voice_banner.offset_top = 18.0
+	_voice_banner.offset_bottom = 48.0
+	_voice_banner.label_settings = HudStyle.readout(Palette.ICE, 16)
+	overlay.get_parent().add_child(_voice_banner)
+	_mute_btn = LobbyChrome.button("Mute mic")
+	_mute_btn.visible = false
+	_mute_btn.set_anchors_preset(Control.PRESET_CENTER)
+	_mute_btn.offset_left = -110.0
+	_mute_btn.offset_right = 110.0
+	_mute_btn.offset_top = 90.0
+	_mute_btn.offset_bottom = 134.0
+	_mute_btn.pressed.connect(_toggle_mic)
+	overlay.get_parent().add_child(_mute_btn)
 	call_deferred("_bind_local")
 
 
@@ -144,16 +163,40 @@ func _process(_delta: float) -> void:
 		_quit()
 	elif pause:
 		_toggle_pause()
+	_refresh_voice_chrome()
 
 
 func _toggle_pause() -> void:
 	_paused = not _paused
 	overlay.visible = _paused
+	_mute_btn.visible = _paused
 	overlay.text = HudStyle.chrome(
-		"PAUSED\nThe round is still on.\nPause to return.  Interact quits."
+		"PAUSED\nThe round is still on.\nPause to return.  Interact quits.\n%s"
+		% VoiceChat.pause_hint()
 	)
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if _paused else Input.MOUSE_MODE_CAPTURED
 	Sfx.play("pause", self)
+	_refresh_voice_chrome()
+
+
+func _toggle_mic() -> void:
+	VoiceChat.set_muted(not VoiceChat.muted)
+	if _paused:
+		overlay.text = HudStyle.chrome(
+			"PAUSED\nThe round is still on.\nPause to return.  Interact quits.\n%s"
+			% VoiceChat.pause_hint()
+		)
+	_refresh_voice_chrome()
+
+
+func _refresh_voice_chrome() -> void:
+	if _voice_banner == null:
+		return
+	_voice_banner.text = HudStyle.chrome(VoiceChat.hud_line())
+	_voice_banner.visible = NetSession.is_active()
+	_voice_banner.modulate = Palette.LIME if VoiceChat.talking else Palette.ICE
+	if _mute_btn != null:
+		_mute_btn.text = HudStyle.chrome("Unmute mic" if VoiceChat.muted else "Mute mic")
 
 
 func _restart() -> void:

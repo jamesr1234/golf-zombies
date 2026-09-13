@@ -125,7 +125,8 @@ static func generate(index: int, base_seed: int) -> HoleData:
 		Surface.Type.GREEN, data.cup,
 		Vector2(data.green_radius * 2.0, data.green_radius * 2.0), 0.0, true
 	))
-	_add_practice_green(data, headings[0])
+	if GameState.has_practice_tee(data.index):
+		_add_practice_green(data, headings[0])
 	if MountainHole.applies(data):
 		MountainHole.layout(data, headings, width)
 	elif CulvertHole.applies(data):
@@ -242,16 +243,18 @@ static func _lift(data: HoleData) -> void:
 	if data.has_cart_pad():
 		data.cart_pad = data.height.lift(data.cart_pad)
 	if data.has_mech_pad():
-		data.mech_pad = data.height.lift(data.mech_pad)
+		data.mech_pad = data.mech_stand()
+		data.mech_yaw = data.mech_face()
 	if data.has_race_hoop():
 		data.race_hoop = data.height.lift(data.race_hoop)
 
 
-## Every hole opens with somewhere to warm up. It shares the flat shelf the tee
-## already gets, so a practice putt rolls true.
+## Clubhouse holes open with somewhere to warm up. It shares the flat shelf the
+## tee already gets, so a practice putt rolls true.
 static func _add_practice_green(data: HoleData, heading: float) -> void:
 	var center := PracticeGreen.center(data.tee, heading)
 	var ends := PracticeGreen.putt_ends(center, heading)
+	data.practice = true
 	data.practice_tee = ends[0]
 	data.practice_cup = ends[1]
 	var fringe := Vector2(
@@ -515,9 +518,11 @@ static func blocks_prop(data: HoleData, spot: Vector3, width: float) -> bool:
 		return true
 	if spot.distance_to(data.tee) < 12.0:
 		return true
-	if spot.distance_to(data.practice_center()) < PracticeGreen.FLAT + 4.0:
+	if data.has_practice() and spot.distance_to(data.practice_center()) < PracticeGreen.FLAT + 4.0:
 		return true
-	if ClubhouseBuild.covers_exit_ground(data.practice_tee, data.cup - data.tee, spot, 4.0):
+	if data.has_practice() and ClubhouseBuild.covers_exit_ground(
+		data.practice_tee, data.cup - data.tee, spot, 4.0
+	):
 		return true
 	if _near_tower(data, spot):
 		return true
@@ -569,9 +574,11 @@ static func _try_tower(data: HoleData, width: float, t: float, side: float) -> b
 		return false
 	if spot.distance_to(data.cup) < data.green_radius + 10.0:
 		return false
-	if spot.distance_to(data.practice_center()) < PracticeGreen.FLAT + 8.0:
+	if data.has_practice() and spot.distance_to(data.practice_center()) < PracticeGreen.FLAT + 8.0:
 		return false
-	if ClubhouseBuild.covers_exit_ground(data.practice_tee, data.cup - data.tee, spot, 8.0):
+	if data.has_practice() and ClubhouseBuild.covers_exit_ground(
+		data.practice_tee, data.cup - data.tee, spot, 8.0
+	):
 		return false
 	if _in_a_pond(data, spot) or _on_a_jump(data, spot):
 		return false

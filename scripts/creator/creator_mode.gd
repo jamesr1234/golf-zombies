@@ -56,7 +56,7 @@ func _ready() -> void:
 	_ui = CreatorUi.create()
 	add_child(_ui)
 	_ui.save_requested.connect(_save)
-	_ui.group_requested.connect(_group.save)
+	_ui.group_requested.connect(_save_group)
 	_ui.exit_requested.connect(_leave)
 	_ui.playtest_requested.connect(playtest)
 	_ui.overview_requested.connect(overview)
@@ -66,7 +66,10 @@ func _ready() -> void:
 	_ui.width_cancelled.connect(_back_to_browser)
 	_ui.spawn_picked.connect(_on_spawn_picked)
 	_ui.spawn_cancelled.connect(_on_spawn_cancelled)
+	_ui.undo_requested.connect(undo_change)
 	_ui.redo_requested.connect(redo_change)
+	_ui.erase_requested.connect(erase_hole)
+	_ui.erase_cancelled.connect(_on_erase_cancelled)
 	_view = CreatorView.new(self, _marks, _ui, _fairway, _place, _group)
 	_pad = CreatorPad.new(self)
 
@@ -89,7 +92,7 @@ func _exit_tree() -> void:
 func _process(delta: float) -> void:
 	if _leaving:
 		return
-	if _ui.picking_width() or _ui.picking_spawn():
+	if _ui.is_blocking():
 		_camera.frozen = true
 		_pad.poll(false, delta)
 		return
@@ -137,7 +140,7 @@ func _refresh_ui() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if _leaving or _ui.is_typing() or _ui.picking_width() or _ui.picking_spawn():
+	if _leaving or _ui.is_typing() or _ui.is_blocking():
 		return
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		_camera.take_mouse((event as InputEventMouseMotion).relative)
@@ -174,24 +177,21 @@ func confirm() -> void:
 	match tool:
 		Tool.PLACE:
 			if _place.is_gating():
-				if _place.set_gate():
-					_history.clear()
+				if _commit(_place.set_gate):
 					Sfx.play("ui_confirm", self)
 			elif _place.is_hunting():
-				if _place.set_aggro():
+				if _commit(_place.set_aggro):
 					Sfx.play("ui_confirm", self)
 					_ask_spawn()
 			elif _place.is_roaming():
-				if _place.set_roam():
+				if _commit(_place.set_roam):
 					Sfx.play("ui_confirm", self)
-			elif _place.place():
-				_history.clear()
+			elif _commit(_place.place):
 				Sfx.play("ui_confirm", self)
 		Tool.GROUP:
 			_group.toggle()
 		_:
-			if _fairway.place():
-				_history.clear()
+			if _commit(_fairway.place):
 				Sfx.play("ui_confirm", self)
 
 
@@ -199,13 +199,13 @@ func cancel() -> void:
 	match tool:
 		Tool.PLACE:
 			if _place.is_gating():
-				if _place.clear_gate():
+				if _commit(_place.clear_gate):
 					Sfx.play("ui_back", self)
 			elif _place.is_zipping():
 				if _place.clear_zip():
 					Sfx.play("ui_back", self)
 			elif _place.is_roaming():
-				if _place.abort_spawn():
+				if _commit(_place.abort_spawn):
 					Sfx.play("ui_back", self)
 			elif _place.release_hold():
 				Sfx.play("ui_back", self)
@@ -254,21 +254,50 @@ func cancel() -> void:
 			_take_back(_fairway.undo)
 
 
+func undo_change() -> void:
+	if not _history.undo(hole):
+		_on_refused("NOTHING TO UNDO")
+		return
+	_drop_place_flow()
+	_rebuild()
+	Sfx.play("ui_back", self)
+
+
 func redo_change() -> void:
 	if not _history.redo(hole):
 		_on_refused("NOTHING TO REDO")
 		return
+	_drop_place_flow()
 	_rebuild()
 	Sfx.play("ui_confirm", self)
 
 
+func _drop_place_flow() -> void:
+	_place.roaming = -1
+	_place.hunting = false
+	_place.gating = -1
+	_place.zip_from = Vector3.INF
+
+
 func _take_back(action: Callable) -> void:
-	var before := hole.to_dict()
-	if not action.call():
+	if not _commit(action):
 		return
-	_history.stash(before)
 	Sfx.play("ui_back", self)
 	_rebuild()
+
+
+func _commit(action: Callable) -> bool:
+	var before := hole.to_dict()
+	if not action.call():
+		return false
+	_remember(before)
+	return true
+
+
+func _remember(before: Dictionary) -> void:
+	if hole.to_dict() == before:
+		return
+	_history.record(before)
 
 
 ## The piece under the crosshair, not the point hanging at camera reach. Reach
@@ -390,21 +419,37 @@ func ask_save() -> void:
 	_ui.ask_save(hole.title)
 
 
+func erase_hole() -> void:
+	var before := hole.to_dict()
+	hole.erase()
+	_remember(before)
+	_drop_place_flow()
+	_group.clear()
+	_rebuild()
+	_camera.frame(_world.data)
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	_ui.flash("HOLE ERASED")
+	Sfx.play("ui_back", self)
+
+
+func _on_erase_cancelled() -> void:
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
 func _ask_spawn() -> void:
 	_ui.ask_spawn()
 
 
 func _on_spawn_picked(counts: Dictionary) -> void:
-	if _place.finish_spawn(counts):
-		_history.clear()
+	if _commit(_place.finish_spawn.bind(counts)):
 		_refresh_props()
 	else:
-		_place.abort_spawn()
+		_commit(_place.abort_spawn)
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
 func _on_spawn_cancelled() -> void:
-	_place.abort_spawn()
+	_commit(_place.abort_spawn)
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
@@ -414,6 +459,14 @@ func toggle_menu() -> void:
 
 func menu_is_open() -> bool:
 	return _ui.menu_is_open()
+
+
+func toggle_help() -> void:
+	_ui.toggle_help()
+
+
+func help_is_open() -> bool:
+	return _ui.help_is_open()
 
 
 func move_menu(delta: int) -> void:
@@ -431,8 +484,10 @@ func cycle_tool(delta: int) -> void:
 func switch_tool(next: Tool) -> void:
 	if tool == next:
 		return
+	var before := hole.to_dict()
 	tool = next
 	_place.release()
+	_remember(before)
 	Sfx.play("ui_move", self)
 	_refresh_ui()
 
@@ -463,9 +518,10 @@ func playtest() -> void:
 
 
 func _on_width_picked(size: FairwayPiece.Width) -> void:
+	var before := hole.to_dict()
 	hole.fairway_size = size
 	hole.needs_width = false
-	_history.clear()
+	_remember(before)
 	_rebuild()
 	_camera.frame(_world.data)
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
@@ -491,8 +547,11 @@ func _go(path: String) -> void:
 
 ## The merge swapped loose pieces for one structure, so the props have to be
 ## rebuilt before the change shows.
+func _save_group(title: String) -> void:
+	_commit(_group.save.bind(title))
+
+
 func _on_group_saved(path: String) -> void:
-	_history.clear()
 	_refresh_props()
 	_ui.flash("MERGED INTO %s" % HoleStore.structure_title(path))
 

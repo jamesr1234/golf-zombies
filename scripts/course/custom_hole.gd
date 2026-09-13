@@ -4,7 +4,7 @@ extends RefCounted
 ## Plain data with no nodes, so the same record round-trips through JSON on
 ## disk today and can be handed to a server later without changing shape.
 
-const VERSION := 1
+const VERSION := 2
 const UNTITLED := "UNTITLED"
 ## A placement is one scene sitting on the hole. The path is either a res://
 ## piece from the catalog or a user:// custom structure, which expands into the
@@ -167,6 +167,13 @@ func prune_placements() -> void:
 	placements = kept
 
 
+## Wipe the ribbon and everything on it. The name and width stay, so a hole
+## can be started over without going back to the browser.
+func erase() -> void:
+	pieces = FairwayPiece.starter()
+	placements.clear()
+
+
 func copy() -> CustomHole:
 	return from_dict(to_dict())
 
@@ -239,6 +246,8 @@ static func from_dict(body: Dictionary) -> CustomHole:
 			row[AGGRO] = float(entry.get(AGGRO, DEFAULT_AGGRO))
 			row[COUNTS] = spawn_counts(entry.get(COUNTS, {}))
 		hole.placements.append(row)
+	if int(body.get("version", 1)) < VERSION:
+		PieceLadder.remap_centers(hole.placements)
 	return hole
 
 

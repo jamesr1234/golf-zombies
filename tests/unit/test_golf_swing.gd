@@ -145,6 +145,7 @@ func test_the_white_line_follows_a_perfect_hit() -> void:
 	golf.golfer = Node.new()
 	add_child_autofree(golf.golfer)
 	golf._lie = Vector3(1.0, 0.15, -2.0)
+	golf._cup = golf._lie + Vector3(0.0, 0.0, -ClubKit.starter().scaled_carry())
 	golf.aim_yaw = 0.0
 	golf.aim_loft = 20.0
 	golf._pose_preview()

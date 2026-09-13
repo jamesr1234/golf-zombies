@@ -9,6 +9,7 @@ signal stroke_taken()
 signal golfer_changed(golfer: Node)
 signal sweet_struck()
 
+const _ChipScale := preload("res://scripts/golf/chip_scale.gd")
 const CLAIM_RANGE := 3.6
 const MOUSE_AIM_DEG := 0.12
 const STICK_AIM_DEG_PER_SEC := 80.0
@@ -207,15 +208,21 @@ func _pose_preview() -> void:
 		_preview.visible = false
 		return
 	_preview.visible = true
-	_preview.draw(Shot.flight_points(
+	var points := Shot.flight_points(
 		_lie, aim_yaw, 1.0, aim_loft, _is_putting(), _shot_kit(), green_span,
 		_preview_surface()
-	))
+	)
+	if not _is_putting():
+		points = _ChipScale.scale_flight(
+			points, _hole_dist(), aim_loft, _shot_kit(), green_span
+		)
+	_preview.draw(points)
 
 
 func _preview_look_along() -> float:
-	var carry := Shot.putt_run(club_kit, green_span) if _is_putting() else Shot.carry_to_height(
-		0.0, 1.0, aim_loft
+	var carry := (
+		Shot.putt_run(club_kit, green_span) if _is_putting()
+		else _ChipScale.chip_max_carry(_hole_dist(), aim_loft, _shot_kit(), green_span)
 	)
 	return clampf(carry * 0.3, 0.0, 28.0)
 
@@ -254,7 +261,9 @@ func _strike() -> void:
 	_lock_lie()
 	_apply_kit()
 	var sweet := meter.sweet
-	ball.strike(aim_yaw, meter.deviation_deg, meter.power, _shot_kit(), green_span, aim_loft)
+	ball.strike(
+		aim_yaw, meter.deviation_deg, meter.power, _shot_kit(), green_span, aim_loft, _hole_dist()
+	)
 	if sweet:
 		_celebrate_sweet()
 	meter.reset()
@@ -340,6 +349,15 @@ func _preview_surface() -> Surface.Type:
 	if ball == null:
 		return Surface.Type.FAIRWAY
 	return ball.current_surface()
+
+
+func _hole_dist() -> float:
+	var from := _lie
+	if from == Vector3.ZERO and ball != null:
+		from = ball.global_position
+	var offset := from - _cup
+	offset.y = 0.0
+	return offset.length()
 
 
 func _yaw_towards(target: Vector3) -> float:

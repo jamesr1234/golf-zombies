@@ -30,12 +30,15 @@ func text(player: Player) -> String:
 		]
 	if player.is_in_mech() and player.state != Player.State.GOLFING:
 		if player.mech != null and player.mech.is_reloading():
-			return "Mech   reloading   %s camera   %s to golf" % [
-				player.input.hint("melee"), player.input.hint("interact")
+			return "Mech   reloading   %s/%s strafe   hold %s to aim   %s to golf" % [
+				player.input.hint("melee"), player.input.hint("shield"),
+				player.input.hint("aim"), player.input.hint("interact")
 			]
 		var shells := 0 if player.mech == null else player.mech.shells()
-		return "Mech   %d / 8   %s rockets   %s camera   %s to golf" % [
-			shells, player.input.hint("shoot"), player.input.hint("melee"), player.input.hint("interact")
+		return "Mech   %d / 8   %s rockets   %s/%s strafe   hold %s to aim   %s to golf" % [
+			shells, player.input.hint("shoot"),
+			player.input.hint("melee"), player.input.hint("shield"),
+			player.input.hint("aim"), player.input.hint("interact")
 		]
 	if player.is_milling():
 		return "Rotate %s   %s to step away" % [
@@ -66,7 +69,11 @@ func text(player: Player) -> String:
 		return "Shield up   look to cover   release %s to drop" % player.input.hint("shield")
 	if player.state == Player.State.PLACING:
 		if player.place.ok:
-			var gear := "lean the ladder" if player.place.kind == "ladder" else "place"
+			var gear := "lean the ladder"
+			if player.place.kind == "mech":
+				gear = "drop the mech"
+			elif player.place.kind != "ladder":
+				gear = "place"
 			return "%s to %s   %s to cancel" % [
 				player.input.hint("shoot"), gear, player.input.hint("swap_gear")
 			]

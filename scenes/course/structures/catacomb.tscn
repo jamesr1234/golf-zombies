@@ -15,16 +15,16 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 0, 0, 0)
 
 [node name="tunnel_small" parent="." instance=ExtResource("2_tunnel_small")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 0, -4.05)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.75, 0, -6.75)
 
 [node name="cube_small" parent="." instance=ExtResource("3_cube_small")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 
 [node name="cube_small2" parent="." instance=ExtResource("3_cube_small")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.75, 0, -6.75)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.45, 0, -9.45)
 
 [node name="pillar_extra_small" parent="." instance=ExtResource("4_pillar_extra_small")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.7, 6.75, -2.7)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 9.45, -4.05)
 
 [node name="wall_extra_small" parent="." instance=ExtResource("5_wall_extra_small")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 0, -8.1)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.75, 0, -10.8)

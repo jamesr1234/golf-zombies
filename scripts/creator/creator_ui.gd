@@ -14,7 +14,10 @@ signal width_picked(size: FairwayPiece.Width)
 signal width_cancelled
 signal spawn_picked(counts: Dictionary)
 signal spawn_cancelled
+signal undo_requested
 signal redo_requested
+signal erase_requested
+signal erase_cancelled
 
 const FLASH_SECONDS := 2.6
 const PALETTE_HEIGHT := 340.0
@@ -25,14 +28,14 @@ var _tool: Label
 var _picked: Label
 var _heading: Label
 var _flash: Label
-var _key_hint: Label
-var _pad_hint: Label
 var _scroll: ScrollContainer
 var _palette: VBoxContainer
 var _keypad: CreatorKeypad
 var _width: CreatorWidth
 var _spawn: CreatorSpawn
+var _confirm: CreatorConfirm
 var _menu: PanelContainer
+var _help: CreatorHelp
 ## Menu rows are held as data so the stick can walk them, not just the mouse.
 var _menu_rows: Array[Button] = []
 var _menu_pick := 0
@@ -56,6 +59,8 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	if _help != null:
+		_help.set_blocked(is_blocking() or menu_is_open() or is_typing())
 	if _flash_left <= 0.0:
 		return
 	_flash_left -= delta
@@ -76,12 +81,24 @@ func picking_spawn() -> bool:
 	return _spawn != null and _spawn.is_open()
 
 
+func confirming() -> bool:
+	return _confirm != null and _confirm.is_open()
+
+
+func is_blocking() -> bool:
+	return picking_width() or picking_spawn() or confirming()
+
+
 func ask_width() -> void:
 	_width.open()
 
 
 func ask_spawn() -> void:
 	_spawn.open()
+
+
+func ask_erase() -> void:
+	_confirm.open()
 
 
 func _mark_handled() -> void:
@@ -166,6 +183,19 @@ func menu_is_open() -> bool:
 	return _menu != null and _menu.visible
 
 
+func toggle_help() -> void:
+	if _help != null:
+		_help.toggle()
+
+
+func help_is_open() -> bool:
+	return _help != null and _help.is_open()
+
+
+func help_is_visible() -> bool:
+	return _help != null and _help.visible
+
+
 func move_menu(delta: int) -> void:
 	if not menu_is_open() or _menu_rows.is_empty():
 		return
@@ -197,8 +227,9 @@ func _submit(text: String) -> void:
 
 
 func _restore_mouse() -> void:
-	if not _menu.visible:
-		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	if _menu.visible or confirming():
+		return
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
 func _build() -> void:
@@ -226,9 +257,8 @@ func _build() -> void:
 	side.add_child(_scroll)
 
 	_flash = CreatorChrome.banner_line(root, Palette.LIME, 20, 96.0)
-	_key_hint = CreatorChrome.footer(root, CreatorPad.HINT)
-	_pad_hint = CreatorChrome.footer(root, CreatorPad.PAD_HINT)
-	_pad_hint.offset_top = -52.0
+	_help = CreatorHelp.create()
+	root.add_child(_help)
 	CreatorChrome.crosshair(root)
 	_keypad = CreatorKeypad.create()
 	_keypad.submitted.connect(_submit)
@@ -242,23 +272,29 @@ func _build() -> void:
 	_spawn.picked.connect(spawn_picked.emit)
 	_spawn.cancelled.connect(spawn_cancelled.emit)
 	root.add_child(_spawn)
+	_confirm = CreatorConfirm.create()
+	_confirm.confirmed.connect(erase_requested.emit)
+	_confirm.cancelled.connect(erase_cancelled.emit)
+	root.add_child(_confirm)
 	_build_menu(root)
 
 
 ## Saving, playtesting and the overview live here as well as on keys, because a
 ## pad has no spare button left once the building loop has its own.
 func _build_menu(root: Control) -> void:
-	var column := CreatorChrome.panel(root, Vector2(180.0, 160.0))
+	var column := CreatorChrome.panel(root, Vector2(200.0, 210.0))
 	_menu = column.get_parent() as PanelContainer
 	var heading := CreatorChrome.centered(Palette.AMBER, 20)
 	heading.text = HudStyle.chrome("Paused")
 	column.add_child(heading)
 	_add_menu_row(column, "Keep building", toggle_menu)
-	_add_menu_row(column, "Redo last change", _close_then.bind(redo_requested))
+	_add_menu_row(column, "Undo", _close_then.bind(undo_requested))
+	_add_menu_row(column, "Redo", _close_then.bind(redo_requested))
 	_add_menu_row(column, "Name and save", _close_then.bind(name_requested))
 	_add_menu_row(column, "Merge group", _close_then.bind(merge_requested))
 	_add_menu_row(column, "Playtest", _close_then.bind(playtest_requested))
 	_add_menu_row(column, "Overview", _close_then.bind(overview_requested))
+	_add_menu_row(column, "Erase hole", _ask_erase)
 	_add_menu_row(column, "Save and quit", _save_and_quit)
 	_add_menu_row(column, "Quit without saving", exit_requested.emit)
 	_show_menu_pick()
@@ -273,6 +309,12 @@ func _add_menu_row(column: VBoxContainer, text: String, action: Callable) -> voi
 func _close_then(after: Signal) -> void:
 	toggle_menu()
 	after.emit()
+
+
+func _ask_erase() -> void:
+	if menu_is_open():
+		toggle_menu()
+	ask_erase()
 
 
 func _save_and_quit() -> void:

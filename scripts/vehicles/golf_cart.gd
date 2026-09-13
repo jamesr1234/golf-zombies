@@ -946,6 +946,8 @@ func _run_over() -> void:
 			if zombie.is_allied():
 				continue
 			_hit[zombie.get_instance_id()] = true
+			if CartBrute.try_swat(self, zombie):
+				continue
 			var hit := zombie.global_position + Vector3.UP * zombie.stats.height * 0.22
 			zombie.take_damage(crush_damage(drive_speed, ram_mult(), crush_damage_per_speed), direction, hit)
 			zombie.stagger(direction * crush_push)
@@ -1154,7 +1156,7 @@ static func turn_rate_deg(
 
 
 ## Damage from being hit by the cart. Cruising speed flattens a walker or a runner
-## outright; at full tilt a brute goes down in one pass too.
+## outright. Brutes ignore this and swat the cart into the air instead.
 static func crush_damage(speed: float, ram := 1.0, per_speed := CRUSH_DAMAGE_PER_SPEED) -> float:
 	if absf(speed) < CRUSH_MIN_SPEED:
 		return 0.0

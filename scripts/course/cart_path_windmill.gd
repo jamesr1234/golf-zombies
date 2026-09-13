@@ -2,7 +2,7 @@
 class_name CartPathWindmill
 extends Node3D
 ## Giant windmills on the racing line. The sails are thick pillars; get clipped
-## and you are thrown off the tarmac, then you explode a beat later.
+## and the cart goes up, then the blast drops you two lane-widths back.
 
 const _SCRIPT := preload("res://scripts/course/cart_path_windmill.gd")
 
@@ -15,7 +15,9 @@ const PILLAR_T := 0.5
 const PILLAR_COUNT := 4
 const SPIN_DEG := 32.0
 const FLING_SPEED := 34.0
-const FLING_LIFT := 14.0
+const FLING_LIFT := 64.0
+## Twice the lane width, so you do not pop back into the sails.
+const FLING_BACK := 50.0
 const EXPLODE_DELAY := 1.0
 const ALONG: Array[float] = [0.30, 0.50, 0.70]
 const END_CLEAR := 90.0
@@ -113,16 +115,11 @@ static func shove_from(path: Node3D, body: Node3D, from: Vector3) -> Vector3:
 
 
 func _build() -> void:
-	add_child(_tower())
-	add_child(_mast_hit())
 	var nacelle := MeshFactory.box_body(
 		Vector3(2.2, 1.6, 3.4), Palette.WALL, Layers.PROP, true, Palette.GLOW_FAINT
 	)
 	nacelle.position = Vector3(0.0, HUB_Y, 0.35)
 	add_child(nacelle)
-	var cap := MeshFactory.taper_body(1.1, 0.15, 1.8, Palette.WALL, Layers.PROP, Palette.GLOW_FAINT)
-	cap.position = Vector3(0.0, TOWER_H + 0.9, 0.0)
-	add_child(cap)
 	var hub := MeshFactory.cylinder_body(0.85, 0.7, Palette.CYAN, Layers.PROP, Palette.GLOW_MEDIUM)
 	hub.rotation.x = deg_to_rad(90.0)
 	hub.position = Vector3(0.0, HUB_Y, -0.85)
@@ -154,7 +151,6 @@ func _physics_process(delta: float) -> void:
 	if rotor != null:
 		for zone in rotor.find_children("*", "Area3D", true, false):
 			_scan(zone as Area3D)
-	_scan(get_node_or_null("MastHit") as Area3D)
 
 
 func _apply_rotor() -> void:
@@ -189,35 +185,6 @@ static func _victim(body: Node3D) -> Node3D:
 	if player.is_riding() and player.cart != null:
 		return player.cart
 	return player
-
-
-func _tower() -> StaticBody3D:
-	var mast := MeshFactory.cylinder_body(
-		TOWER_R, TOWER_H, Palette.WALL, Layers.PROP, Palette.GLOW_FAINT
-	)
-	mast.position.y = TOWER_H * 0.5
-	var ring := MeshFactory.cylinder(TOWER_R + 0.16, 0.22, Palette.CYAN, Palette.GLOW_STRONG)
-	ring.position.y = HUB_Y - TOWER_H * 0.5 - 0.7
-	mast.add_child(ring)
-	return mast
-
-
-func _mast_hit() -> Area3D:
-	var zone := Area3D.new()
-	zone.name = "MastHit"
-	zone.collision_layer = 0
-	zone.collision_mask = Layers.PLAYER | Layers.VEHICLE
-	zone.monitoring = true
-	zone.monitorable = false
-	zone.position.y = TOWER_H * 0.5
-	var shape := CollisionShape3D.new()
-	var cylinder := CylinderShape3D.new()
-	cylinder.radius = TOWER_R + 0.35
-	cylinder.height = TOWER_H
-	shape.shape = cylinder
-	zone.add_child(shape)
-	zone.body_entered.connect(_on_pillar_hit)
-	return zone
 
 
 func _sail_hull(index: int) -> CollisionShape3D:

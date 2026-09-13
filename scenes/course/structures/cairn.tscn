@@ -13,19 +13,19 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.35, 0, -1.35)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 
 [node name="cube_small3" parent="." instance=ExtResource("1_cube_small")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.7, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 0, 0)
 
 [node name="cube_extra_small" parent="." instance=ExtResource("2_cube_extra_small")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.35, 2.7, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.35, 4.05, 0)
 
 [node name="cube_extra_small2" parent="." instance=ExtResource("2_cube_extra_small")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.35, 2.7, -1.35)
-
-[node name="cube_extra_small3" parent="." instance=ExtResource("2_cube_extra_small")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.7, 2.7, -1.35)
-
-[node name="cube_extra_small4" parent="." instance=ExtResource("2_cube_extra_small")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.35, 4.05, -1.35)
 
+[node name="cube_extra_small3" parent="." instance=ExtResource("2_cube_extra_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 4.05, -1.35)
+
+[node name="cube_extra_small4" parent="." instance=ExtResource("2_cube_extra_small")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.35, 5.4, -1.35)
+
 [node name="pillar_extra_small" parent="." instance=ExtResource("3_pillar_extra_small")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.7, 5.4, -1.35)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 6.75, -1.35)

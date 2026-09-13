@@ -2,8 +2,8 @@ class_name CartPath
 extends Node3D
 ## Drive from the finished green to a staging tee. A forcefield on both lips
 ## tries to keep you on the tarmac; slip into the trees and you reappear on the
-## line beside the crash. Windmill pillars throw you off first, then the blast
-## lands a second later.
+## line beside the crash. Windmill pillars throw the cart skyward first, then
+## the blast drops you well behind the mill.
 
 const PATH_WIDTH := 25.0
 const PATH_THICKNESS := 1.4
@@ -27,6 +27,7 @@ const _Gate := preload("res://scripts/course/cart_path_gate.gd")
 const _Forest := preload("res://scripts/course/cart_path_forest.gd")
 const _Boost := preload("res://scripts/course/cart_path_boost.gd")
 const _Windmill := preload("res://scripts/course/cart_path_windmill.gd")
+const _FairwayField := preload("res://scripts/course/fairway_field.gd")
 
 var tee := Vector3.ZERO
 var heading := Vector3.FORWARD
@@ -104,8 +105,8 @@ func off_path(at: Vector3) -> bool:
 	return CartPathTrack.distance_to(centerline, at) > PATH_WIDTH * 0.5 + ROUGH_SLIP
 
 
-func reset_from(crash: Vector3) -> Dictionary:
-	var along := CartPathTrack.along(centerline, crash)
+func reset_from(crash: Vector3, back := 0.0) -> Dictionary:
+	var along := maxf(0.0, CartPathTrack.along(centerline, crash) - back)
 	var on := CartPathTrack.at(centerline, along)
 	var face := CartPathTrack.heading_at(centerline, along)
 	return {
@@ -150,7 +151,12 @@ func fling_off(body: Node3D, from: Vector3) -> bool:
 	var shove := _Windmill.shove_from(self, body, from)
 	if body.has_method("fling"):
 		body.fling(shove, _Windmill.FLING_SPEED, _Windmill.FLING_LIFT, _Windmill.EXPLODE_DELAY)
-	_pending.append({"body": body, "left": _Windmill.EXPLODE_DELAY})
+	_pending.append({
+		"body": body,
+		"left": _Windmill.EXPLODE_DELAY,
+		"crash": from,
+		"back": _Windmill.FLING_BACK,
+	})
 	return true
 
 
@@ -169,7 +175,8 @@ func _tick_pending(delta: float) -> bool:
 		var body := item["body"] as Node3D
 		_pending.remove_at(i)
 		if body != null and is_instance_valid(body):
-			_crash_now(body, true)
+			var crash: Vector3 = item.get("crash", Vector3.INF)
+			_crash_now(body, true, float(item.get("back", 0.0)), crash)
 			exploded = true
 	return exploded
 
@@ -183,9 +190,10 @@ func _pending_of(body: Node3D) -> int:
 	return -1
 
 
-func _crash_now(body: Node3D, blast := true) -> void:
+func _crash_now(body: Node3D, blast := true, back := 0.0, reset_at := Vector3.INF) -> void:
 	var at := body.global_position if body.is_inside_tree() else body.position
-	var pose := reset_from(at)
+	var from := at if not reset_at.is_finite() else reset_at
+	var pose := reset_from(from, back)
 	if blast:
 		_explode(at)
 	if body.has_method("recover_at"):
@@ -376,10 +384,18 @@ static func _hide_old_pin(hole_node: Node3D) -> void:
 		beam.visible = false
 
 
-## Punch the planted hole's OOB walls wherever the cart path crosses them.
-static func open_across(hole_node: Node3D, centerline: Array[Vector3]) -> void:
+## Punch OOB walls and fairway lips wherever the cart path crosses them.
+## Flatten the current hole's heightmap under the tarmac so a hill cannot block it.
+static func open_across(
+	hole_node: Node3D, centerline: Array[Vector3], height: HeightField = null
+) -> void:
 	if hole_node == null or centerline.size() < 2:
 		return
+	if height != null:
+		height.pave_lane(centerline, HeightField.LANE_HALF, HeightField.DECK)
+		var ground := _find_ground(hole_node)
+		if ground != null:
+			height.refresh_body(ground)
 	var walls: Array[StaticBody3D] = []
 	for child in hole_node.get_children():
 		var body := child as StaticBody3D
@@ -389,6 +405,7 @@ static func open_across(hole_node: Node3D, centerline: Array[Vector3]) -> void:
 		var gates := _crossings_on(hole_node, body, centerline)
 		if not gates.is_empty():
 			_punch_gates(hole_node, body, gates)
+	_FairwayField.open_across(hole_node, centerline)
 
 
 static func _crossings_on(hole_node: Node3D, body: StaticBody3D, centerline: Array[Vector3]) -> PackedFloat32Array:
@@ -401,6 +418,8 @@ static func _crossings_on(hole_node: Node3D, body: StaticBody3D, centerline: Arr
 		var a := hole_node.to_local(centerline[i - 1])
 		var b := hole_node.to_local(centerline[i])
 		var hit := _segment_hits_wall(a, b, body.position, size, along_x)
+		if hit == INF:
+			hit = _segment_near_wall(a, b, body.position, size, along_x)
 		if hit == INF:
 			continue
 		var fresh := true
@@ -433,6 +452,52 @@ static func _segment_hits_wall(
 	if z < at.z - size.z * 0.5 - 1.0 or z > at.z + size.z * 0.5 + 1.0:
 		return INF
 	return z
+
+
+## Path can graze a fence without crossing its mid-plane. Treat a near miss
+## as a gate so a turning exit is not still walled off.
+static func _segment_near_wall(
+	a: Vector3, b: Vector3, at: Vector3, size: Vector3, along_x: bool
+) -> float:
+	var keep := PATH_WIDTH * 0.5 + 2.0
+	var half := size * 0.5
+	var min_p := at - half
+	var max_p := at + half
+	var steps := maxi(2, int(ceil(Vector2(a.x - b.x, a.z - b.z).length() / 2.0)))
+	var best := INF
+	var best_g := INF
+	for s in steps + 1:
+		var p := a.lerp(b, float(s) / float(steps))
+		var dx := 0.0
+		if p.x < min_p.x:
+			dx = min_p.x - p.x
+		elif p.x > max_p.x:
+			dx = p.x - max_p.x
+		var dz := 0.0
+		if p.z < min_p.z:
+			dz = min_p.z - p.z
+		elif p.z > max_p.z:
+			dz = p.z - max_p.z
+		var d := Vector2(dx, dz).length()
+		if d > keep:
+			continue
+		var g := p.x if along_x else p.z
+		if d < best:
+			best = d
+			best_g = g
+	return best_g
+
+
+static func _find_ground(hole_node: Node3D) -> StaticBody3D:
+	for node in hole_node.find_children("*", "StaticBody3D", true, false):
+		var body := node as StaticBody3D
+		if body == null or (body.collision_layer & Layers.WORLD) == 0:
+			continue
+		for child in body.get_children():
+			var shape := child as CollisionShape3D
+			if shape != null and shape.shape is HeightMapShape3D:
+				return body
+	return null
 
 
 static func _punch_gates(hole_node: Node3D, body: StaticBody3D, gates: PackedFloat32Array) -> void:
@@ -477,7 +542,9 @@ static func _punch_gates(hole_node: Node3D, body: StaticBody3D, gates: PackedFlo
 			Vector3(body.position.x, mid_y, (cursor + far) * 0.5),
 			Vector3(size.x, size.y, maxf(0.0, far - cursor))
 		)
-	body.queue_free()
+	if body.get_parent() == hole_node:
+		hole_node.remove_child(body)
+	body.free()
 
 
 static func _open_gate(hole_node: Node3D, cup: Vector3, along: Vector3, gate_at: Vector3) -> void:
@@ -486,7 +553,9 @@ static func _open_gate(hole_node: Node3D, cup: Vector3, along: Vector3, gate_at:
 		return
 	var size := _box_size(far)
 	if size == Vector3.ZERO:
-		far.queue_free()
+		if far.get_parent() == hole_node:
+			hole_node.remove_child(far)
+		far.free()
 		return
 	var half_gate := GATE_WIDTH * 0.5
 	var mid_y := far.position.y
@@ -518,7 +587,9 @@ static func _open_gate(hole_node: Node3D, cup: Vector3, along: Vector3, gate_at:
 			Vector3(far.position.x, mid_y, (far_z + gz + half_gate) * 0.5),
 			Vector3(size.x, size.y, maxf(0.8, far_z - gz - half_gate))
 		)
-	far.queue_free()
+	if far.get_parent() == hole_node:
+		hole_node.remove_child(far)
+	far.free()
 
 
 static func _farthest_barrier(hole_node: Node3D, cup: Vector3, along: Vector3) -> StaticBody3D:

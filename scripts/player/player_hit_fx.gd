@@ -3,10 +3,14 @@ extends RefCounted
 ## Hit flash, ragdoll flop, and the downed / revived body reactions.
 
 const HIT_FLASH_TIME := 0.16
+## Long enough to cover one club swing, so a brute that lands four times in the
+## follow-through cannot dump a full bar and end a solo run.
+const HURT_LOCK := 0.5
 const BODY_RADIUS := 0.4
 const STAND_HEAD_HEIGHT := 1.55
 
 var flash_left := 0.0
+var hurt_lock_left := 0.0
 var flash_material: StandardMaterial3D
 
 
@@ -39,6 +43,7 @@ func start_flash(player: Player) -> void:
 
 
 func tick_flash(player: Player, delta: float) -> void:
+	hurt_lock_left = maxf(0.0, hurt_lock_left - delta)
 	if flash_left <= 0.0:
 		return
 	flash_left = maxf(0.0, flash_left - delta)
@@ -48,6 +53,14 @@ func tick_flash(player: Player, delta: float) -> void:
 
 func is_flashing() -> bool:
 	return flash_left > 0.0
+
+
+func can_take_hit() -> bool:
+	return hurt_lock_left <= 0.0
+
+
+func register_hit() -> void:
+	hurt_lock_left = HURT_LOCK
 
 
 func on_downed(player: Player) -> void:

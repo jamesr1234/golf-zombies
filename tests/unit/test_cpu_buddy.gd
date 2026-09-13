@@ -70,14 +70,18 @@ func test_the_cpu_shoots_enemies() -> void:
 	assert_true(CpuBuddy.SHOOT_ENEMIES)
 
 
-func test_a_long_approach_wants_more_power_than_a_chip() -> void:
+func test_a_close_chip_wants_a_stuffed_meter() -> void:
+	var close := CpuBuddy.wanted_power(
+		Vector3.ZERO, Vector3(0.0, 0.0, -ChipScale.putting_collar())
+	)
+	var mid := CpuBuddy.wanted_power(Vector3.ZERO, Vector3(0.0, 0.0, -50.0))
 	var drive := CpuBuddy.wanted_power(
 		Vector3.ZERO, Vector3(0.0, 0.0, -ClubKit.starter().scaled_carry() * 0.85)
 	)
-	var chip := CpuBuddy.wanted_power(Vector3.ZERO, Vector3(0.0, 0.0, -8.0))
+	assert_gt(close, 0.85, "just off the collar is a smash, not a tap")
+	assert_lt(mid, close, "further back has to take a partial")
+	assert_lt(mid, 0.8)
 	assert_gt(drive, 0.7)
-	assert_lt(chip, 0.3)
-	assert_gt(drive, chip)
 
 
 func test_a_short_putt_wants_less_power_than_a_long_one() -> void:
@@ -287,3 +291,20 @@ func test_the_cpu_walks_to_a_gun_in_the_arena() -> void:
 	var pad := cpu.input as CpuInput
 	assert_gt(pad.move.length(), 0.2, "unarmed, the buddy has to walk to a pickup")
 	assert_false(cpu.weapon.has_weapon())
+
+
+func test_parking_a_cpu_takes_them_off_the_course() -> void:
+	var cpu: Player = preload("res://scenes/players/player.tscn").instantiate()
+	add_child_autofree(cpu)
+	cpu.possess_cpu()
+	cpu.global_position = Vector3(4.0, 1.2, 2.0)
+	assert_true(cpu.is_on_course())
+	cpu.set_on_course(false)
+	assert_false(cpu.is_on_course())
+	assert_false(cpu.visible)
+	assert_eq(cpu.collision_layer, 0)
+	assert_lt(cpu.global_position.y, -100.0)
+	cpu.set_on_course(true)
+	assert_true(cpu.is_on_course())
+	assert_true(cpu.visible)
+	assert_gt(cpu.collision_layer, 0)

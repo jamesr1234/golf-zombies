@@ -223,6 +223,7 @@ func _grant(
 				cart.install_armor()
 		"mech":
 			score.mech_bought = true
+			score.add_mech_charges(1)
 
 
 func _find(item_id: String) -> Dictionary:
