@@ -8,6 +8,13 @@ const INDEX := "index"
 const HOLE := "hole"
 
 static var _slots: Dictionary = {}
+## True after apply(), even when the host packed nothing. Missing slots then
+## stay generated instead of falling through to this machine's disk.
+static var _live := false
+
+
+static func is_live() -> bool:
+	return _live
 
 
 static func hole(index: int) -> CustomHole:
@@ -29,6 +36,7 @@ static func pack() -> Array:
 
 static func apply(rows: Array) -> void:
 	clear()
+	_live = true
 	for row in rows:
 		if typeof(row) != TYPE_DICTIONARY:
 			continue
@@ -43,6 +51,7 @@ static func apply(rows: Array) -> void:
 
 static func clear() -> void:
 	_slots.clear()
+	_live = false
 
 
 ## Groups become the loose pieces they were made from, so a joiner does not
