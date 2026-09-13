@@ -32,6 +32,7 @@ static func sandbox() -> void:
 
 static func clear_sandbox() -> void:
 	sandbox()
+	CourseDeck.clear()
 	for row in list_holes():
 		delete_hole(String(row["id"]))
 	for path in list_structures():
@@ -79,7 +80,19 @@ static func course_slot(title: String) -> int:
 
 
 ## Newest playable hole titled for this slot, or null to keep the generated one.
+## An online match uses only the host pack: a slot the host never saved stays
+## generated, even if this machine has its own titled save.
 static func course_hole(index: int) -> CustomHole:
+	if index < 0 or index >= GameState.HOLE_COUNT:
+		return null
+	if CourseDeck.is_live():
+		return CourseDeck.hole(index)
+	return disk_course_hole(index)
+
+
+## Disk only. Used when packing a match so a leftover session cannot ship
+## itself back out as the host course.
+static func disk_course_hole(index: int) -> CustomHole:
 	if index < 0 or index >= GameState.HOLE_COUNT:
 		return null
 	for row in list_holes():
