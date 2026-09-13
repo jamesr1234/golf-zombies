@@ -1,0 +1,104 @@
+# Builds a universal macOS .app (Apple Silicon + Intel) and uploads the zip.
+# Same Godot 4.6.1 as the GUT workflow. Download the artifact from the run.
+name: Export macOS
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    name: Universal .app
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      GODOT_VERSION: "4.6.1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache Godot and export templates
+        id: cache-godot
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ runner.temp }}/godot
+            ${{ runner.temp }}/export-templates
+          key: godot-${{ env.GODOT_VERSION }}-stable-linux-macos-export
+
+      - name: Download Godot ${{ env.GODOT_VERSION }}
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        working-directory: ${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          mkdir -p godot
+          curl -fsSL -o godot.zip \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q godot.zip -d godot
+          mv "godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64" godot/godot
+          chmod +x godot/godot
+          rm -f godot.zip
+
+      - name: Download export templates
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        working-directory: ${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          curl -fsSL -o templates.tpz \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          mkdir -p export-templates
+          unzip -q templates.tpz -d export-templates
+          rm -f templates.tpz
+
+      - name: Install Godot and templates
+        run: |
+          set -euo pipefail
+          chmod +x "${{ runner.temp }}/godot/godot"
+          echo "${{ runner.temp }}/godot" >> "$GITHUB_PATH"
+          template_src="${{ runner.temp }}/export-templates/templates"
+          if [[ ! -d "$template_src" ]]; then
+            echo "::error::Export templates missing at $template_src"
+            ls -la "${{ runner.temp }}/export-templates" || true
+            exit 1
+          fi
+          dest="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          mkdir -p "$dest"
+          cp -a "$template_src/." "$dest/"
+          test -f "$dest/macos.zip"
+
+      - name: Import project
+        run: godot --headless --import
+
+      - name: Export macOS
+        run: |
+          set -euo pipefail
+          mkdir -p build/macos
+          godot --headless --export-release "macOS" "build/macos/Golf Zombies.app"
+          app="build/macos/Golf Zombies.app"
+          if [[ ! -d "$app" ]]; then
+            echo "::error::Export did not create $app"
+            find build -maxdepth 3 -print || true
+            exit 1
+          fi
+          # Steam looks next to the binary, not inside the PCK.
+          cp steam_appid.txt "$app/Contents/MacOS/steam_appid.txt"
+          # -y keeps any symlinks Godot puts in the bundle.
+          (cd build/macos && zip -r -y ../../GolfZombies-macos.zip "Golf Zombies.app")
+          ls -lh GolfZombies-macos.zip
+          unzip -l GolfZombies-macos.zip | head
+
+      - name: Upload macOS app
+        uses: actions/upload-artifact@v4
+        with:
+          name: GolfZombies-macos
+          path: GolfZombies-macos.zip
+          if-no-files-found: error

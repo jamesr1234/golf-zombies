@@ -18,6 +18,24 @@ Open the project in Godot and press F5, or from the command line:
 /Applications/Godot.app/Contents/MacOS/Godot --path .
 ```
 
+### macOS app (Apple Silicon and Intel)
+
+The **macOS** export preset builds a universal `.app` (arm64 + x86_64), so it
+runs natively on an M1 MacBook Pro. GitHub Actions uploads
+`GolfZombies-macos.zip` on every pull request, push to `main`, and manual run
+(**Actions → Export macOS → GolfZombies-macos**).
+
+Unzip, then right-click **Golf Zombies** and choose **Open**. The build is
+ad-hoc signed, not notarized, so Gatekeeper will warn on the first launch. If
+macOS still blocks it:
+
+```bash
+xattr -cr "Golf Zombies.app"
+open "Golf Zombies.app"
+```
+
+Single-player and LAN work without Steam. Steam invites need the Steam client.
+
 The title screen picks **1 Player** or **2 Player**, then Easy / Medium / Hard /
 Impossible.
 
