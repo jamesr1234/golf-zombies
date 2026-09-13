@@ -20,8 +20,9 @@ Open the project in Godot and press F5, or from the command line:
 
 ### macOS app (Apple Silicon / M1)
 
-The **macOS Apple Silicon** export preset builds a native arm64 `.app` for M1
-(and later) Macs. Download **GolfZombies-macos-m1.zip** from
+The **macOS Apple Silicon** export preset builds a universal `.app` (arm64 +
+x86_64) that runs natively on M1 and later Macs. Official Godot templates ship
+only that universal Mac binary. Download **GolfZombies-macos-m1.zip** from
 [Releases (macos-m1-preview)](https://github.com/jamesr1234/golf-zombies/releases/tag/macos-m1-preview).
 Unzip it.
 

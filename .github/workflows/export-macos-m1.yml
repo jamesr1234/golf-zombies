@@ -1,4 +1,5 @@
-# Builds a native Apple Silicon (arm64) macOS .app and uploads the zip.
+# Builds a universal macOS .app that runs natively on Apple Silicon (M1).
+# Official Godot templates only ship godot_macos_release.universal.
 # Same Godot 4.6.1 as the GUT workflow.
 name: Export macOS M1
 
@@ -17,7 +18,7 @@ permissions:
 
 jobs:
   export:
-    name: Apple Silicon .app
+    name: Apple Silicon (universal) .app
     runs-on: ubuntu-latest
     timeout-minutes: 40
     env:
@@ -117,7 +118,7 @@ jobs:
           target_commitish: ${{ github.event.pull_request.head.sha || github.sha }}
           files: GolfZombies-macos-m1.zip
           body: |
-            Native Apple Silicon (M1/arm64) Mac app. Download **GolfZombies-macos-m1.zip**.
+            Universal Mac app that runs natively on Apple Silicon (M1). Download **GolfZombies-macos-m1.zip**.
 
             macOS will often say the app is **damaged or corrupt**. That is Gatekeeper
             blocking an unsigned download, not a broken zip.

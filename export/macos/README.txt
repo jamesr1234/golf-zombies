@@ -1,4 +1,4 @@
-Golf Zombies for Mac (Apple Silicon / M1)
+Golf Zombies for Mac (Apple Silicon / M1, universal)
 
 If macOS says the app is damaged or corrupt, that is Gatekeeper,
 not a broken file. The build is not Apple-notarized.
