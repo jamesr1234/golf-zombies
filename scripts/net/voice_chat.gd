@@ -21,6 +21,7 @@ var _rack := VoiceRack.new()
 var _mic: AudioStreamPlayer
 var _pending := PackedVector2Array()
 var _capturing := false
+var _vad_hang := 0
 
 
 func _ready() -> void:
@@ -39,12 +40,14 @@ func _process(delta: float) -> void:
 		return
 	if muted:
 		talking = false
+		_vad_hang = 0
 		return
 	if open_mic or _ptt_held():
 		_ensure_capture()
 		_capture_and_send()
 	else:
 		talking = false
+		_vad_hang = 0
 
 
 func can_open_mic() -> bool:
@@ -79,6 +82,7 @@ func set_muted(on: bool) -> void:
 	muted = on
 	if muted:
 		talking = false
+		_vad_hang = 0
 	_save_prefs()
 	prefs_changed.emit()
 
@@ -134,12 +138,14 @@ func hud_line() -> String:
 
 func try_send(frames: PackedVector2Array, ptt: bool) -> bool:
 	var speech := VoiceCodec.is_speech(frames)
-	if not VoiceCodec.should_transmit(muted, open_mic, ptt, speech):
+	var hanging := _vad_hang > 0
+	if not VoiceCodec.should_transmit(muted, open_mic, ptt, speech, hanging):
 		talking = false
 		return false
 	if not NetSession.is_active():
 		talking = false
 		return false
+	_vad_hang = VoiceCodec.next_hang(speech, _vad_hang)
 	talking = true
 	_mark_speaking(multiplayer.get_unique_id())
 	_transmit(VoiceCodec.pack(frames))
@@ -162,6 +168,7 @@ func reset_for_test() -> void:
 	send_count = 0
 	speaking.clear()
 	_pending = PackedVector2Array()
+	_vad_hang = 0
 	_stop_capture()
 
 
@@ -238,6 +245,7 @@ func _stop_capture() -> void:
 		_mic.stop()
 	_capturing = false
 	_pending = PackedVector2Array()
+	_vad_hang = 0
 	talking = false
 	_rack.clear()
 
