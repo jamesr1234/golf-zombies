@@ -1,0 +1,109 @@
+# Export Windows and Linux release builds. Same Godot version as GUT.
+name: Export PC
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    name: Windows and Linux (Godot 4.6.1)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      GODOT_VERSION: "4.6.1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache Godot editor
+        id: cache-godot
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/godot
+          key: godot-${{ env.GODOT_VERSION }}-stable-linux.x86_64
+
+      - name: Cache export templates
+        id: cache-templates
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/export-templates
+          key: godot-${{ env.GODOT_VERSION }}-stable-pc-templates
+
+      - name: Download Godot ${{ env.GODOT_VERSION }}
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        working-directory: ${{ runner.temp }}
+        run: |
+          mkdir -p godot
+          curl -fsSL -o godot.zip \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q godot.zip -d godot
+          mv "godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64" godot/godot
+          chmod +x godot/godot
+          rm -f godot.zip
+
+      - name: Download PC export templates
+        if: steps.cache-templates.outputs.cache-hit != 'true'
+        working-directory: ${{ runner.temp }}
+        run: |
+          mkdir -p export-templates
+          curl -fL --retry 4 --retry-delay 4 -o templates.tpz \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          unzip -j templates.tpz \
+            "templates/version.txt" \
+            "templates/windows_release_x86_64.exe" \
+            "templates/windows_release_x86_64_console.exe" \
+            "templates/linux_release.x86_64" \
+            -d export-templates
+          rm -f templates.tpz
+
+      - name: Install Godot and templates
+        run: |
+          chmod +x "${{ runner.temp }}/godot/godot"
+          echo "${{ runner.temp }}/godot" >> "$GITHUB_PATH"
+          dest="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          mkdir -p "$dest"
+          cp -a "${{ runner.temp }}/export-templates/." "$dest/"
+
+      - name: Import project
+        run: godot --headless --import --quit-after 1
+
+      - name: Export Windows Desktop
+        run: |
+          mkdir -p build/windows
+          godot --headless --export-release "Windows Desktop" build/windows/golf-zombies.exe
+          cp steam_appid.txt build/windows/
+          test -f build/windows/golf-zombies.exe
+          test -f build/windows/golf-zombies.pck
+
+      - name: Export Linux
+        run: |
+          mkdir -p build/linux
+          godot --headless --export-release "Linux" build/linux/golf-zombies.x86_64
+          cp steam_appid.txt build/linux/
+          chmod +x build/linux/golf-zombies.x86_64
+          test -f build/linux/golf-zombies.x86_64
+          test -f build/linux/golf-zombies.pck
+
+      - name: Upload Windows build
+        uses: actions/upload-artifact@v4
+        with:
+          name: golf-zombies-windows-x86_64
+          path: build/windows/
+          if-no-files-found: error
+
+      - name: Upload Linux build
+        uses: actions/upload-artifact@v4
+        with:
+          name: golf-zombies-linux-x86_64
+          path: build/linux/
+          if-no-files-found: error
