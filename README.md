@@ -23,8 +23,9 @@ Open the project in Godot and press F5, or from the command line:
 The **macOS Apple Silicon** export preset builds a universal `.app` (arm64 +
 x86_64) that runs natively on M1 and later Macs. Official Godot templates ship
 only that universal Mac binary. Download **GolfZombies-macos-m1.zip** from
-[Releases (macos-m1-preview)](https://github.com/jamesr1234/golf-zombies/releases/tag/macos-m1-preview).
-Unzip it.
+[Releases (macos-m1-preview)](https://github.com/jamesr1234/golf-zombies/releases/tag/macos-m1-preview)
+once `main` publishes it. Pull request runs attach the same zip on the
+**Export macOS M1** check instead of replacing that release. Unzip it.
 
 The build is not Apple-notarized. macOS will often say the app is **damaged**
 or **corrupt**. That is Gatekeeper, not a broken file. In Terminal:

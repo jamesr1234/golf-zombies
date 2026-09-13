@@ -13,6 +13,7 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# write is only used by the main-branch release step. PR jobs skip it.
 permissions:
   contents: write
 
@@ -108,14 +109,17 @@ jobs:
           path: GolfZombies-macos-m1.zip
           if-no-files-found: error
 
+      # PR runs upload the zip as an artifact. Only main (or a manual
+      # dispatch on main) updates the public macos-m1-preview tag.
       - name: Publish Mac M1 preview release
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: macos-m1-preview
           name: Golf Zombies for Mac (Apple Silicon)
           prerelease: true
           make_latest: false
-          target_commitish: ${{ github.event.pull_request.head.sha || github.sha }}
+          target_commitish: ${{ github.sha }}
           files: GolfZombies-macos-m1.zip
           body: |
             Universal Mac app that runs natively on Apple Silicon (M1). Download **GolfZombies-macos-m1.zip**.
