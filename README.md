@@ -18,6 +18,16 @@ Open the project in Godot and press F5, or from the command line:
 /Applications/Godot.app/Contents/MacOS/Godot --path .
 ```
 
+### Windows (PC)
+
+Download **GolfZombies-windows.zip** from
+[Releases (windows-preview)](https://github.com/jamesr1234/golf-zombies/releases/tag/windows-preview).
+Unzip it and run `golf-zombies.exe`. Linux is in the same release as
+**GolfZombies-linux.zip**.
+
+Single-player and LAN work without Steam. Keep `steam_appid.txt` next to the
+exe if you want Steam features.
+
 The title screen picks **1 Player** or **2 Player**, then Easy / Medium / Hard /
 Impossible.
 

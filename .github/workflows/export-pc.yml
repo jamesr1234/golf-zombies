@@ -1,4 +1,6 @@
 # Export Windows and Linux release builds. Same Godot version as GUT.
+# Actions artifacts are easy to miss on the PR Checks tab, so a prerelease
+# also puts a normal download on the Releases page.
 name: Export PC
 
 on:
@@ -12,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   export:
@@ -43,8 +45,9 @@ jobs:
         if: steps.cache-godot.outputs.cache-hit != 'true'
         working-directory: ${{ runner.temp }}
         run: |
+          set -euo pipefail
           mkdir -p godot
-          curl -fsSL -o godot.zip \
+          curl -fL --retry 4 --retry-delay 4 -o godot.zip \
             "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
           unzip -q godot.zip -d godot
           mv "godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64" godot/godot
@@ -55,6 +58,7 @@ jobs:
         if: steps.cache-templates.outputs.cache-hit != 'true'
         working-directory: ${{ runner.temp }}
         run: |
+          set -euo pipefail
           mkdir -p export-templates
           curl -fL --retry 4 --retry-delay 4 -o templates.tpz \
             "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
@@ -68,42 +72,77 @@ jobs:
 
       - name: Install Godot and templates
         run: |
+          set -euo pipefail
           chmod +x "${{ runner.temp }}/godot/godot"
           echo "${{ runner.temp }}/godot" >> "$GITHUB_PATH"
           dest="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
           mkdir -p "$dest"
           cp -a "${{ runner.temp }}/export-templates/." "$dest/"
+          test -f "$dest/windows_release_x86_64.exe"
+          test -f "$dest/linux_release.x86_64"
 
       - name: Import project
         run: godot --headless --import --quit-after 1
 
       - name: Export Windows Desktop
         run: |
+          set -euo pipefail
           mkdir -p build/windows
           godot --headless --export-release "Windows Desktop" build/windows/golf-zombies.exe
-          cp steam_appid.txt build/windows/
+          cp steam_appid.txt export/windows/README.txt build/windows/
           test -f build/windows/golf-zombies.exe
           test -f build/windows/golf-zombies.pck
+          rm -f GolfZombies-windows.zip
+          (cd build/windows && zip -r ../../GolfZombies-windows.zip .)
+          ls -lh GolfZombies-windows.zip
 
       - name: Export Linux
         run: |
+          set -euo pipefail
           mkdir -p build/linux
           godot --headless --export-release "Linux" build/linux/golf-zombies.x86_64
-          cp steam_appid.txt build/linux/
+          cp steam_appid.txt export/linux/README.txt build/linux/
           chmod +x build/linux/golf-zombies.x86_64
           test -f build/linux/golf-zombies.x86_64
           test -f build/linux/golf-zombies.pck
+          rm -f GolfZombies-linux.zip
+          (cd build/linux && zip -r ../../GolfZombies-linux.zip .)
+          ls -lh GolfZombies-linux.zip
 
       - name: Upload Windows build
         uses: actions/upload-artifact@v4
         with:
           name: golf-zombies-windows-x86_64
-          path: build/windows/
+          path: GolfZombies-windows.zip
           if-no-files-found: error
 
       - name: Upload Linux build
         uses: actions/upload-artifact@v4
         with:
           name: golf-zombies-linux-x86_64
-          path: build/linux/
+          path: GolfZombies-linux.zip
           if-no-files-found: error
+
+      - name: Publish PC preview release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: windows-preview
+          name: Golf Zombies for Windows
+          prerelease: true
+          make_latest: false
+          target_commitish: ${{ github.event.pull_request.head.sha || github.sha }}
+          files: |
+            GolfZombies-windows.zip
+            GolfZombies-linux.zip
+          body: |
+            Windows x86_64 build. Download **GolfZombies-windows.zip**, unzip it,
+            and run `golf-zombies.exe`.
+
+            Linux x86_64 is in **GolfZombies-linux.zip** (`golf-zombies.x86_64`).
+
+            Single-player and LAN work without Steam. Keep `steam_appid.txt`
+            next to the executable if you want Steam features.
+
+            This preview includes online voice (quieter open mic), host Course
+            Creator holes for every player, shop mech drops, and snapped
+            obstacle sizes.
