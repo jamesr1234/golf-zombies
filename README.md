@@ -22,8 +22,8 @@ Open the project in Godot and press F5, or from the command line:
 
 Download **GolfZombies-windows.zip** from
 [Releases (windows-preview)](https://github.com/jamesr1234/golf-zombies/releases/tag/windows-preview).
-Unzip it and run `golf-zombies.exe`. Linux is in the same release as
-**GolfZombies-linux.zip**.
+That zip is the last preview published from `main`. Unzip it and run
+`golf-zombies.exe`. Linux is in the same release as **GolfZombies-linux.zip**.
 
 Single-player and LAN work without Steam. Keep `steam_appid.txt` next to the
 exe if you want Steam features.

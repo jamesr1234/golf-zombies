@@ -1,6 +1,7 @@
 # Export Windows and Linux release builds. Same Godot version as GUT.
-# Actions artifacts are easy to miss on the PR Checks tab, so a prerelease
-# also puts a normal download on the Releases page.
+# Pull requests upload Actions artifacts only. The public windows-preview
+# release is published from main (or a manual workflow_dispatch) so an
+# in-progress PR cannot replace the advertised download.
 name: Export PC
 
 on:
@@ -124,6 +125,7 @@ jobs:
           if-no-files-found: error
 
       - name: Publish PC preview release
+        if: github.event_name != 'pull_request'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: windows-preview
