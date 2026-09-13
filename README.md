@@ -18,6 +18,24 @@ Open the project in Godot and press F5, or from the command line:
 /Applications/Godot.app/Contents/MacOS/Godot --path .
 ```
 
+### macOS app (Apple Silicon / M1)
+
+The **macOS Apple Silicon** export preset builds a native arm64 `.app` for M1
+(and later) Macs. Download **GolfZombies-macos-m1.zip** from
+[Releases (macos-m1-preview)](https://github.com/jamesr1234/golf-zombies/releases/tag/macos-m1-preview).
+Unzip it.
+
+The build is not Apple-notarized. macOS will often say the app is **damaged**
+or **corrupt**. That is Gatekeeper, not a broken file. In Terminal:
+
+```bash
+cd ~/Downloads
+xattr -dr com.apple.quarantine "Golf Zombies.app"
+open "Golf Zombies.app"
+```
+
+Single-player and LAN work without Steam. Steam invites need the Steam client.
+
 The title screen picks **1 Player** or **2 Player**, then Easy / Medium / Hard /
 Impossible.
 
