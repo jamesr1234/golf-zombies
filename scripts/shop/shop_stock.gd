@@ -19,11 +19,11 @@ static func apparel() -> Array[Dictionary]:
 		_wear("band_cyan", "Cyan Headband", 25, "headband", "", Palette.CYAN),
 		_wear("band_lime", "Lime Headband", 25, "headband", "", Palette.LIME),
 		_wear("shorts_amber", "Amber Shorts", 35, "bottom", "shorts", Palette.AMBER),
-		_wear("shorts_pink", "Hot Pink Shorts", 35, "bottom", "shorts", Palette.HOT_PINK),
+		_wear("shorts_pink", "Sun Shorts", 35, "bottom", "shorts", Palette.SUN),
 		_wear("shirt_cyan", "Cyan Shirt", 40, "shirt", "", Palette.CYAN),
-		_wear("shirt_violet", "Violet Shirt", 40, "shirt", "", Palette.VIOLET),
+		_wear("shirt_violet", "Azure Shirt", 40, "shirt", "", Palette.AZURE),
 		_wear("pants_ice", "Ice Pants", 45, "bottom", "pants", Palette.ICE),
-		_wear("pants_magenta", "Magenta Pants", 45, "bottom", "pants", Palette.MAGENTA),
+		_wear("pants_magenta", "Orange Pants", 45, "bottom", "pants", Palette.ORANGE),
 	]
 
 

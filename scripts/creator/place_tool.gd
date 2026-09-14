@@ -191,7 +191,11 @@ func aim(holder: Node3D, neighbors: Node, at: Vector3) -> void:
 	if not _holding:
 		_at = _surface_snapped(neighbors, at) if surface_snap else _snapped(neighbors, at)
 	_ghost.rotation.y = deg_to_rad(yaw)
-	_ghost.position = GridSnap.anchored_at(_ghost, _at, yaw)
+	_ghost.position = (
+		GunPickup.sit_at(_ghost, _at, yaw)
+		if CustomHole.is_weapon(path)
+		else GridSnap.anchored_at(_ghost, _at, yaw)
+	)
 	_ghost.visible = hole.covers(_at)
 	# #region agent log
 	_dbg_place_ghost(path)
@@ -357,7 +361,10 @@ func nearest_weapon(at: Vector3, within := 8.0) -> int:
 	for i in hole.placements.size():
 		if not CustomHole.is_weapon(String(hole.placements[i][CustomHole.PATH])):
 			continue
-		var distance: float = (hole.placements[i][CustomHole.POSITION] as Vector3).distance_to(at)
+		# XZ only: the camera hangs in the air and a snapped gun sits on the
+		# grass, so a 3D compare misses the thing you are looking straight at.
+		var pos := _world_pos(hole.placements[i][CustomHole.POSITION])
+		var distance := Vector2(pos.x - at.x, pos.z - at.z).length()
 		if distance < closest:
 			closest = distance
 			best = i
@@ -447,15 +454,15 @@ func release() -> void:
 
 func summary() -> String:
 	if is_gating():
-		return "DRAW THE LINE   CLICK TO SET   RIGHT CLICK FOR NO LINE"
+		return "DRAW THE LINE   R2 TO SET   L2 FOR NO LINE"
 	if is_zipping():
-		return "PLACE THE LOWER END   CLICK TO SET   RIGHT CLICK TO CANCEL"
+		return "PLACE THE LOWER END   R2 TO SET   L2 TO CANCEL"
 	if is_hunting():
-		return "SET THE CHASE   %d M   CLICK TO SET   RIGHT CLICK TO CANCEL" % roundi(aggro_radius)
+		return "SET THE CHASE   %d M   R2 TO SET   L2 TO CANCEL" % roundi(aggro_radius)
 	if is_roaming():
-		return "SET THE YARD   %d M   CLICK TO SET   RIGHT CLICK TO CANCEL" % roundi(roam_radius)
+		return "SET THE YARD   %d M   R2 TO SET   L2 TO CANCEL" % roundi(roam_radius)
 	if is_holding():
-		return "HOLDING   CLICK TO SET   RIGHT CLICK TO MOVE AGAIN"
+		return "HOLDING   R2 TO SET   L2 TO MOVE AGAIN"
 	var lock := ""
 	if surface_snap:
 		lock += "   SURFACE SNAP"
@@ -548,6 +555,11 @@ func _zip_point(neighbors: Node, at: Vector3) -> Vector3:
 
 func _surface_snapped(neighbors: Node, at: Vector3) -> Vector3:
 	var top := GridSnap.column_top(at, space, height)
+	# Guns are not cell-tall pieces. Snapping Y onto the 1.35 m grid buries
+	# them whenever the fairway is not sitting on a cell, and the mesh is
+	# centered so the origin-on-grass pose already puts half of it in the dirt.
+	if CustomHole.is_weapon(picked_path()):
+		return Vector3(snappedf(at.x, GridSnap.CELL), top, snappedf(at.z, GridSnap.CELL))
 	if _ghost == null:
 		return GridSnap.to_grid(Vector3(at.x, top, at.z))
 	var turned := Transform3D(Basis(Vector3.UP, deg_to_rad(yaw)), at) * _hull()

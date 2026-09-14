@@ -9,7 +9,7 @@
 [ext_resource type="Script" path="res://scripts/ui/ball_arrow.gd" id="7_arrow"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bg"]
-bg_color = Color(0.04, 0.02, 0.09, 0.78)
+bg_color = Color(0.02, 0.05, 0.07, 0.78)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
@@ -17,7 +17,7 @@ border_width_bottom = 1
 border_color = Color(0.15, 0.95, 1, 0.55)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_health"]
-bg_color = Color(1, 0.14, 0.72, 0.95)
+bg_color = Color(1, 0.42, 0.06, 0.95)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_status"]
 bg_color = Color(0.15, 0.95, 1, 0.95)
@@ -27,12 +27,12 @@ content_margin_left = 24.0
 content_margin_top = 18.0
 content_margin_right = 24.0
 content_margin_bottom = 18.0
-bg_color = Color(0.04, 0.02, 0.09, 0.88)
+bg_color = Color(0.02, 0.05, 0.07, 0.88)
 border_width_left = 2
 border_width_top = 2
 border_width_right = 2
 border_width_bottom = 2
-border_color = Color(1, 0.14, 0.72, 0.8)
+border_color = Color(1, 0.42, 0.06, 0.8)
 corner_radius_top_left = 4
 corner_radius_top_right = 4
 corner_radius_bottom_right = 4
@@ -51,7 +51,7 @@ visible = false
 anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
-color = Color(0.5, 0, 0.3, 0.22)
+color = Color(0.5, 0.14, 0.0, 0.22)
 
 [node name="Score" type="Label" parent="Root"]
 anchor_right = 1.0

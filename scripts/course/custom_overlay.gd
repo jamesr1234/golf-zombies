@@ -92,7 +92,10 @@ static func _add(
 			overlay.add_child(node)
 			continue
 		node.rotation.y = deg_to_rad(yaw)
-		node.position = GridSnap.anchored_at(node, lifted, yaw)
+		if node is GunPickup:
+			node.position = GunPickup.sit_at(node, lifted, yaw)
+		else:
+			node.position = GridSnap.anchored_at(node, lifted, yaw)
 		overlay.add_child(node)
 
 

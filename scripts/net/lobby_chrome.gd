@@ -11,7 +11,7 @@ static func button(copy: String) -> Button:
 	made.custom_minimum_size = Vector2(220.0, 44.0)
 	made.add_theme_font_size_override("font_size", 22)
 	made.add_theme_color_override("font_color", Palette.ICE)
-	made.add_theme_color_override("font_hover_color", Palette.MAGENTA)
+	made.add_theme_color_override("font_hover_color", Palette.ORANGE)
 	return made
 
 
@@ -36,7 +36,7 @@ static func field(placeholder: String, text := "") -> LineEdit:
 static func heading(copy: String) -> Label:
 	var label := Label.new()
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.label_settings = HudStyle.readout(Palette.VIOLET, 14)
+	label.label_settings = HudStyle.readout(Palette.AZURE, 14)
 	label.text = HudStyle.chrome(copy)
 	return label
 

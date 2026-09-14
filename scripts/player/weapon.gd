@@ -14,7 +14,7 @@ const _WorldFx := preload("res://scripts/net/world_fx.gd")
 const _ShapeDrop := preload("res://scripts/player/shape_drop.gd")
 const CART_GROUP := "golf_carts"
 
-## The bag you walk in with. Pickups and the shop can still add more later.
+## Guns laid on the tee for pickup. The bag starts empty.
 const STARTER_GUNS: Array[WeaponStats] = [
 	preload("res://resources/weapons/rifle.tres"),
 	preload("res://resources/weapons/shotgun.tres"),
@@ -27,7 +27,7 @@ const STARTER_GUNS: Array[WeaponStats] = [
 	preload("res://resources/weapons/shape_remote.tres"),
 ]
 
-## Starts empty. A match fills the starter stash; pickups call add_gun.
+## Starts empty. Pickups and the shop call add_gun.
 var loadout: Array[WeaponStats] = []
 
 var index := 0
@@ -218,7 +218,7 @@ func apply_replicated_loadout(
 	ammo_changed.emit()
 
 
-## Every gun in the catalog, first slot selected so you start on the rifle.
+## Every gun in the catalog. Tests and the shop use this; a match does not.
 func fill_stash() -> void:
 	for stats in STARTER_GUNS:
 		add_gun(stats)

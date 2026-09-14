@@ -64,6 +64,8 @@ func _hole(delta: float) -> void:
 		return
 	if _arena_fight(delta):
 		return
+	if _grab_gun():
+		return
 	if _can("can_retrieve_ball"):
 		_ghost.tap("interact")
 		return
@@ -379,6 +381,17 @@ func _fight() -> void:
 		_ghost.hold("shoot")
 	if on_target and range <= MELEE_RANGE:
 		_ghost.tap("melee")
+
+
+func _grab_gun() -> bool:
+	if _player.weapon != null and _player.weapon.has_weapon():
+		return false
+	var gun := ArenaHole.nearest_gun(_player)
+	if gun == null:
+		return false
+	_walk_toward(gun.global_position)
+	_ghost.hold("sprint", true)
+	return true
 
 
 func _arena_fight(_delta: float) -> bool:

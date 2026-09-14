@@ -498,7 +498,7 @@ func test_a_replicated_sniper_beam_is_visible() -> void:
 
 func test_a_replicated_firework_bursts() -> void:
 	var world := _world_fx()
-	var burst := world.apply_fireworks(Vector3.UP, Palette.MAGENTA)
+	var burst := world.apply_fireworks(Vector3.UP, Palette.ORANGE)
 	assert_not_null(burst)
 	assert_gt(get_tree().get_nodes_in_group("fireworks").size(), 0)
 

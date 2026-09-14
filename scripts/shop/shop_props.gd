@@ -143,12 +143,12 @@ static func _shotgun(parent: Node3D) -> void:
 static func _rocket(parent: Node3D) -> void:
 	parent.rotation.y = deg_to_rad(16.0)
 	parent.rotation.z = deg_to_rad(6.0)
-	var tube := _cyl(parent, 0.08, 0.95, Palette.MAGENTA.darkened(0.28), Palette.GLOW_SOFT, Vector3(0.0, 0.0, -0.12))
+	var tube := _cyl(parent, 0.08, 0.95, Palette.ORANGE.darkened(0.28), Palette.GLOW_SOFT, Vector3(0.0, 0.0, -0.12))
 	tube.rotation.x = deg_to_rad(90.0)
-	var drum := _cyl(parent, 0.16, 0.18, Palette.MAGENTA, Palette.GLOW_STRONG, Vector3(0.12, 0.0, 0.18))
+	var drum := _cyl(parent, 0.16, 0.18, Palette.ORANGE, Palette.GLOW_STRONG, Vector3(0.12, 0.0, 0.18))
 	drum.rotation.z = deg_to_rad(90.0)
-	_sphere(parent, 0.1, Palette.HOT_PINK, Palette.GLOW_STRONG, Vector3(0.0, 0.0, -0.62))
-	var grip := _box(parent, Vector3(0.09, 0.22, 0.1), Palette.MAGENTA.darkened(0.5), 0.0, Vector3(0.0, -0.18, 0.22))
+	_sphere(parent, 0.1, Palette.SUN, Palette.GLOW_STRONG, Vector3(0.0, 0.0, -0.62))
+	var grip := _box(parent, Vector3(0.09, 0.22, 0.1), Palette.ORANGE.darkened(0.5), 0.0, Vector3(0.0, -0.18, 0.22))
 	grip.rotation.x = deg_to_rad(-16.0)
 
 
@@ -248,7 +248,7 @@ static func _hex(parent: Node3D) -> void:
 	for i in 6:
 		var angle := float(i) * TAU / 6.0
 		var bar := _box(
-			parent, Vector3(0.38, 0.06, 0.06), Palette.VIOLET, Palette.GLOW_STRONG,
+			parent, Vector3(0.38, 0.06, 0.06), Palette.AZURE, Palette.GLOW_STRONG,
 			Vector3(sin(angle) * radius, 0.0, cos(angle) * radius)
 		)
 		bar.rotation.y = angle + PI * 0.5
@@ -274,7 +274,7 @@ static func _cart_body(parent: Node3D) -> void:
 			wheel.rotation.z = deg_to_rad(90.0)
 	for x: float in [-0.32, 0.32]:
 		_box(parent, Vector3(0.18, 0.1, 0.06), Palette.HEADLIGHT, Palette.GLOW_STRONG, Vector3(x, 0.42, -1.05))
-	var ram := _box(parent, Vector3(1.05, 0.16, 0.42), Palette.MAGENTA, Palette.GLOW_STRONG, Vector3(0.0, 0.28, -1.12))
+	var ram := _box(parent, Vector3(1.05, 0.16, 0.42), Palette.ORANGE, Palette.GLOW_STRONG, Vector3(0.0, 0.28, -1.12))
 	ram.rotation.x = deg_to_rad(32.0)
 	for x: float in [-0.38, 0.38]:
 		var plate := _box(parent, Vector3(0.08, 0.42, 1.15), Palette.ICE, Palette.GLOW_MEDIUM, Vector3(x, 0.52, 0.05))

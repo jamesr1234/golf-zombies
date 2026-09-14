@@ -5,6 +5,7 @@ extends Object
 
 enum Mode { SOLO, COOP, ONLINE_VS, ONLINE_COOP_VS }
 enum Kind { EASY, MEDIUM, HARD, IMPOSSIBLE }
+enum TutorialGoal { NONE, DRIVE_RAMP, CLEAR_PACK }
 
 const LABELS: PackedStringArray = ["Easy", "Medium", "Hard", "Impossible"]
 
@@ -16,6 +17,16 @@ static var difficulty := Kind.MEDIUM
 static var custom_hole: CustomHole
 ## The hole the creator should open with. Empty means start something new.
 static var creator_hole: CustomHole
+## True when the creator should run the action-by-action lesson.
+static var creator_tutorial := false
+## Lesson step to resume after a tutorial playtest. 0 means start from the top.
+static var creator_lesson_at := 0
+## Tool in hand when that playtest launched, so the workbench opens on Place.
+static var creator_lesson_tool := 0
+## Pause / finish of a tutorial playtest should land back in the creator.
+static var return_to_creator := false
+## What the current lesson playtest has to finish before the workbench opens.
+static var tutorial_goal := TutorialGoal.NONE
 
 
 static func is_solo() -> bool:
@@ -71,6 +82,8 @@ static func reset() -> void:
 	difficulty = Kind.MEDIUM
 	custom_hole = null
 	creator_hole = null
+	creator_tutorial = false
+	_clear_lesson()
 
 
 static func mute_master(muted: bool) -> void:
@@ -91,9 +104,31 @@ static func play_custom(hole: CustomHole) -> void:
 	creator_hole = hole
 
 
+## Same as play_custom, but the pause menu and a finished hole send the player
+## back to the workbench on the next lesson step.
+static func play_tutorial_hole(
+	hole: CustomHole, lesson_at: int, tool := 0, goal := TutorialGoal.NONE
+) -> void:
+	play_custom(hole)
+	creator_tutorial = true
+	creator_lesson_at = maxi(lesson_at, 0)
+	creator_lesson_tool = tool
+	return_to_creator = true
+	tutorial_goal = goal
+
+
 static func edit_custom(hole: CustomHole) -> void:
 	creator_hole = hole
 	custom_hole = null
+	creator_tutorial = false
+	_clear_lesson()
+
+
+static func start_tutorial() -> void:
+	var hole := CustomHole.create("Tutorial")
+	hole.needs_width = true
+	edit_custom(hole)
+	creator_tutorial = true
 
 
 static func take_creator_hole() -> CustomHole:
@@ -101,6 +136,38 @@ static func take_creator_hole() -> CustomHole:
 	creator_hole = null
 	custom_hole = null
 	return hole
+
+
+static func take_creator_tutorial() -> bool:
+	var on := creator_tutorial
+	creator_tutorial = false
+	return on
+
+
+static func take_creator_lesson_at() -> int:
+	var at := creator_lesson_at
+	creator_lesson_at = 0
+	return at
+
+
+static func take_creator_lesson_tool() -> int:
+	var next := creator_lesson_tool
+	creator_lesson_tool = 0
+	return next
+
+
+static func take_return_to_creator() -> bool:
+	var on := return_to_creator
+	return_to_creator = false
+	tutorial_goal = TutorialGoal.NONE
+	return on
+
+
+static func _clear_lesson() -> void:
+	creator_lesson_at = 0
+	creator_lesson_tool = 0
+	return_to_creator = false
+	tutorial_goal = TutorialGoal.NONE
 
 
 static func label_for(kind: Kind) -> String:

@@ -56,6 +56,7 @@ static func build(data: HoleData) -> Node3D:
 		ArenaBuild.dress(region, data)
 	else:
 		region.add_child(_FairwayField.create(data))
+		GunPickup.place_starters(region, data)
 	for patch in data.patches:
 		root.add_child(SurfacePatch.create(patch, data.height))
 	if data.has_soccer_goal():

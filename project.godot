@@ -10,11 +10,11 @@ config_version=5
 
 [application]
 
-config/name="golf zombies"
+config/name="Golf Is?"
 run/main_scene="res://scenes/ui/main_menu.tscn"
 config/features=PackedStringArray("4.6", "Forward Plus")
 run/low_processor_mode=true
-config/icon="res://icon.svg"
+config/icon="res://icon.png"
 
 [autoload]
 

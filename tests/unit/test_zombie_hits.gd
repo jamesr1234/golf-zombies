@@ -67,7 +67,7 @@ func test_walkers_start_a_little_faster_than_a_shuffle() -> void:
 	var walker: ZombieStats = preload("res://resources/zombies/walker.tres")
 	var runner: ZombieStats = preload("res://resources/zombies/runner.tres")
 	assert_gt(walker.speed, 3.0, "green walkers should close ground on hole one")
-	assert_lt(walker.speed, runner.speed, "they still should not outrun the pink ones")
+	assert_lt(walker.speed, runner.speed, "they still should not outrun the yellow ones")
 
 
 func test_walking_on_a_slope_follows_the_turf() -> void:

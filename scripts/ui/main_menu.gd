@@ -33,7 +33,6 @@ var difficulty_index := 1
 var started := false
 
 var _title: Label
-var _tag: Label
 var _panel: PanelContainer
 var _heading: Label
 var _options: VBoxContainer
@@ -190,7 +189,7 @@ func _build() -> void:
 	glow.offset_top = 40.0
 	glow.offset_right = -80.0
 	glow.offset_bottom = -40.0
-	glow.color = Color(Palette.MAGENTA, 0.05)
+	glow.color = Color(Palette.ORANGE, 0.05)
 	glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(glow)
 
@@ -206,15 +205,9 @@ func _build() -> void:
 
 	_title = Label.new()
 	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_title.label_settings = HudStyle.banner(Palette.MAGENTA, 52)
-	_title.text = HudStyle.chrome("Golf Zombies")
+	_title.label_settings = HudStyle.banner(Palette.ORANGE, 52)
+	_title.text = HudStyle.chrome("Golf Is?")
 	root.add_child(_title)
-
-	_tag = Label.new()
-	_tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_tag.label_settings = HudStyle.readout(Palette.CYAN, 18)
-	_tag.text = HudStyle.chrome("Nine holes. One ball. Don't get eaten.")
-	root.add_child(_tag)
 
 	_panel = PanelContainer.new()
 	_panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -270,9 +263,9 @@ func _refresh() -> void:
 		button.add_theme_stylebox_override("hover", _option_style(true))
 		button.add_theme_stylebox_override("pressed", _option_style(true))
 		button.add_theme_color_override(
-			"font_color", Palette.MAGENTA if i == selected else Palette.ICE
+			"font_color", Palette.ORANGE if i == selected else Palette.ICE
 		)
-		button.add_theme_color_override("font_hover_color", Palette.MAGENTA)
+		button.add_theme_color_override("font_hover_color", Palette.ORANGE)
 		var index := i
 		button.pressed.connect(func() -> void:
 			if step == Step.MODE:
@@ -301,8 +294,8 @@ func _panel_style() -> StyleBoxFlat:
 
 func _option_style(selected: bool) -> StyleBoxFlat:
 	var box := StyleBoxFlat.new()
-	box.bg_color = Color(Palette.MAGENTA, 0.18) if selected else Color(0.06, 0.04, 0.1, 0.7)
-	box.border_color = Palette.MAGENTA if selected else Color(Palette.CYAN, 0.35)
+	box.bg_color = Color(Palette.ORANGE, 0.18) if selected else Color(0.04, 0.06, 0.08, 0.7)
+	box.border_color = Palette.ORANGE if selected else Color(Palette.CYAN, 0.35)
 	box.set_border_width_all(2 if selected else 1)
 	box.set_corner_radius_all(3)
 	box.content_margin_left = 14.0

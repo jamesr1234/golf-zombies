@@ -1,7 +1,7 @@
 class_name TeeSign
 extends Node3D
 ## Neon marker beside the tee. Local +Z is the readable face. Header copy and a
-## top-down of the hole all sit inside the magenta frame.
+## top-down of the hole all sit inside the orange frame.
 
 const BOARD := Vector2(2.45, 3.55)
 const BOARD_Y := 3.05
@@ -41,7 +41,7 @@ func _posts() -> void:
 		post.position = Vector3(side * half, 1.6, 0.0)
 		post.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(post)
-		var ring := MeshFactory.cylinder(0.11, 0.08, Palette.MAGENTA, Palette.GLOW_MEDIUM)
+		var ring := MeshFactory.cylinder(0.11, 0.08, Palette.ORANGE, Palette.GLOW_MEDIUM)
 		ring.position = Vector3(side * half, 2.55, 0.0)
 		ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(ring)
@@ -56,7 +56,7 @@ func _board() -> void:
 	_unshaded(back)
 	add_child(back)
 	_frame(
-		BOARD + Vector2(0.12, 0.12), 0.07, BOARD_Y, 0.03, Palette.MAGENTA, Palette.GLOW_MEDIUM
+		BOARD + Vector2(0.12, 0.12), 0.07, BOARD_Y, 0.03, Palette.ORANGE, Palette.GLOW_MEDIUM
 	)
 	_frame(BOARD - Vector2(0.08, 0.08), 0.045, BOARD_Y, 0.05, Palette.CYAN, Palette.GLOW_SOFT)
 	var plate := MeshFactory.box(

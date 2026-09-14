@@ -239,7 +239,7 @@ func _pose_steps() -> void:
 func _paint_button() -> void:
 	if _cap == null:
 		return
-	var color := Palette.CYAN if sync_dir > 0 else Palette.MAGENTA
+	var color := Palette.CYAN if sync_dir > 0 else Palette.ORANGE
 	_cap.material_override = MeshFactory.material(color, false, 0.8)
 
 

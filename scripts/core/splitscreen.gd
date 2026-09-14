@@ -4,6 +4,8 @@ extends Node
 ## stacked split-screen. Owns pause, restart, and the quit back to the title.
 
 const TITLE := "res://scenes/ui/main_menu.tscn"
+const CREATOR := "res://scenes/creator/hole_creator.tscn"
+const _Tutorial := preload("res://scripts/creator/tutorial_playtest.gd")
 
 @onready var screens: VBoxContainer = $Screens
 @onready var top_screen: SubViewportContainer = $Screens/Top
@@ -23,6 +25,8 @@ var _flow: MatchFlow
 var _paused := false
 var _ended := false
 var _solo := true
+var _leaving := false
+var _drill: _Tutorial
 
 
 func _enter_tree() -> void:
@@ -45,6 +49,9 @@ func _ready() -> void:
 		_human = _players[0]
 		_setup_coop()
 	_flow.run_ended.connect(_on_run_ended)
+	if GameSettings.tutorial_goal != GameSettings.TutorialGoal.NONE:
+		_drill = _Tutorial.new()
+		_drill.start(GameSettings.tutorial_goal)
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	_flow.begin()
 
@@ -74,8 +81,17 @@ func _input(event: InputEvent) -> void:
 				player.add_mouse_look(motion)
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	_update_solo_view()
+	if _drill != null and not _ended and not _leaving:
+		if _drill.tick(
+			world,
+			_flow.phase == MatchFlow.Phase.PLAYING,
+			_flow.spawner.live_count() if _flow.spawner != null else 0,
+			delta
+		):
+			_leave_match()
+			return
 	var interact := (
 		Input.is_action_just_pressed("p1_interact")
 		or Input.is_action_just_pressed("p2_interact")
@@ -85,9 +101,17 @@ func _process(_delta: float) -> void:
 		or Input.is_action_just_pressed("p2_pause")
 	)
 	if _ended and (interact or pause):
-		_restart()
+		if GameSettings.return_to_creator:
+			if _drill != null and not _drill.can_leave():
+				_restart()
+			else:
+				_leave_match()
+		else:
+			_restart()
 	elif _paused and interact:
-		_quit_to_menu()
+		if _drill != null and not _drill.can_leave():
+			return
+		_leave_match()
 	elif pause:
 		_toggle_pause()
 
@@ -106,9 +130,17 @@ func _toggle_pause() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if _paused else Input.MOUSE_MODE_CAPTURED
 	_broadcast(
 		"PAUSED",
-		"Press pause again to get back to the round.\nPress interact to quit to the menu.",
+		"Press pause again to get back to the round.\n%s" % _pause_leave_copy(),
 		_paused
 	)
+
+
+func _pause_leave_copy() -> String:
+	if _drill != null:
+		return _drill.pause_leave_copy()
+	if GameSettings.return_to_creator:
+		return "Press interact to return to the hole creator."
+	return "Press interact to quit to the menu."
 
 
 func _restart() -> void:
@@ -117,9 +149,17 @@ func _restart() -> void:
 
 
 func _quit_to_menu() -> void:
+	_leave_match()
+
+
+func _leave_match() -> void:
+	if _leaving:
+		return
+	_leaving = true
 	get_tree().paused = false
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	get_tree().change_scene_to_file(TITLE)
+	var path := CREATOR if GameSettings.take_return_to_creator() else TITLE
+	get_tree().change_scene_to_file(path)
 
 
 func _on_run_ended(_won: bool) -> void:

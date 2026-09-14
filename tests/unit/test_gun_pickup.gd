@@ -86,6 +86,39 @@ func test_hole_ten_leaves_the_rocket_outside_the_maze() -> void:
 	)
 
 
+func test_a_generated_hole_lays_the_starters_on_the_tee() -> void:
+	var data := HoleGenerator.generate(0, 20260816)
+	var root := HoleBuilder.build(data)
+	add_child_autofree(root)
+	var guns := root.find_children("*", "GunPickup", true, false)
+	assert_eq(guns.size(), Weapon.STARTER_GUNS.size())
+	var seen: Array[WeaponStats] = []
+	for node in guns:
+		var pickup := node as GunPickup
+		assert_true(pickup.laid_out)
+		assert_false(seen.has(pickup.stats))
+		seen.append(pickup.stats)
+		assert_true(Weapon.STARTER_GUNS.has(pickup.stats), pickup.stats.display_name)
+
+
+func test_a_custom_hole_only_gets_the_guns_you_placed() -> void:
+	var hole := CustomHole.create("Unarmed")
+	var empty := HoleBuilder.build(CustomLayout.build(hole))
+	add_child_autofree(empty)
+	assert_eq(empty.find_children("*", "GunPickup", true, false).size(), 0)
+	hole.add_placement(RIFLE.resource_path, Vector3(0.0, 0.0, -20.0))
+	var armed := HoleBuilder.build(CustomLayout.build(hole))
+	add_child_autofree(armed)
+	var guns := armed.find_children("*", "GunPickup", true, false)
+	assert_eq(guns.size(), 1)
+	assert_eq((guns[0] as GunPickup).stats, RIFLE)
+	var grass := CustomLayout.build(hole).height.height_at(0.0, -20.0)
+	assert_almost_eq(
+		(guns[0] as GunPickup).global_position.y, grass + GunPickup.HOVER, 0.08,
+		"a placed gun hovers so you can walk into it"
+	)
+
+
 func test_overlay_harvest_skips_the_pickup() -> void:
 	var overlay := Node3D.new()
 	add_child_autofree(overlay)

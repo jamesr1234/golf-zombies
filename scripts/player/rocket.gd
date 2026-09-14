@@ -4,7 +4,7 @@ extends Node3D
 ## fly until something solid is in the way, then pay the blast radius.
 
 const SPEED := 48.0
-const COLOR := Palette.HOT_PINK
+const COLOR := Palette.SUN
 
 var damage := 110.0
 var blast_radius := 6.5

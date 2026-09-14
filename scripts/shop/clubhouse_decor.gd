@@ -30,11 +30,11 @@ static func build(host: Clubhouse) -> void:
 		_plaque(host, entry)
 	for entry in DOOR_SIGNS:
 		_door_sign(host, entry)
-	_rug(host, Vector3(0.0, ClubhouseBuild.PLAZA_TOP + 0.03, 9.4), Vector2(6.4, 8.0), Color(0.18, 0.08, 0.22))
+	_rug(host, Vector3(0.0, ClubhouseBuild.PLAZA_TOP + 0.03, 9.4), Vector2(6.4, 8.0), Color(0.06, 0.14, 0.18))
 	_rug(
 		host,
 		Vector3(0.0, ClubhouseBuild.floor_y(true) + 0.03, -1.6),
-		Vector2(7.2, 6.4), Color(0.22, 0.06, 0.1)
+		Vector2(7.2, 6.4), Color(0.22, 0.10, 0.04)
 	)
 	_rug(
 		host,

@@ -21,8 +21,8 @@ func test_readout_glows_in_the_palette_colour() -> void:
 
 
 func test_banner_is_heavier_and_more_tracked_than_a_readout() -> void:
-	var readout := HudStyle.readout(Palette.MAGENTA)
-	var banner := HudStyle.banner(Palette.MAGENTA)
+	var readout := HudStyle.readout(Palette.ORANGE)
+	var banner := HudStyle.banner(Palette.ORANGE)
 	assert_gt(banner.font_size, readout.font_size)
 	assert_gt(banner.shadow_size, readout.shadow_size)
 	assert_gt(
@@ -39,7 +39,7 @@ func test_hud_applies_the_scoreboard_style_on_ready() -> void:
 	assert_eq(hud.money_label.label_settings.font_color, Palette.LIME)
 	assert_eq(hud.ammo_label.label_settings.font_color, Palette.AMBER)
 	assert_eq(hud.prompt_label.label_settings.font_color, Palette.LIME)
-	assert_eq(hud.message_title.label_settings.font_color, Palette.MAGENTA)
+	assert_eq(hud.message_title.label_settings.font_color, Palette.ORANGE)
 	assert_eq(hud.message_body.label_settings.font_color, Palette.ICE)
 	assert_eq(hud.shop_title.label_settings.font_color, Palette.AMBER)
 	assert_not_null(hud.score_label.label_settings.font)

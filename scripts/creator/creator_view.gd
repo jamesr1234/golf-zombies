@@ -38,7 +38,9 @@ func draw(data: HoleData) -> void:
 			_dbg_fairway(data, hole, ends)
 			# #endregion
 		CreatorMode.Tool.GROUP:
-			_marks.ring(_group.center(), _group.radius, Palette.AMBER)
+			_marks.view_ring(
+				_group.center(), _group.radius, Palette.AMBER, _view_camera()
+			)
 			for i in hole.placements.size():
 				if _group.is_selected(i):
 					_marks.marker(hole.placements[i][CustomHole.POSITION], Palette.LIME)
@@ -103,6 +105,12 @@ func fairway_labels() -> PackedStringArray:
 	return out
 
 
+func _view_camera() -> Camera3D:
+	if not _marks.is_inside_tree():
+		return null
+	return _marks.get_viewport().get_camera_3d()
+
+
 ## Every weapon line already drawn, plus the one being dragged out right now.
 func _draw_gates(data: HoleData, hole: CustomHole) -> void:
 	for i in hole.placements.size():
@@ -138,9 +146,9 @@ func _draw_spawns(hole: CustomHole) -> void:
 		var chase := _place.aggro_radius if editing and _place.is_hunting() else SpawnPack.clamp_aggro(
 			float(hole.placements[i].get(CustomHole.AGGRO, SpawnPack.DEFAULT_AGGRO))
 		)
-		var yard_color := Palette.LIME if editing and not _place.is_hunting() else Palette.HOT_PINK
+		var yard_color := Palette.LIME if editing and not _place.is_hunting() else Palette.SUN
 		var chase_color := Palette.LIME if editing and _place.is_hunting() else Palette.CYAN
-		_marks.marker(at, yard_color if editing else Palette.HOT_PINK)
+		_marks.marker(at, yard_color if editing else Palette.SUN)
 		_marks.ring(at, yard, yard_color)
 		_marks.ring(at, chase, chase_color)
 	if CustomHole.is_spawn(_place.picked_path()) and not _place.is_roaming():

@@ -152,7 +152,7 @@ func _build() -> void:
 
 	var title := Label.new()
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.label_settings = HudStyle.banner(Palette.MAGENTA, 36)
+	title.label_settings = HudStyle.banner(Palette.ORANGE, 36)
 	title.text = HudStyle.chrome("Fairway Width")
 	root.add_child(title)
 
@@ -201,8 +201,8 @@ func _hit(index: int) -> void:
 
 func _option_style(selected: bool) -> StyleBoxFlat:
 	var box := StyleBoxFlat.new()
-	box.bg_color = Color(Palette.MAGENTA, 0.18) if selected else Color(0.06, 0.04, 0.1, 0.7)
-	box.border_color = Palette.MAGENTA if selected else Color(Palette.CYAN, 0.35)
+	box.bg_color = Color(Palette.ORANGE, 0.18) if selected else Color(0.04, 0.06, 0.08, 0.7)
+	box.border_color = Palette.ORANGE if selected else Color(Palette.CYAN, 0.35)
 	box.set_border_width_all(2 if selected else 1)
 	box.set_corner_radius_all(3)
 	return box

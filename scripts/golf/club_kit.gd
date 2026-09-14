@@ -62,7 +62,7 @@ static func by_id(kit_id: String) -> ClubKit:
 			kit.speed_scale = 1.28
 			kit.putt_speed_scale = 0.5
 			kit.mishit_power_scale = 0.35
-			kit.color = Palette.MAGENTA
+			kit.color = Palette.ORANGE
 		_:
 			kit.id = STARTER_ID
 			kit.display_name = "Starter Set"

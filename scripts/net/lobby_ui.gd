@@ -377,7 +377,7 @@ func _build() -> void:
 	add_child(root)
 	_title = Label.new()
 	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_title.label_settings = HudStyle.banner(Palette.MAGENTA, 52)
+	_title.label_settings = HudStyle.banner(Palette.ORANGE, 52)
 	_title.text = HudStyle.chrome(_title_copy())
 	root.add_child(_title)
 	_status = Label.new()

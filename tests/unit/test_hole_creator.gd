@@ -452,6 +452,48 @@ func test_surface_snap_writes_height_as_an_offset() -> void:
 	tool.release()
 
 
+## A gun's origin is the middle of the mesh. Snapping that point onto the
+## grass buries it, and a 3D grab from the camera then misses it.
+func test_a_surface_snapped_weapon_sits_above_the_grass() -> void:
+	var hole := CustomHole.create("Armed Snap")
+	var tool := PlaceTool.new(hole)
+	var host := Node3D.new()
+	add_child_autofree(host)
+	var data := CustomLayout.build(hole)
+	tool.height = data.height
+	tool.surface_snap = true
+	while tool.shelf() != PieceCatalog.WEAPONS:
+		tool.step_shelf(1)
+	tool.aim(host, host, Vector3(0.0, 20.0, -20.0))
+	assert_true(CustomHole.is_weapon(tool.picked_path()))
+	var ghost_y := tool._ghost.position.y
+	var grass := tool.height.height_at(tool.aim_at().x, tool.aim_at().z)
+	assert_almost_eq(ghost_y, grass + GunPickup.HOVER, 0.08, "the ghost hovers, it does not sink")
+	assert_true(tool.place())
+	var stored: Vector3 = hole.placements[0][CustomHole.POSITION]
+	assert_almost_eq(stored.y, 0.0, 0.05, "the record still stores a ground point")
+	var overlay := CustomOverlay.build(hole, data)
+	add_child_autofree(overlay)
+	var pickup := overlay.get_child(0) as GunPickup
+	assert_not_null(pickup)
+	assert_almost_eq(pickup.position.y, grass + GunPickup.HOVER, 0.08)
+	var box := GridSnap.world_aabb(pickup)
+	assert_gt(box.position.y, grass - 0.02, "the mesh must not sit in the dirt")
+	tool.release()
+
+
+func test_a_weapon_on_the_grass_is_found_from_above() -> void:
+	var hole := CustomHole.create("Find Gun")
+	hole.add_placement(RIFLE, Vector3(0.0, 0.0, -20.0))
+	var tool := PlaceTool.new(hole)
+	tool.height = CustomLayout.build(hole).height
+	var grass := tool.height.height_at(0.0, -20.0)
+	assert_eq(tool.nearest_weapon(Vector3(0.0, grass, -20.0)), 0)
+	assert_eq(tool.nearest_weapon(Vector3(0.4, grass + 14.0, -20.2)), 0, "look down from the air")
+	assert_eq(tool.nearest_weapon(Vector3(0.0, 14.0, -20.0)), 0)
+	assert_eq(tool.nearest_weapon(Vector3(20.0, grass, -20.0)), -1)
+
+
 func test_turning_a_piece_stays_on_half_right_angles() -> void:
 	var tool := PlaceTool.new(CustomHole.create("Turning"))
 	tool.turn(1)
@@ -505,6 +547,25 @@ func test_erase_uses_the_surface_under_the_crosshair() -> void:
 	var tool := PlaceTool.new(hole)
 	assert_false(tool.erase(Vector3(0.0, -8.2, -34.5)), "an underground aim is not close enough")
 	assert_true(tool.erase(Vector3(0.0, 0.0, -31.2)), "the grass hit under the lens is")
+
+
+func test_the_group_ring_faces_the_lens() -> void:
+	var camera := CreatorCamera.create()
+	add_child_autofree(camera)
+	camera.current = true
+	camera.rotation = Vector3(deg_to_rad(-20.0), deg_to_rad(55.0), 0.0)
+	camera.global_position = Vector3(8.0, 14.0, 22.0)
+	var look := -camera.global_transform.basis.z
+	var center := camera.aim_point()
+	for i in CreatorMarks.RING_STEPS:
+		var at := CreatorMarks.ring_point(
+			center, 10.8, TAU * float(i) / float(CreatorMarks.RING_STEPS),
+			camera.global_transform.basis.x, camera.global_transform.basis.y
+		)
+		assert_almost_eq(at.distance_to(center), 10.8, 0.01)
+		assert_almost_eq((at - center).dot(look), 0.0, 0.01, "every point sits on the lens plane")
+	var ground := CreatorMarks.ring_point(center, 10.8, 0.0)
+	assert_almost_eq(ground.y, center.y, 0.01, "a yard ring still lies on the grass")
 
 
 func test_the_group_tool_gathers_a_ring_and_saves_it() -> void:
@@ -985,14 +1046,54 @@ func test_circle_does_the_tool_in_hand() -> void:
 	creator.switch_tool(CreatorMode.Tool.PLACE)
 	creator._place.aim(creator._held, creator._world.nav(), Vector3(0.0, 0.0, -20.0))
 	creator.context()
-	assert_true(creator._place.is_holding(), "place Circle parks the ghost when no gun is down")
+	assert_true(creator._place.is_holding(), "place Circle parks the ghost")
 	assert_false(creator._place.is_gating())
 	creator.context()
 	assert_false(creator._place.is_holding(), "Circle again lets the ghost follow")
 	creator.hole.add_placement(RIFLE, creator._camera.aim_point())
 	creator._refresh_props()
 	creator.context()
-	assert_true(creator._place.is_gating(), "place Circle draws a weapon line")
+	assert_false(creator._place.is_gating(), "Circle does not start a weapon line")
+	assert_true(creator._place.is_holding(), "Circle still parks when a gun is already down")
+
+
+## R2 walks every drop: the piece, then the line or yard, then the chase.
+func test_r2_confirms_weapon_lines_and_spawn_rings() -> void:
+	var creator: CreatorMode = load("res://scenes/creator/hole_creator.tscn").instantiate()
+	add_child_autofree(creator)
+	await wait_frames(1)
+	creator.switch_tool(CreatorMode.Tool.PLACE)
+	while creator._place.shelf() != PieceCatalog.WEAPONS:
+		creator._place.step_shelf(1)
+	creator._place.aim(creator._held, creator._world.nav(), Vector3(0.0, 0.0, -20.0))
+	creator.confirm()
+	assert_true(creator._place.is_gating(), "R2 drops the gun and starts its line")
+	creator.context()
+	assert_true(creator._place.is_gating(), "Circle does not set the line")
+	creator._place.aim_gate = 0.4
+	creator.confirm()
+	assert_false(creator._place.is_gating())
+	assert_almost_eq(float(creator.hole.placements[0][CustomHole.GATE]), 0.4, 0.001)
+	var gun_at: Vector3 = creator.hole.placements[0][CustomHole.POSITION]
+	var placed := creator.hole.placements.size()
+	creator._camera.rotation = Vector3.ZERO
+	creator._camera.global_position = gun_at + Vector3(0.0, 0.0, creator._camera.reach)
+	creator.confirm()
+	assert_eq(creator.hole.placements.size(), placed, "R2 must not drop a second gun")
+	assert_true(creator._place.is_gating(), "R2 redraws a line on a gun already down")
+	creator.cancel()
+	_pick_spawn(creator._place)
+	creator._place.aim(creator._held, creator._world.nav(), Vector3(0.0, 0.0, -20.0))
+	creator.confirm()
+	assert_true(creator._place.is_roaming(), "R2 drops the spawn and starts the yard")
+	creator.context()
+	assert_false(creator._place.is_hunting(), "Circle does not set the yard")
+	creator.confirm()
+	assert_true(creator._place.is_hunting(), "R2 sets the yard and starts the chase")
+	creator.context()
+	assert_true(creator._place.is_hunting(), "Circle does not set the chase")
+	creator.confirm()
+	assert_true(creator._ui.picking_spawn(), "R2 sets the chase and asks who walks it")
 
 
 func test_the_pause_menu_asks_before_erasing_the_hole() -> void:
@@ -1073,16 +1174,69 @@ func test_the_browser_lists_what_was_saved() -> void:
 	await wait_frames(1)
 	assert_eq(browser.rows.size(), 2)
 	assert_eq(String(browser.rows[0]["title"]), "Beta", "the newest hole is at the top")
-	assert_true(browser.picking_new(), "a new hole is always the first choice")
+	assert_true(browser.picking_tutorial(), "the lesson sits above every hole")
+	assert_false(browser.picking_new())
 	assert_true(browser._open)
 	assert_false(browser._leaving)
 	browser.move(1)
-	assert_eq(browser.picked, 1)
+	assert_true(browser.picking_new())
+	browser.move(1)
+	assert_eq(browser.picked, 2)
 	assert_false(browser.picking_new())
 	browser.erase()
 	assert_eq(browser.rows.size(), 1)
 	assert_false(browser.picking_new())
-	assert_eq(String(browser.rows[browser.picked - 1]["title"]), "Alpha")
+	assert_eq(String(browser.rows[browser._hole_index()]["title"]), "Alpha")
+
+
+func test_the_browser_asks_before_deleting() -> void:
+	HoleStore.save_hole(CustomHole.create("Keep Me"))
+	var browser: HoleBrowser = load("res://scenes/creator/hole_browser.tscn").instantiate()
+	add_child_autofree(browser)
+	await wait_frames(1)
+	browser.move(1)
+	browser.move(1)
+	assert_false(browser.picking_new())
+	browser.ask_erase()
+	assert_true(browser.confirming())
+	assert_eq(browser._confirm.prompt(), HudStyle.chrome(HoleBrowser.DELETE_PROMPT))
+	browser.move(1)
+	assert_eq(browser.picked, 2, "the list holds still while the prompt is up")
+	browser._confirm._open = true
+	browser._confirm._pick = 1
+	browser._confirm.confirm()
+	assert_false(browser.confirming())
+	assert_eq(browser.rows.size(), 1, "backing out keeps the hole")
+
+
+func test_the_browser_deletes_after_confirm() -> void:
+	HoleStore.save_hole(CustomHole.create("Drop Me"))
+	var browser: HoleBrowser = load("res://scenes/creator/hole_browser.tscn").instantiate()
+	add_child_autofree(browser)
+	await wait_frames(1)
+	browser.move(1)
+	browser.move(1)
+	browser.ask_erase()
+	browser._confirm._open = true
+	browser._confirm._pick = 0
+	browser._confirm.confirm()
+	assert_false(browser.confirming())
+	assert_eq(browser.rows.size(), 0)
+
+
+func test_the_browser_does_not_ask_to_delete_the_tutorial() -> void:
+	HoleStore.save_hole(CustomHole.create("Mine"))
+	var browser: HoleBrowser = load("res://scenes/creator/hole_browser.tscn").instantiate()
+	add_child_autofree(browser)
+	await wait_frames(1)
+	assert_true(browser.picking_tutorial())
+	browser.ask_erase()
+	assert_false(browser.confirming())
+	browser.move(1)
+	assert_true(browser.picking_new())
+	browser.ask_erase()
+	assert_false(browser.confirming())
+	assert_eq(browser.rows.size(), 1)
 
 
 func test_help_starts_closed_and_toggles() -> void:

@@ -4,12 +4,12 @@ extends CanvasLayer
 ## re-wired when a player goes down, starts golfing or swaps weapons.
 
 const LOW_HEALTH := 0.45
-const DOWNED_TINT := Color(0.55, 0.02, 0.35, 0.38)
-const HURT_TINT := Color(0.45, 0.0, 0.3, 0.22)
+const DOWNED_TINT := Color(0.55, 0.16, 0.02, 0.38)
+const HURT_TINT := Color(0.50, 0.12, 0.0, 0.22)
 const HIT_FLASH := Color(0.95, 0.04, 0.08, 0.7)
 const UNDERWATER_TINT := Color(0.02, 0.18, 0.42, 0.4)
 const REVIVE_TINT := Palette.LIME
-const BLEED_TINT := Palette.MAGENTA
+const BLEED_TINT := Palette.ORANGE
 const DRUNK_SHADER := preload("res://assets/shaders/drunk_vision.gdshader")
 const _MechReticle := preload("res://scripts/ui/mech_reticle.gd")
 const CALLOUT_TIME := 1.35
@@ -304,7 +304,7 @@ func _update_timer() -> void:
 		timer_label.text = HudStyle.chrome(GameState.format_clock(poker_t))
 		var color := Palette.ICE
 		if poker_t <= 10.0:
-			color = Palette.MAGENTA
+			color = Palette.ORANGE
 		elif poker_t <= 30.0:
 			color = Palette.AMBER
 		timer_label.label_settings.font_color = color
@@ -322,7 +322,7 @@ func _update_timer() -> void:
 	timer_label.text = HudStyle.chrome(GameState.format_clock(flow.hole_time_left))
 	var color := Palette.ICE
 	if flow.hole_time_left <= 10.0:
-		color = Palette.MAGENTA
+		color = Palette.ORANGE
 	elif flow.hole_time_left <= 30.0:
 		color = Palette.AMBER
 	timer_label.label_settings.font_color = color

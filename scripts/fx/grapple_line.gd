@@ -2,7 +2,7 @@ class_name GrappleLine
 extends Node3D
 ## Neon rope from the muzzle to the claw. The cable stays taut while you ride.
 
-const COLOR := Palette.HOT_PINK
+const COLOR := Palette.SUN
 const CORE := Palette.ICE
 const WIDTH := 0.055
 const GLOW_WIDTH := 0.11

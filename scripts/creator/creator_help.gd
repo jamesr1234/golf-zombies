@@ -17,7 +17,7 @@ const ROWS: Array[Dictionary] = [
 	{"icons": ["dpad_left", "dpad_right"], "join": "/", "label": "Turn / grow / reach"},
 	{"icons": ["l1", "r1"], "join": "/", "label": "Previous / next tool"},
 	{"icons": ["square"], "join": "", "label": "Next shelf"},
-	{"icons": ["circle"], "join": "", "label": "Hold / line / merge"},
+	{"icons": ["circle"], "join": "", "label": "Hold / merge"},
 	{"icons": ["l1", "circle"], "join": "+", "label": "Undo"},
 	{"icons": ["l1", "triangle"], "join": "+", "label": "Redo"},
 	{"icons": ["l3"], "join": "", "label": "Surface snap"},

@@ -20,7 +20,7 @@ static func apply(hud: Hud) -> void:
 	hud.money_label.label_settings = readout(Palette.LIME)
 	hud.ammo_label.label_settings = readout(Palette.AMBER)
 	hud.prompt_label.label_settings = readout(Palette.LIME, PROMPT_SIZE)
-	hud.message_title.label_settings = readout(Palette.MAGENTA)
+	hud.message_title.label_settings = readout(Palette.ORANGE)
 	hud.message_body.label_settings = readout(Palette.ICE, BODY_SIZE)
 	hud.shop_title.label_settings = banner(Palette.AMBER)
 	hud.shop_body.label_settings = readout(Palette.ICE, BODY_SIZE)

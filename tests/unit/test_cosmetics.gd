@@ -37,7 +37,7 @@ func test_a_shirt_has_sleeves_and_a_leaning_chevron() -> void:
 	var body := PlayerBody.new()
 	add_child_autofree(body)
 	body.build(Palette.PLAYER_ONE)
-	body.wear_shirt("shirt_violet", Palette.VIOLET)
+	body.wear_shirt("shirt_violet", Palette.AZURE)
 	var sleeves := 0
 	var tilted := 0
 	for mesh in body._shirts:
@@ -65,7 +65,7 @@ func test_shorts_keep_a_waist_on_the_hips() -> void:
 	var body := PlayerBody.new()
 	add_child_autofree(body)
 	body.build(Palette.PLAYER_ONE)
-	body.wear_bottom("shorts_pink", "shorts", Palette.HOT_PINK)
+	body.wear_bottom("shorts_pink", "shorts", Palette.SUN)
 	var on_hips := 0
 	for mesh in body._bottoms:
 		if mesh.get_parent() == body.hips:
@@ -82,7 +82,7 @@ func test_scrolling_a_shirt_tries_it_on_without_buying() -> void:
 	assert_true(body.is_wearing("shirt_cyan"), "the rack is a preview, not a purchase")
 	assert_false(body.is_wearing("shirt_violet"))
 	assert_true(body.is_trying_on("shirt_violet"))
-	assert_eq(_chest_color(body), Palette.VIOLET)
+	assert_eq(_chest_color(body), Palette.AZURE)
 	body.clear_try_on()
 	assert_false(body.is_trying_on("shirt_violet"))
 	assert_eq(_chest_color(body), Palette.CYAN)
@@ -105,12 +105,12 @@ func test_buying_the_preview_keeps_it_when_you_walk_off() -> void:
 	add_child_autofree(body)
 	body.build(Palette.PLAYER_ONE)
 	body.try_on(ShopStock.wear_by_id("shirt_violet"))
-	body.wear_shirt("shirt_violet", Palette.VIOLET)
+	body.wear_shirt("shirt_violet", Palette.AZURE)
 	assert_true(body.is_wearing("shirt_violet"))
 	assert_false(body.is_trying_on("shirt_violet"))
 	body.clear_try_on()
 	assert_true(body.is_wearing("shirt_violet"))
-	assert_eq(_chest_color(body), Palette.VIOLET)
+	assert_eq(_chest_color(body), Palette.AZURE)
 
 
 func test_inspect_spin_stays_on_the_item_middle() -> void:

@@ -21,6 +21,10 @@ var pitch := -14.0
 var frozen := false
 
 var _mouse := Vector2.ZERO
+## Tip is up, so Cross is "continue", not descend.
+var _lock_drop := false
+## Sticky after a tip until Cross / Z are released.
+var _hold_drop := false
 
 
 static func create() -> CreatorCamera:
@@ -59,6 +63,16 @@ func nudge_reach(steps: float) -> void:
 	reach = clampf(reach + steps * REACH_STEP, REACH_MIN, REACH_MAX)
 
 
+func lock_drop(on: bool) -> void:
+	_lock_drop = on
+	if on:
+		_hold_drop = true
+
+
+func drop_held() -> bool:
+	return _lock_drop or _hold_drop
+
+
 ## Stick up / W is look-forward. Godot's move vector already puts forward on
 ## -Y, so adding basis.z (the camera's back) walks the way the lens points.
 static func travel(basis: Basis, wish: Vector2) -> Vector3:
@@ -87,8 +101,15 @@ func fly(delta: float) -> void:
 	var climb := PadInput.pressed("revive") and not PadInput.pressed("melee")
 	if Input.is_physical_key_pressed(KEY_SPACE) or climb:
 		step += Vector3.UP
+	var jump := PadInput.pressed("jump")
 	var drop := Input.is_physical_key_pressed(KEY_Z) and not _command_mod()
-	if drop or PadInput.pressed("jump"):
+	if _lock_drop or _hold_drop:
+		if jump or drop:
+			jump = false
+			drop = false
+		elif not _lock_drop:
+			_hold_drop = false
+	if drop or jump:
 		step += Vector3.DOWN
 	# L3 is surface snap, so boost stays on Shift.
 	var speed := SPEED * (BOOST if Input.is_physical_key_pressed(KEY_SHIFT) else 1.0)

@@ -1,14 +1,14 @@
 shader_type sky;
 
-// Synthwave night: magenta haze on the horizon fading up to near-black, with a
+// Neon night: teal haze on the horizon fading up to near-black, with a
 // scatter of stars hashed off the view direction so no texture is needed.
 
-uniform vec3 horizon_color : source_color = vec3(0.42, 0.05, 0.45);
-uniform vec3 zenith_color : source_color = vec3(0.02, 0.01, 0.1);
+uniform vec3 horizon_color : source_color = vec3(0.05, 0.38, 0.42);
+uniform vec3 zenith_color : source_color = vec3(0.01, 0.03, 0.06);
 uniform vec3 ground_color : source_color = vec3(0.01, 0.01, 0.02);
 uniform float star_threshold = 0.9987;
 uniform float star_energy = 2.5;
-// Higher values keep the magenta hugging the horizon instead of flooding the sky.
+// Higher values keep the teal hugging the horizon instead of flooding the sky.
 uniform float horizon_falloff = 4.0;
 
 float star_hash(vec3 cell) {

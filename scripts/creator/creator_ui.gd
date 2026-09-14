@@ -36,6 +36,7 @@ var _spawn: CreatorSpawn
 var _confirm: CreatorConfirm
 var _menu: PanelContainer
 var _help: CreatorHelp
+var _coach: CreatorCoach
 ## Menu rows are held as data so the stick can walk them, not just the mouse.
 var _menu_rows: Array[Button] = []
 var _menu_pick := 0
@@ -196,6 +197,16 @@ func help_is_visible() -> bool:
 	return _help != null and _help.visible
 
 
+func attach_lesson(lesson: CreatorLesson) -> void:
+	if _coach != null:
+		_coach.bind(lesson)
+		lesson.praised.connect(func(_text: String) -> void: Sfx.play("ui_confirm", self))
+
+
+func coach_is_visible() -> bool:
+	return _coach != null and _coach.visible
+
+
 func move_menu(delta: int) -> void:
 	if not menu_is_open() or _menu_rows.is_empty():
 		return
@@ -213,7 +224,7 @@ func pick_menu() -> void:
 func _show_menu_pick() -> void:
 	for i in _menu_rows.size():
 		_menu_rows[i].add_theme_color_override(
-			"font_color", Palette.MAGENTA if i == _menu_pick else Palette.ICE
+			"font_color", Palette.ORANGE if i == _menu_pick else Palette.ICE
 		)
 
 
@@ -239,7 +250,7 @@ func _build() -> void:
 	add_child(root)
 
 	var side := CreatorChrome.bar(root, Control.PRESET_TOP_LEFT, Vector2(18.0, 16.0))
-	_title = CreatorChrome.label(Palette.MAGENTA, 26, true)
+	_title = CreatorChrome.label(Palette.ORANGE, 26, true)
 	side.add_child(_title)
 	_stat = CreatorChrome.label(Palette.CYAN, 16)
 	side.add_child(_stat)
@@ -276,6 +287,8 @@ func _build() -> void:
 	_confirm.confirmed.connect(erase_requested.emit)
 	_confirm.cancelled.connect(erase_cancelled.emit)
 	root.add_child(_confirm)
+	_coach = CreatorCoach.create()
+	root.add_child(_coach)
 	_build_menu(root)
 
 

@@ -5,22 +5,22 @@ extends Object
 ## since those are grid materials rather than flat colours.
 
 const CYAN := Color(0.15, 0.95, 1.0)
-const MAGENTA := Color(1.0, 0.14, 0.72)
+const ORANGE := Color(1.0, 0.42, 0.06)
 const LIME := Color(0.5, 1.0, 0.2)
 const AMBER := Color(1.0, 0.7, 0.1)
 const BABY_BLUE := Color(0.58, 0.84, 1.0)
-const VIOLET := Color(0.62, 0.28, 1.0)
-const HOT_PINK := Color(1.0, 0.24, 0.5)
+const AZURE := Color(0.16, 0.52, 1.0)
+const SUN := Color(1.0, 0.86, 0.08)
 const ICE := Color(0.8, 0.97, 1.0)
 const NET: Color = Color(0.42, 1.0, 0.62)
-const DOOR := Color(0.52, 0.32, 1.0)
-const NIGHT := Color(0.03, 0.03, 0.06)
+const DOOR := Color(0.12, 0.85, 0.72)
+const NIGHT := Color(0.02, 0.04, 0.06)
 
 const PLAYER_ONE := CYAN
 const PLAYER_TWO := AMBER
 ## Seat colours for online VS. Local co-op still uses the first two.
 const SEATS: Array[Color] = [
-	CYAN, AMBER, MAGENTA, LIME, VIOLET, HOT_PINK, BABY_BLUE, ICE,
+	CYAN, AMBER, ORANGE, LIME, AZURE, SUN, BABY_BLUE, ICE,
 ]
 
 
@@ -30,11 +30,11 @@ static func seat_color(seat: int) -> Color:
 	return SEATS[posmod(seat, SEATS.size())]
 
 const BALL := ICE
-const FLAG := HOT_PINK
+const FLAG := SUN
 const FLAGPOLE := ICE
-const AIM_ARROW := MAGENTA
-const CUP_RING := MAGENTA
-const CUP_MOUTH := Color(0.02, 0.01, 0.03)
+const AIM_ARROW := ORANGE
+const CUP_RING := ORANGE
+const CUP_MOUTH := Color(0.02, 0.015, 0.01)
 
 const CART := Color(0.2, 1.0, 0.85)
 const CART_FRAME := Color(0.09, 0.26, 0.28)
@@ -50,7 +50,7 @@ const ALLY_CAP := Color(0.2, 0.78, 1.0)
 const BEER_LID := Color(0.82, 0.86, 0.9)
 
 const TRACER := AMBER
-const HIT_ZOMBIE := MAGENTA
+const HIT_ZOMBIE := ORANGE
 const HIT_WORLD := CYAN
 const PICKUP := LIME
 
@@ -68,16 +68,16 @@ const TREE_CANOPIES: Array[Color] = [
 	Color(0.48, 0.95, 0.18),
 	Color(0.16, 0.70, 0.58),
 	Color(0.62, 0.88, 0.20),
-	VIOLET,
-	HOT_PINK,
+	AZURE,
+	SUN,
 	AMBER,
 ]
 const ROCK := Color(0.1, 0.13, 0.18)
 const ROCK_TRIM := CYAN
 const MECH := Color(0.95, 0.55, 0.12)
 const MECH_FRAME := Color(0.16, 0.1, 0.05)
-const WALL := Color(0.12, 0.06, 0.14)
-const WALL_TRIM := MAGENTA
+const WALL := Color(0.07, 0.09, 0.10)
+const WALL_TRIM := ORANGE
 const CONCRETE := Color(0.2, 0.22, 0.26)
 const CONCRETE_TRIM := CYAN
 

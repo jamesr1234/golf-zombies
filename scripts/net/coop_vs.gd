@@ -9,7 +9,7 @@ const TEAM_COUNT := 8
 const FIELD_SIZE := TEAM_COUNT * TEAM_SIZE
 const MAX_OVER_PAR := 4
 const SEAT_NAMES: PackedStringArray = [
-	"Cyan", "Amber", "Magenta", "Lime", "Violet", "Pink", "Blue", "Ice",
+	"Cyan", "Amber", "Orange", "Lime", "Azure", "Sun", "Blue", "Ice",
 ]
 
 

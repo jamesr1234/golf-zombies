@@ -76,7 +76,7 @@ func gesture_deg() -> float:
 func _build(index: int) -> void:
 	_body = PlayerBody.new()
 	add_child(_body)
-	var palette := [Palette.ICE, Palette.VIOLET, Palette.LIME, Palette.HOT_PINK, Palette.CYAN, Palette.AMBER]
+	var palette := [Palette.ICE, Palette.AZURE, Palette.LIME, Palette.SUN, Palette.CYAN, Palette.AMBER]
 	_body.build(palette[posmod(index, palette.size())])
 	var lamp := OmniLight3D.new()
 	lamp.light_color = Color(1.0, 0.62, 0.28)

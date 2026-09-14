@@ -6,7 +6,7 @@ const RADIUS := 0.048
 const THICK := 0.012
 const MAX_TOSS := 40
 const COLORS: Array[Color] = [
-	Palette.AMBER, Palette.MAGENTA, Palette.CYAN, Palette.LIME, Palette.HOT_PINK,
+	Palette.AMBER, Palette.ORANGE, Palette.CYAN, Palette.LIME, Palette.SUN,
 ]
 
 var _rng := RandomNumberGenerator.new()

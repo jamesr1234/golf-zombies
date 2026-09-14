@@ -255,18 +255,17 @@ func test_opening_the_exit_clears_the_leave_bays() -> void:
 
 
 func test_the_arena_clears_the_starter_stash() -> void:
-	var world: Node3D = load("res://scenes/world.tscn").instantiate()
-	add_child_autofree(world)
+	var world := _arena_world()
 	var flow := world.get_node("MatchFlow") as MatchFlow
 	var human := world.get_node("Players/Player2") as Player
-	flow.starting_hole = 5
-	flow.start_in_clubhouse = false
-	flow.cpu_drives_at_start = false
 	flow.begin()
 	await wait_physics_frames(6)
 	assert_true(ArenaHole.applies(flow.hole))
 	assert_eq(human.weapon.loadout.size(), 0, "pick from the floor, do not walk in armed")
-	assert_eq(world.find_children("*", "GunPickup", true, false).size(), ArenaHole.WEAPONS.size())
+	assert_eq(
+		flow.hole_root.find_children("*", "GunPickup", true, false).size(),
+		ArenaHole.WEAPONS.size()
+	)
 
 
 func test_the_round_waits_until_everyone_has_two_guns() -> void:
@@ -296,14 +295,10 @@ func test_a_third_gun_stays_on_the_floor_until_the_round_starts() -> void:
 
 
 func test_a_wipe_stands_you_back_up_for_the_next_hole() -> void:
-	var world: Node3D = load("res://scenes/world.tscn").instantiate()
-	add_child_autofree(world)
+	var world := _arena_world()
 	var flow := world.get_node("MatchFlow") as MatchFlow
 	var human := world.get_node("Players/Player2") as Player
 	var cpu := world.get_node("Players/Player1") as Player
-	flow.starting_hole = 5
-	flow.start_in_clubhouse = false
-	flow.cpu_drives_at_start = false
 	flow.begin()
 	await wait_physics_frames(6)
 	assert_true(ArenaHole.applies(flow.hole))
@@ -319,14 +314,10 @@ func test_a_wipe_stands_you_back_up_for_the_next_hole() -> void:
 
 
 func test_a_wipe_during_warmup_still_opens_the_exit() -> void:
-	var world: Node3D = load("res://scenes/world.tscn").instantiate()
-	add_child_autofree(world)
+	var world := _arena_world()
 	var flow := world.get_node("MatchFlow") as MatchFlow
 	var human := world.get_node("Players/Player2") as Player
 	var cpu := world.get_node("Players/Player1") as Player
-	flow.starting_hole = 5
-	flow.start_in_clubhouse = false
-	flow.cpu_drives_at_start = false
 	flow.begin()
 	await wait_physics_frames(6)
 	assert_eq(flow.phase, MatchFlow.Phase.PREP)
@@ -339,14 +330,10 @@ func test_a_wipe_during_warmup_still_opens_the_exit() -> void:
 
 
 func test_the_arena_opens_then_seals_after_the_loadout() -> void:
-	var world: Node3D = load("res://scenes/world.tscn").instantiate()
-	add_child_autofree(world)
+	var world := _arena_world()
 	var flow := world.get_node("MatchFlow") as MatchFlow
 	var human := world.get_node("Players/Player2") as Player
 	var cpu := world.get_node("Players/Player1") as Player
-	flow.starting_hole = 5
-	flow.start_in_clubhouse = false
-	flow.cpu_drives_at_start = false
 	flow.begin()
 	await wait_physics_frames(6)
 	var doors := ArenaDoors.of(flow.hole_root)
@@ -370,6 +357,19 @@ func test_the_arena_opens_then_seals_after_the_loadout() -> void:
 	flow.skip_preview(false)
 	assert_eq(flow.phase, MatchFlow.Phase.PLAYING)
 	assert_false(doors.is_open(), "the pit seals for the fight")
+
+
+func _arena_world() -> Node3D:
+	var world: Node3D = load("res://scenes/world.tscn").instantiate()
+	add_child_autofree(world)
+	var flow := world.get_node("MatchFlow") as MatchFlow
+	flow.starting_hole = 5
+	flow.start_in_clubhouse = false
+	flow.start_to_clubhouse = false
+	flow.start_on_cart_path = false
+	flow.start_at_cup = false
+	flow.cpu_drives_at_start = false
+	return world
 
 
 func _assert_leave_gap_open(flow: MatchFlow) -> void:

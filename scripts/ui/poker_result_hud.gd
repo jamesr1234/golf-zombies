@@ -18,13 +18,13 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var panel := $Panel as PanelContainer
 	if panel != null:
-		panel.add_theme_stylebox_override("panel", _box(Palette.MAGENTA))
-	title.label_settings = HudStyle.banner(Palette.MAGENTA)
+		panel.add_theme_stylebox_override("panel", _box(Palette.ORANGE))
+	title.label_settings = HudStyle.banner(Palette.ORANGE)
 	body.label_settings = HudStyle.readout(Palette.ICE, HudStyle.BODY_SIZE)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_idle = _box(Palette.CYAN)
-	_pick = _box(Palette.MAGENTA)
+	_pick = _box(Palette.ORANGE)
 	_style(yes_btn, "Yes")
 	_style(no_btn, "No")
 	yes_btn.pressed.connect(_on_yes)
@@ -67,7 +67,7 @@ func _style(btn: Button, copy: String) -> void:
 	btn.add_theme_font_override("font", HudStyle.banner(Palette.ICE).font)
 	btn.add_theme_font_size_override("font_size", 22)
 	btn.add_theme_color_override("font_color", Palette.ICE)
-	btn.add_theme_color_override("font_hover_color", Palette.MAGENTA)
+	btn.add_theme_color_override("font_hover_color", Palette.ORANGE)
 	btn.add_theme_color_override("font_disabled_color", Color(Palette.ICE, 0.35))
 	btn.mouse_filter = Control.MOUSE_FILTER_STOP
 
@@ -77,12 +77,12 @@ func _paint(btn: Button, on: bool) -> void:
 	btn.add_theme_stylebox_override("hover", _pick)
 	btn.add_theme_stylebox_override("pressed", _pick)
 	btn.add_theme_stylebox_override("disabled", _idle)
-	btn.add_theme_color_override("font_color", Palette.MAGENTA if on else Palette.ICE)
+	btn.add_theme_color_override("font_color", Palette.ORANGE if on else Palette.ICE)
 
 
 func _box(color: Color) -> StyleBoxFlat:
 	var box := StyleBoxFlat.new()
-	box.bg_color = Color(0.04, 0.02, 0.09, 0.97)
+	box.bg_color = Color(0.02, 0.05, 0.07, 0.97)
 	box.border_color = Color(color, 0.9)
 	box.set_border_width_all(2)
 	box.set_corner_radius_all(4)

@@ -93,7 +93,7 @@ func _post() -> void:
 	add_child(pole)
 	_shape_cyl(POST_R + 0.04, height, Vector3(0.0, height * 0.5, 0.0), Vector3.ZERO)
 	for t in [0.28, 0.55, 0.82]:
-		var band := MeshFactory.cylinder(POST_R + 0.03, 0.07, Palette.HOT_PINK, Palette.GLOW_MEDIUM)
+		var band := MeshFactory.cylinder(POST_R + 0.03, 0.07, Palette.SUN, Palette.GLOW_MEDIUM)
 		band.position.y = height * t
 		add_child(band)
 	var cap := MeshFactory.sphere(POST_R + 0.04, Palette.ICE, Palette.GLOW_SOFT)
@@ -110,10 +110,10 @@ func _target() -> void:
 	back.rotation.x = deg_to_rad(90.0)
 	back.position.z = -0.05
 	face.add_child(back)
-	_ring(face, TARGET_R, Palette.HOT_PINK, Palette.GLOW_MEDIUM, 0.0)
+	_ring(face, TARGET_R, Palette.SUN, Palette.GLOW_MEDIUM, 0.0)
 	_ring(face, TARGET_R * 0.64, Palette.ICE, Palette.GLOW_SOFT, 0.012)
-	_ring(face, TARGET_R * 0.34, Palette.MAGENTA, Palette.GLOW_STRONG, 0.024)
-	var bull := MeshFactory.disk(TARGET_R * 0.12, Palette.HOT_PINK, Palette.GLOW_STRONG)
+	_ring(face, TARGET_R * 0.34, Palette.ORANGE, Palette.GLOW_STRONG, 0.024)
+	var bull := MeshFactory.disk(TARGET_R * 0.12, Palette.SUN, Palette.GLOW_STRONG)
 	bull.rotation.x = deg_to_rad(90.0)
 	bull.position.z = 0.036
 	face.add_child(bull)
@@ -125,7 +125,7 @@ func _target() -> void:
 		bar.position.z = 0.04
 		face.add_child(bar)
 	var lamp := OmniLight3D.new()
-	lamp.light_color = Palette.HOT_PINK
+	lamp.light_color = Palette.SUN
 	lamp.light_energy = 2.8
 	lamp.omni_range = 6.0
 	lamp.position.z = 0.2

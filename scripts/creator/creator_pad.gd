@@ -9,8 +9,9 @@ extends RefCounted
 ## these on the very keys the creator uses.
 ##
 ## D-pad walks the list you can see. Shoulders change the tool. Circle parks a
-## piece so you can walk around it, or draws a weapon line when a gun is down.
-## Group Circle is merge. L1 held with Circle or Triangle walks history.
+## piece so you can walk around it. Group Circle is merge. R2 places, and also
+## sets a weapon line, spawn yard and chase. L1 held with Circle or Triangle
+## walks history.
 ## Options is the rest. L1+R1 opens the pad command list.
 
 const BUTTONS: PackedStringArray = [
@@ -82,6 +83,11 @@ func poll(active := true, delta := 0.0) -> void:
 	for suffix in BUTTONS:
 		fired[suffix] = _pad.just(suffix)
 	_pad.just("revive")
+	var next := _pad.just("jump")
+	if _host.waiting_on_tip() and not _host.menu_is_open():
+		if next:
+			_host.continue_lesson()
+		return
 	var l1 := PadInput.pressed("melee")
 	var help := false
 	if active:
@@ -106,6 +112,20 @@ func poll(active := true, delta := 0.0) -> void:
 			_host.cycle_tool(1)
 		return
 	_mark_l1(l1)
+	# #region agent log
+	if fired["shoot"] or fired["sprint"] or fired["aim"] or fired["reload"]:
+		_host._dbg("D", "creator_pad.gd:poll", "pad edge", {
+			"id": _host._lesson.id() if _host._lesson != null else "",
+			"praise": _host.waiting_on_tip(),
+			"shoot": fired["shoot"],
+			"sprint": fired["sprint"],
+			"aim": fired["aim"],
+			"reload": fired["reload"],
+			"shoot_held": PadInput.pressed("shoot"),
+			"sprint_held": PadInput.pressed("sprint"),
+			"trig": _host._dbg_trig(),
+		})
+	# #endregion
 	if fired["shoot"]:
 		_host.confirm()
 	if fired["aim"]:

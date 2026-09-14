@@ -69,7 +69,7 @@ func finish() -> void:
 
 ## The corner a fairway piece would add, so the shape is read before it lands.
 func ghost_segment(from: Vector3, to: Vector3, width: float, ok: bool) -> void:
-	var color := Palette.LIME if ok else Palette.HOT_PINK
+	var color := Palette.LIME if ok else Palette.SUN
 	var along := to - from
 	along.y = 0.0
 	if along.length_squared() < 0.01:
@@ -115,13 +115,39 @@ func gate_line(data: HoleData, t: float, width: float, color: Color) -> void:
 	_segment(at + side + lift, at - side + lift, color)
 
 
-func ring(center: Vector3, radius: float, color: Color) -> void:
-	var previous := center + Vector3(radius, 0.0, 0.0)
+## A yard stays on the grass. A group ring faces the lens so flying around
+## still shows a full circle instead of a line on the ground.
+func ring(
+	center: Vector3, radius: float, color: Color,
+	along := Vector3.RIGHT, around := Vector3.BACK
+) -> void:
+	var previous := ring_point(center, radius, 0.0, along, around)
 	for i in range(1, RING_STEPS + 1):
 		var angle := TAU * float(i) / float(RING_STEPS)
-		var point := center + Vector3(cos(angle), 0.0, sin(angle)) * radius
+		var point := ring_point(center, radius, angle, along, around)
 		_segment(previous, point, color)
 		previous = point
+
+
+func view_ring(center: Vector3, radius: float, color: Color, camera: Camera3D) -> void:
+	if camera == null:
+		ring(center, radius, color)
+		return
+	var basis := camera.global_transform.basis
+	ring(center, radius, color, basis.x, basis.y)
+
+
+static func ring_point(
+	center: Vector3, radius: float, angle: float,
+	along := Vector3.RIGHT, around := Vector3.BACK
+) -> Vector3:
+	var x := along
+	var y := around
+	if x.length_squared() < 0.0001:
+		x = Vector3.RIGHT
+	if y.length_squared() < 0.0001:
+		y = Vector3.BACK
+	return center + (x.normalized() * cos(angle) + y.normalized() * sin(angle)) * radius
 
 
 func line(from: Vector3, to: Vector3, color: Color) -> void:

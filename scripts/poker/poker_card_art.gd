@@ -95,7 +95,7 @@ static func _paint_back() -> Image:
 			var u := float(x + y)
 			var v := float(x - y + ph)
 			var cell := posmod(int(u / SS), 14) < 7 and posmod(int(v / SS), 14) < 7
-			_plot(img, x, y, Palette.CYAN if cell else Palette.MAGENTA)
+			_plot(img, x, y, Palette.CYAN if cell else Palette.ORANGE)
 	_ring(img, 0.5 * pw, 0.5 * ph, 0.09 * ph, 0.12 * ph, Palette.LED_WHITE)
 	_pip(img, 0.5 * pw, 0.5 * ph, 0.055 * ph, 3, Palette.NIGHT, false)
 	return img

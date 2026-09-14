@@ -77,7 +77,7 @@ func test_the_hud_paints_the_arrow_in_the_player_colour() -> void:
 	cam.position = Vector3(0.0, 2.0, 8.0)
 	cam.look_at(Vector3.ZERO)
 	ball.global_position = Vector3.ZERO
-	player.body_color = Palette.MAGENTA
+	player.body_color = Palette.ORANGE
 	player.golf = GolfController.new()
 	add_child_autofree(player.golf)
 	player.golf.ball = ball
@@ -85,7 +85,7 @@ func test_the_hud_paints_the_arrow_in_the_player_colour() -> void:
 	hud.flow = autofree(MatchFlow.new())
 	hud.flow.ball = ball
 	hud._update_arrow()
-	assert_eq(hud.ball_arrow.color, Palette.MAGENTA)
+	assert_eq(hud.ball_arrow.color, Palette.ORANGE)
 	assert_false(hud.ball_arrow.visible, "the lie is in frame")
 
 

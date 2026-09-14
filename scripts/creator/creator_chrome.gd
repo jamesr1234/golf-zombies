@@ -27,7 +27,7 @@ static func button(text: String, action: Callable) -> Button:
 	made.focus_mode = Control.FOCUS_NONE
 	made.add_theme_font_size_override("font_size", 17)
 	made.add_theme_color_override("font_color", Palette.ICE)
-	made.add_theme_color_override("font_hover_color", Palette.MAGENTA)
+	made.add_theme_color_override("font_hover_color", Palette.ORANGE)
 	made.pressed.connect(action)
 	return made
 
@@ -99,7 +99,7 @@ static func fill_palette(
 		var ok: bool = i >= allowed.size() or allowed[i]
 		row.modulate = Color.WHITE if ok else Color(1.0, 1.0, 1.0, 0.28)
 		row.label_settings = HudStyle.readout(
-			Palette.MAGENTA if i == selected else (Palette.ICE if ok else Palette.HOT_PINK), 15
+			Palette.ORANGE if i == selected else (Palette.ICE if ok else Palette.SUN), 15
 		)
 
 
@@ -127,7 +127,7 @@ static func crosshair(root: Control) -> void:
 	dot.offset_top = -CROSSHAIR * 0.5
 	dot.offset_right = CROSSHAIR * 0.5
 	dot.offset_bottom = CROSSHAIR * 0.5
-	dot.color = Palette.MAGENTA
+	dot.color = Palette.ORANGE
 	dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(dot)
 

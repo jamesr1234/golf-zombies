@@ -116,6 +116,10 @@ var _predicting := false
 var _predict := NetPredict.new()
 var _airborne := false
 var _land_age := -1.0
+
+
+func is_airborne() -> bool:
+	return _airborne
 var _land_strength := 0.0
 ## Seconds the driver has been asking a wedged cart to move.
 var _stuck_for := 0.0

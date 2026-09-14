@@ -9,6 +9,7 @@ signal run_ended(won: bool)
 
 const _Music := preload("res://scripts/fx/music.gd")
 const _ClubhouseFlow := preload("res://scripts/core/match_clubhouse.gd")
+const _Tutorial := preload("res://scripts/creator/tutorial_playtest.gd")
 
 enum Phase { PREP, PLAYING, RETRIEVE, TRANSIT, SHOP }
 
@@ -343,8 +344,6 @@ func _sync_loadouts() -> void:
 			continue
 		if ArenaHole.applies(hole):
 			player.weapon.clear_stash()
-		else:
-			player.weapon.fill_stash()
 
 
 func _begin_in_clubhouse(index: int) -> void:
@@ -447,6 +446,9 @@ func start_hole(index: int) -> void:
 
 
 func _warmup_copy(index: int) -> String:
+	var drill := _tutorial_copy()
+	if not drill.is_empty():
+		return drill
 	if hole != null and hole.custom != null:
 		return _tee_copy()
 	if index == 1:
@@ -460,6 +462,10 @@ func _warmup_copy(index: int) -> String:
 	if ArenaHole.applies_index(index):
 		return ArenaHole.WARMUP
 	return _tee_copy()
+
+
+func _tutorial_copy() -> String:
+	return _Tutorial.banner_body(GameSettings.tutorial_goal)
 
 
 func _tee_copy() -> String:
@@ -689,6 +695,9 @@ func start_play() -> void:
 
 
 func _play_copy() -> String:
+	var drill := _tutorial_copy()
+	if not drill.is_empty():
+		return drill
 	if hole != null and hole.has_soccer_goal():
 		return "First ball in the net wins. Less accuracy, more speed."
 	if ArenaHole.applies(hole):

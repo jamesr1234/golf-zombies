@@ -14,7 +14,7 @@ func test_a_new_burst_culls_the_oldest_once_the_cap_is_full() -> void:
 	for _i in Fireworks.MAX_LIVE:
 		assert_not_null(Fireworks.spawn(root, Vector3.ZERO, Palette.LIME))
 	assert_eq(get_tree().get_nodes_in_group("fireworks").size(), Fireworks.MAX_LIVE)
-	assert_not_null(Fireworks.spawn(root, Vector3.UP, Palette.MAGENTA))
+	assert_not_null(Fireworks.spawn(root, Vector3.UP, Palette.ORANGE))
 	assert_eq(
 		get_tree().get_nodes_in_group("fireworks").size(), Fireworks.MAX_LIVE,
 		"a massacre must not stack every burst"

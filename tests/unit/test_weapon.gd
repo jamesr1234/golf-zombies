@@ -170,7 +170,7 @@ func test_the_shape_remote_is_a_gun_you_can_add() -> void:
 	assert_false(gun.add_gun(REMOTE), "owning it once is enough")
 
 
-func test_the_warp_door_starts_in_the_bag() -> void:
+func test_the_warp_door_is_in_the_pickup_catalog() -> void:
 	var gun := _gun()
 	gun.fill_stash()
 	assert_true(gun.has_gun(DOOR))

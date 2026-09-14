@@ -397,7 +397,7 @@ func _build() -> void:
 	shaft.name = "Shaft"
 	shaft.position.y = SHAFT_H * 0.5
 	_pivot.add_child(shaft)
-	_knob = MeshFactory.sphere(0.11, Palette.MAGENTA, Palette.GLOW_STRONG)
+	_knob = MeshFactory.sphere(0.11, Palette.ORANGE, Palette.GLOW_STRONG)
 	_knob.name = "Knob"
 	_knob.position.y = SHAFT_H
 	shaft.add_child(_knob)

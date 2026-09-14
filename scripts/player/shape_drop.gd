@@ -17,7 +17,7 @@ const YEET_SPEED := 32.0
 const YEET_UP := 12.0
 const YEET_SPIN := 18.0
 const COLORS: Array[Color] = [
-	Palette.CYAN, Palette.AMBER, Palette.MAGENTA, Palette.VIOLET, Palette.ICE, Palette.LIME,
+	Palette.CYAN, Palette.AMBER, Palette.ORANGE, Palette.AZURE, Palette.ICE, Palette.LIME,
 ]
 
 var visual_only := false

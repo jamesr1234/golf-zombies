@@ -273,6 +273,26 @@ class FlowStub:
 	var phase := 0
 
 
+func test_an_unarmed_cpu_walks_to_a_gun_on_a_regular_hole() -> void:
+	var cpu: Player = preload("res://scenes/players/player.tscn").instantiate()
+	var pickup: GunPickup = preload("res://scenes/course/props/gun_pickup.tscn").instantiate()
+	add_child_autofree(cpu)
+	add_child_autofree(pickup)
+	cpu.possess_cpu()
+	cpu.set_physics_process(false)
+	var hole := HoleData.new()
+	hole.index = 0
+	var flow := FlowStub.new()
+	flow.hole = hole
+	cpu.flow = flow
+	cpu.global_position = Vector3(0.0, 1.2, 0.0)
+	pickup.global_position = Vector3(8.0, 1.0, 0.0)
+	cpu.brain.tick(0.016)
+	var pad := cpu.input as CpuInput
+	assert_gt(pad.move.length(), 0.2, "unarmed, the buddy has to walk to a pickup")
+	assert_false(cpu.weapon.has_weapon())
+
+
 func test_the_cpu_walks_to_a_gun_in_the_arena() -> void:
 	var cpu: Player = preload("res://scenes/players/player.tscn").instantiate()
 	var pickup: GunPickup = preload("res://scenes/course/props/gun_pickup.tscn").instantiate()

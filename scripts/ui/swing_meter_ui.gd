@@ -3,15 +3,15 @@ extends Control
 ## Vertical swing bar. Sweet spots mark max power at the top and perfect
 ## contact at the bottom. No distance number: judging that is the game.
 
-const TRACK_COLOR := Color(0.04, 0.02, 0.09, 0.78)
+const TRACK_COLOR := Color(0.02, 0.05, 0.07, 0.78)
 const FILL_COLOR := Palette.CYAN
 const PUTT_FILL := Palette.LIME
 const POWER_COLOR := Palette.AMBER
 const WINDOW_COLOR := Color(Palette.LIME, 0.32)
 const POWER_SWEET := Color(Palette.AMBER, 0.46)
 const CONTACT_SWEET := Color(Palette.LIME, 0.55)
-const OUTLINE_COLOR := Color(Palette.MAGENTA, 0.85)
-const MISS_COLOR := Color(Palette.MAGENTA, 0.16)
+const OUTLINE_COLOR := Color(Palette.ORANGE, 0.85)
+const MISS_COLOR := Color(Palette.ORANGE, 0.16)
 ## Empty track above full power so the top sweet spot sits inside the bar.
 const HEADROOM := 0.1
 const PAD := 3.0

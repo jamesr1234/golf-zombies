@@ -933,12 +933,20 @@ func test_a_shot_zombie_blinks_white_and_gets_knocked_back() -> void:
 	assert_false(zombie.is_flashing(), "the flash is a blink, not a paint job")
 
 
-func test_both_players_start_with_the_full_stash() -> void:
+func test_both_players_start_unarmed_and_pick_up_the_tee_guns() -> void:
 	for player in players:
-		assert_eq(player.weapon.loadout.size(), Weapon.STARTER_GUNS.size())
-		assert_true(player.weapon.has_weapon())
-		assert_true(player.raygun.visible)
-		assert_gt(player.raygun.get_child_count(), 0, "the gun should have a model")
+		assert_eq(player.weapon.loadout.size(), 0)
+		assert_false(player.weapon.has_weapon())
+		assert_false(player.raygun.visible)
+	var guns := world.find_children("*", "GunPickup", true, false)
+	assert_eq(guns.size(), Weapon.STARTER_GUNS.size(), "the tee holds the old starter bag")
+	(guns[0] as GunPickup)._on_body_entered(players[0])
+	(guns[1] as GunPickup)._on_body_entered(players[1])
+	assert_true(players[0].weapon.has_weapon())
+	assert_true(players[1].weapon.has_weapon())
+	await wait_physics_frames(2)
+	assert_true(players[0].raygun.visible)
+	assert_gt(players[0].raygun.get_child_count(), 0, "the gun should have a model")
 	_stand_by_ball(players[0])
 	golf.try_toggle(players[0])
 	await wait_physics_frames(2)
@@ -1072,6 +1080,7 @@ func test_the_driver_can_pull_the_camera_out_behind_the_cart() -> void:
 
 
 func test_the_passenger_can_still_look_around() -> void:
+	assert_true(players[0].weapon.add_gun(Weapon.STARTER_GUNS[0]))
 	assert_true(players[0].weapon.has_weapon())
 	_stand_by_cart(players[0])
 	_stand_by_cart(players[1])

@@ -2,7 +2,7 @@ class_name GolfSession
 extends GolfController
 ## Per-ball golf for online VS. Claim and strike are host-validated; the swing
 ## meter still runs on the golfer's machine. Live aim is sent from that machine
-## so the other screens can turn the pink arrow and white flight line with them.
+## so the other screens can turn the orange arrow and white flight line with them.
 
 var _sent_aim_yaw := INF
 var _sent_aim_loft := INF

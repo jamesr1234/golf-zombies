@@ -4,7 +4,7 @@ extends Node3D
 
 const SPEED := 88.0
 const SPIN_DEG := 540.0
-const COLOR := Palette.HOT_PINK
+const COLOR := Palette.SUN
 
 var shooter: Player
 var visual_only := false

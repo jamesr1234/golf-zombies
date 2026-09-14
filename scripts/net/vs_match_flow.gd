@@ -830,8 +830,6 @@ func _sync_loadouts() -> void:
 			continue
 		if ArenaHole.applies(hole):
 			player.weapon.clear_stash()
-		else:
-			player.weapon.fill_stash()
 
 
 func _sync_local_score() -> void:

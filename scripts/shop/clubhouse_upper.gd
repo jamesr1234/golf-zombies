@@ -107,7 +107,7 @@ static func _lights(host: Clubhouse) -> void:
 
 static func _rug(host: Clubhouse) -> void:
 	var at := Vector3(0.0, ClubhouseBuild.story_floor_y(1) + 0.03, -1.0)
-	var rug := MeshFactory.box(Vector3(14.0, 0.04, 18.0), Color(0.16, 0.05, 0.12), 0.12)
+	var rug := MeshFactory.box(Vector3(14.0, 0.04, 18.0), Color(0.12, 0.08, 0.04), 0.12)
 	rug.position = at
 	host.add_child(rug)
 	var trim := MeshFactory.box(Vector3(14.16, 0.02, 18.16), ClubhouseDecor.BRASS, 0.2)

@@ -275,7 +275,7 @@ static func cover_point(partner_at: Vector3, threat_at: Vector3, partner: Player
 
 
 func _grab_gun(pad: CpuInput) -> bool:
-	if not ArenaHole.needs_gun(_player):
+	if _player.weapon != null and _player.weapon.has_weapon() and not ArenaHole.needs_gun(_player):
 		return false
 	var gun := ArenaHole.nearest_gun(_player)
 	if gun == null:

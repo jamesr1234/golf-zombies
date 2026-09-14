@@ -231,7 +231,7 @@ func test_opening_the_cooler_plants_the_wagon() -> void:
 
 
 func test_the_wagon_is_lime_not_pink() -> void:
-	assert_ne(Palette.BEER_CART, Palette.HOT_PINK)
+	assert_ne(Palette.BEER_CART, Palette.SUN)
 	assert_gt(Palette.BEER_CART.g, Palette.BEER_CART.r, "the body has to read as lime from afar")
 	assert_gt(Palette.BEER_CART.g, Palette.BEER_CART.b)
 

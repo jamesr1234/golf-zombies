@@ -25,7 +25,7 @@ const ENJOY := "enjoy!"
 const ENJOY_TIME := 1.6
 const SEAT := Vector3(-0.42, 0.86, 0.18)
 const STAND := Vector3(1.38, 0.0, 2.05)
-const GIRL_COLOR := Palette.HOT_PINK
+const GIRL_COLOR := Palette.SUN
 
 @export var cooler_open := false
 var drive_speed := 0.0

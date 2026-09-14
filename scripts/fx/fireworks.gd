@@ -21,8 +21,8 @@ const CRACKLE_AT := 0.16
 const GLOW := 8.0
 
 const COLORS: Array[Color] = [
-	Palette.MAGENTA, Palette.LIME, Palette.CYAN,
-	Palette.AMBER, Palette.VIOLET, Palette.ICE, Palette.HOT_PINK,
+	Palette.ORANGE, Palette.LIME, Palette.CYAN,
+	Palette.AMBER, Palette.AZURE, Palette.ICE, Palette.SUN,
 ]
 
 

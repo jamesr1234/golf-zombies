@@ -26,6 +26,8 @@ var _view: CreatorView
 ## Keys and pad buttons both live here, kept off the camera's flight controls.
 var _pad: CreatorPad
 var _history := CreatorHistory.new()
+var _lesson: CreatorLesson
+var _wants_tutorial := false
 
 
 func _enter_tree() -> void:
@@ -75,11 +77,13 @@ func _ready() -> void:
 
 	_rebuild()
 	_camera.frame(_world.data)
+	_wants_tutorial = GameSettings.take_creator_tutorial()
 	if hole.needs_width:
 		_ui.ask_width()
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	else:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		_begin_lesson()
 	# The bed hangs off the tree root, which is still settling on the frame a
 	# scene change lands.
 	Music.play_lounge.call_deferred()
@@ -92,11 +96,14 @@ func _exit_tree() -> void:
 func _process(delta: float) -> void:
 	if _leaving:
 		return
+	if _lesson != null:
+		_lesson.tick(self, delta)
 	if _ui.is_blocking():
 		_camera.frozen = true
 		_pad.poll(false, delta)
 		return
 	_camera.frozen = _ui.is_typing() or _ui.menu_is_open()
+	_camera.lock_drop(waiting_on_tip())
 	# The name field runs its own pad handling, so the creator lets go while a
 	# prompt is up rather than reading the same button twice.
 	_pad.poll(not _ui.is_typing(), delta)
@@ -142,6 +149,8 @@ func _refresh_ui() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if _leaving or _ui.is_typing() or _ui.is_blocking():
 		return
+	if waiting_on_tip() and _take_next(event):
+		return
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		_camera.take_mouse((event as InputEventMouseMotion).relative)
 		return
@@ -167,6 +176,8 @@ func _on_click(button: InputEventMouseButton) -> void:
 
 
 func _scroll(steps: float) -> void:
+	if not _guided(CreatorLesson.Act.SIDE):
+		return
 	if tool == Tool.GROUP:
 		_group.grow(steps)
 	else:
@@ -174,6 +185,19 @@ func _scroll(steps: float) -> void:
 
 
 func confirm() -> void:
+	# #region agent log
+	_dbg("A", "creator_mode.gd:confirm", "confirm called", {
+		"id": _lesson.id() if _lesson != null else "",
+		"live": _lesson != null and _lesson.is_live(),
+		"praise": waiting_on_tip(),
+		"tool": int(tool),
+		"lmb": Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT),
+		"shoot": PadInput.pressed("shoot"),
+		"trig": _dbg_trig(),
+	})
+	# #endregion
+	if not _guided(CreatorLesson.Act.CONFIRM):
+		return
 	match tool:
 		Tool.PLACE:
 			if _place.is_gating():
@@ -186,6 +210,8 @@ func confirm() -> void:
 			elif _place.is_roaming():
 				if _commit(_place.set_roam):
 					Sfx.play("ui_confirm", self)
+			elif _begin_weapon_line():
+				Sfx.play("ui_move", self)
 			elif _commit(_place.place):
 				Sfx.play("ui_confirm", self)
 		Tool.GROUP:
@@ -196,6 +222,8 @@ func confirm() -> void:
 
 
 func cancel() -> void:
+	if not _guided(CreatorLesson.Act.CANCEL):
+		return
 	match tool:
 		Tool.PLACE:
 			if _place.is_gating():
@@ -252,9 +280,13 @@ func cancel() -> void:
 			_group.clear()
 		_:
 			_take_back(_fairway.undo)
+	if _lesson != null:
+		_lesson.after_cancel(self)
 
 
 func undo_change() -> void:
+	if not _guided(CreatorLesson.Act.UNDO):
+		return
 	if not _history.undo(hole):
 		_on_refused("NOTHING TO UNDO")
 		return
@@ -264,6 +296,8 @@ func undo_change() -> void:
 
 
 func redo_change() -> void:
+	if not _guided(CreatorLesson.Act.REDO):
+		return
 	if not _history.redo(hole):
 		_on_refused("NOTHING TO REDO")
 		return
@@ -323,6 +357,8 @@ func _hover_hit() -> Dictionary:
 
 
 func step_piece(delta: int) -> void:
+	if not _guided(CreatorLesson.Act.STEP_PIECE):
+		return
 	match tool:
 		Tool.PLACE:
 			_place.step_piece(delta)
@@ -333,10 +369,14 @@ func step_piece(delta: int) -> void:
 
 
 func step_shelf(delta: int) -> void:
+	if not _guided(CreatorLesson.Act.STEP_SHELF):
+		return
 	_place.step_shelf(delta)
 
 
 func turn(steps: int) -> void:
+	if not _guided(CreatorLesson.Act.TURN):
+		return
 	_place.turn(steps)
 
 
@@ -345,6 +385,10 @@ func spins_free() -> bool:
 
 
 func spin(dir: float, delta: float) -> void:
+	if dir == 0.0:
+		return
+	if not _guided(CreatorLesson.Act.TURN):
+		return
 	_place.spin(dir, delta)
 
 
@@ -353,23 +397,36 @@ func spin(dir: float, delta: float) -> void:
 func side(delta: int) -> void:
 	match tool:
 		Tool.PLACE:
+			if not _guided(CreatorLesson.Act.TURN):
+				return
 			_place.turn(delta)
 		Tool.GROUP:
+			if not _guided(CreatorLesson.Act.SIDE):
+				return
 			_group.grow(float(delta))
 		_:
+			if not _guided(CreatorLesson.Act.SIDE):
+				return
 			_camera.nudge_reach(float(delta))
 
 
 func overview() -> void:
+	if _lesson != null and _lesson.is_live():
+		Sfx.play("ui_deny", self)
+		return
 	_camera.overview(_world.data)
 
 
 func draw_weapon_line() -> void:
+	if not _guided(CreatorLesson.Act.LINE):
+		return
 	switch_tool(Tool.PLACE)
-	_place.start_gate(_camera.aim_point())
+	_place.start_gate(_hover_point())
 
 
 func snap_surface() -> void:
+	if not _guided(CreatorLesson.Act.SNAP_SURFACE):
+		return
 	if tool != Tool.PLACE:
 		return
 	_place.toggle_surface_snap()
@@ -378,15 +435,19 @@ func snap_surface() -> void:
 
 
 func toggle_yaw_snap() -> void:
+	if not _guided(CreatorLesson.Act.YAW_SNAP):
+		return
 	_place.toggle_yaw_snap()
 	Sfx.play("ui_move", self)
 	_ui.flash("ROTATION SNAP ON" if _place.yaw_snap else "ROTATION SNAP OFF")
 	_refresh_ui()
 
 
-## Circle / F: merge a group, draw a weapon line when a gun is already down,
-## or park the ghost so the camera can walk around it before R2 places.
+## Circle / F: merge a group, or park the ghost so the camera can walk around
+## it before R2 places. Weapon lines, yards and chase rings are all R2.
 func context() -> void:
+	if not _guided(CreatorLesson.Act.CONTEXT):
+		return
 	match tool:
 		Tool.GROUP:
 			ask_group()
@@ -402,24 +463,42 @@ func _place_context() -> void:
 		Sfx.play("ui_back", self)
 		_refresh_ui()
 		return
-	if _place.nearest_weapon(_camera.aim_point()) >= 0:
-		draw_weapon_line()
-		return
 	if _place.hold():
 		Sfx.play("ui_move", self)
 		_ui.flash("HOLDING")
 		_refresh_ui()
 
 
+## R2 redraws a gun's line when the weapons shelf is up and the crosshair is
+## already on one. A parked ghost still drops, so a second gun can sit next
+## to the first.
+func _begin_weapon_line() -> bool:
+	if _place.is_holding():
+		return false
+	if not CustomHole.is_weapon(_place.picked_path()):
+		return false
+	if _place.nearest_weapon(_hover_point()) < 0:
+		return false
+	draw_weapon_line()
+	return true
+
+
 func ask_group() -> void:
+	if not _guided(CreatorLesson.Act.CONTEXT):
+		return
 	_ui.ask_group(HoleStore.suggest_structure_title())
 
 
 func ask_save() -> void:
+	if not _guided(CreatorLesson.Act.SAVE):
+		return
 	_ui.ask_save(hole.title)
 
 
 func erase_hole() -> void:
+	if _lesson != null and _lesson.is_live():
+		Sfx.play("ui_deny", self)
+		return
 	var before := hole.to_dict()
 	hole.erase()
 	_remember(before)
@@ -446,11 +525,15 @@ func _on_spawn_picked(counts: Dictionary) -> void:
 	else:
 		_commit(_place.abort_spawn)
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	_aim()
 
 
 func _on_spawn_cancelled() -> void:
 	_commit(_place.abort_spawn)
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	if _lesson != null:
+		_lesson.after_cancel(self)
+	_aim()
 
 
 func toggle_menu() -> void:
@@ -462,6 +545,8 @@ func menu_is_open() -> bool:
 
 
 func toggle_help() -> void:
+	if not _guided(CreatorLesson.Act.HELP):
+		return
 	_ui.toggle_help()
 
 
@@ -484,6 +569,8 @@ func cycle_tool(delta: int) -> void:
 func switch_tool(next: Tool) -> void:
 	if tool == next:
 		return
+	if not _guided(CreatorLesson.Act.SWITCH_TOOL):
+		return
 	var before := hole.to_dict()
 	tool = next
 	_place.release()
@@ -500,6 +587,8 @@ func _save(title: String) -> void:
 			_ui.flash("SAVED %s   REPLACES HOLE %d" % [hole.title.to_upper(), slot + 1])
 		else:
 			_ui.flash("SAVED %s" % hole.title.to_upper())
+		if _lesson != null:
+			_lesson.note_saved()
 	else:
 		_ui.flash("COULD NOT SAVE THAT HOLE")
 
@@ -507,14 +596,33 @@ func _save(title: String) -> void:
 ## Straight from the workbench onto the tee, so a shape can be judged by playing
 ## it rather than by looking at it.
 func playtest() -> void:
+	if _lesson != null and _lesson.is_live():
+		Sfx.play("ui_deny", self)
+		return
+	_launch_playtest()
+
+
+func lesson_playtest() -> bool:
+	if _lesson == null:
+		return false
+	return _launch_playtest(true)
+
+
+func _launch_playtest(from_lesson := false) -> bool:
 	if not hole.is_playable():
 		_ui.flash("THE HOLE NEEDS AT LEAST %d PIECES" % FairwayPiece.MIN_PIECES)
-		return
+		return false
 	if not HoleStore.save_hole(hole):
 		_ui.flash("COULD NOT SAVE THAT HOLE")
-		return
-	GameSettings.play_custom(hole)
+		return false
+	if from_lesson:
+		GameSettings.play_tutorial_hole(
+			hole, _lesson.index() + 1, int(tool), _lesson.playtest_goal()
+		)
+	else:
+		GameSettings.play_custom(hole)
 	_go(GAMEPLAY)
+	return true
 
 
 func _on_width_picked(size: FairwayPiece.Width) -> void:
@@ -525,6 +633,7 @@ func _on_width_picked(size: FairwayPiece.Width) -> void:
 	_rebuild()
 	_camera.frame(_world.data)
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	_begin_lesson()
 
 
 func _back_to_browser() -> void:
@@ -557,5 +666,108 @@ func _on_group_saved(path: String) -> void:
 
 
 func _on_refused(reason: String) -> void:
+	# #region agent log
+	_dbg("A", "creator_mode.gd:_on_refused", "place refused", {
+		"reason": reason,
+		"id": _lesson.id() if _lesson != null else "",
+		"praise": waiting_on_tip(),
+	})
+	# #endregion
 	Sfx.play("ui_deny", self)
 	_ui.flash(reason)
+
+
+func _guided(act: int) -> bool:
+	if _lesson == null or _lesson.allows(act):
+		return true
+	# #region agent log
+	_dbg("B", "creator_mode.gd:_guided", "lesson denied", {
+		"act": act,
+		"id": _lesson.id(),
+		"praise": _lesson.praising(),
+		"shoot": PadInput.pressed("shoot"),
+		"sprint": PadInput.pressed("sprint"),
+		"lmb": Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT),
+		"trig": _dbg_trig(),
+	})
+	# #endregion
+	Sfx.play("ui_deny", self)
+	return false
+
+
+func waiting_on_tip() -> bool:
+	return _lesson != null and _lesson.praising()
+
+
+func continue_lesson() -> void:
+	if _lesson == null:
+		return
+	# #region agent log
+	var before := _lesson.id()
+	# #endregion
+	if _lesson.launches_playtest():
+		if not lesson_playtest():
+			return
+	_lesson.continue_tip(self)
+	# #region agent log
+	_dbg("E", "creator_mode.gd:continue_lesson", "continued", {
+		"from": before,
+		"to": _lesson.id(),
+		"praise": _lesson.praising(),
+		"shoot": PadInput.pressed("shoot"),
+		"lmb": Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT),
+		"trig": _dbg_trig(),
+	})
+	# #endregion
+	Sfx.play("ui_move", self)
+
+
+func _begin_lesson() -> void:
+	if not _wants_tutorial or _lesson != null:
+		return
+	_lesson = CreatorLesson.new()
+	_ui.attach_lesson(_lesson)
+	_lesson.start(self)
+	var at := GameSettings.take_creator_lesson_at()
+	if at > 0:
+		tool = GameSettings.take_creator_lesson_tool() as Tool
+		_lesson.resume_at(self, at)
+
+
+func _take_next(event: InputEvent) -> bool:
+	var key := event as InputEventKey
+	if key != null and key.pressed and not key.echo:
+		if key.physical_keycode == CreatorLesson.NEXT:
+			continue_lesson()
+			return true
+		if key.physical_keycode == KEY_ESCAPE:
+			return false
+		return true
+	return event is InputEventMouseButton
+
+
+func _dbg(hyp: String, loc: String, msg: String, extra: Dictionary) -> void:
+	# #region agent log
+	var f := FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-e87fdb.log", FileAccess.READ_WRITE)
+	if f == null:
+		f = FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-e87fdb.log", FileAccess.WRITE)
+	if f != null:
+		f.seek_end()
+		f.store_line(JSON.stringify({
+			"sessionId": "e87fdb",
+			"runId": "pre-fix",
+			"hypothesisId": hyp,
+			"location": loc,
+			"message": msg,
+			"timestamp": Time.get_ticks_msec(),
+			"data": extra,
+		}))
+		f.close()
+	# #endregion
+
+
+func _dbg_trig() -> float:
+	var best := 0.0
+	for device in Input.get_connected_joypads():
+		best = maxf(best, absf(Input.get_joy_axis(device, JOY_AXIS_TRIGGER_RIGHT)))
+	return snappedf(best, 0.01)

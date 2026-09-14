@@ -14,7 +14,7 @@ const _Wall := preload("res://assets/obstacles/wall_extra_large.glb")
 const _Board := preload("res://scenes/course/structures/scoreboard.tscn")
 const _Gun := preload("res://scenes/course/props/gun_pickup.tscn")
 const _PALETTE: Array[Color] = [
-	Palette.ICE, Palette.VIOLET, Palette.LIME, Palette.HOT_PINK, Palette.CYAN, Palette.AMBER
+	Palette.ICE, Palette.AZURE, Palette.LIME, Palette.SUN, Palette.CYAN, Palette.AMBER
 ]
 
 

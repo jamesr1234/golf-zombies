@@ -7,7 +7,8 @@ const MENU := "res://scenes/ui/main_menu.tscn"
 const CREATOR := "res://scenes/creator/hole_creator.tscn"
 const GAMEPLAY := "res://scenes/main.tscn"
 const _Music := preload("res://scripts/fx/music.gd")
-## Circle plays, Square edits, Triangle starts a new hole, L1 deletes.
+## Circle plays, Square edits, Triangle starts a new hole, L1 asks to delete.
+const DELETE_PROMPT := "Are you sure you want to delete this hole?"
 const PAD_KEYS: PackedStringArray = [
 	"move_forward", "move_back", "interact", "jump", "reload", "revive", "melee", "pause",
 ]
@@ -17,6 +18,7 @@ var picked := 0
 
 var _list: VBoxContainer
 var _blurb: Label
+var _confirm: CreatorConfirm
 var _leaving := false
 var _open := false
 var _pad := PadInput.new()
@@ -43,16 +45,27 @@ func reload() -> void:
 
 
 func move(delta: int) -> void:
+	if confirming():
+		return
 	picked = posmod(picked + delta, _count())
 	Sfx.play("ui_move", self)
 	_refresh()
 
 
-func picking_new() -> bool:
+func picking_tutorial() -> bool:
 	return picked == 0
 
 
+func picking_new() -> bool:
+	return picked == 1
+
+
 func play() -> void:
+	if confirming():
+		return
+	if picking_tutorial():
+		start_tutorial()
+		return
 	if picking_new():
 		create()
 		return
@@ -68,6 +81,11 @@ func play() -> void:
 
 
 func edit() -> void:
+	if confirming():
+		return
+	if picking_tutorial():
+		start_tutorial()
+		return
 	if picking_new():
 		create()
 		return
@@ -80,6 +98,8 @@ func edit() -> void:
 
 
 func create() -> void:
+	if confirming():
+		return
 	Sfx.play("ui_confirm", self)
 	var hole := CustomHole.create()
 	hole.needs_width = true
@@ -87,8 +107,26 @@ func create() -> void:
 	_go(CREATOR)
 
 
+func start_tutorial() -> void:
+	if confirming():
+		return
+	Sfx.play("ui_confirm", self)
+	GameSettings.start_tutorial()
+	_go(CREATOR)
+
+
+func ask_erase() -> void:
+	if confirming() or picking_tutorial() or picking_new() or rows.is_empty():
+		return
+	_confirm.open(DELETE_PROMPT)
+
+
+func confirming() -> bool:
+	return _confirm != null and _confirm.is_open()
+
+
 func erase() -> void:
-	if picking_new() or rows.is_empty():
+	if picking_tutorial() or picking_new() or rows.is_empty():
 		return
 	Sfx.play("ui_back", self)
 	HoleStore.delete_hole(String(rows[_hole_index()]["id"]))
@@ -96,22 +134,24 @@ func erase() -> void:
 
 
 func back() -> void:
+	if confirming():
+		return
 	Sfx.play("ui_back", self)
 	_go(MENU)
 
 
 func _selected() -> CustomHole:
-	if picking_new() or rows.is_empty():
+	if picking_tutorial() or picking_new() or rows.is_empty():
 		return null
 	return HoleStore.load_hole(String(rows[_hole_index()]["id"]))
 
 
 func _count() -> int:
-	return rows.size() + 1
+	return rows.size() + 2
 
 
 func _hole_index() -> int:
-	return picked - 1
+	return picked - 2
 
 
 func _open_later() -> void:
@@ -120,7 +160,7 @@ func _open_later() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
-	if not _open or _leaving or key == null or not key.pressed or key.echo:
+	if not _open or _leaving or confirming() or key == null or not key.pressed or key.echo:
 		return
 	match key.physical_keycode:
 		KEY_W, KEY_UP:
@@ -134,7 +174,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		KEY_N:
 			create()
 		KEY_X, KEY_DELETE:
-			erase()
+			ask_erase()
 		KEY_ESCAPE:
 			back()
 		_:
@@ -148,7 +188,7 @@ func _unhandled_input(event: InputEvent) -> void:
 ## so each button counts once, and it only ever sees the controller, never the
 ## keyboard half of the same action.
 func _process(_delta: float) -> void:
-	if not _open or _leaving:
+	if not _open or _leaving or confirming():
 		return
 	# Every button is read before any of them acts, so a press is never missed
 	# because an earlier branch short-circuited the poll.
@@ -166,7 +206,7 @@ func _process(_delta: float) -> void:
 	elif fired["revive"]:
 		create()
 	elif fired["melee"]:
-		erase()
+		ask_erase()
 	elif fired["pause"]:
 		back()
 
@@ -181,8 +221,12 @@ func _go(path: String) -> void:
 func _refresh() -> void:
 	for child in _list.get_children():
 		child.queue_free()
+	_list.add_child(_tutorial_entry(picking_tutorial()))
+	_list.add_child(_divider())
 	_list.add_child(_new_entry(picking_new()))
-	if picking_new():
+	if picking_tutorial():
+		_blurb.text = HudStyle.chrome("Learn every tool by using it.")
+	elif picking_new():
 		_blurb.text = HudStyle.chrome("Start a blank hole.")
 	else:
 		var row: Dictionary = rows[_hole_index()]
@@ -192,7 +236,7 @@ func _refresh() -> void:
 			_replace_note(row),
 		])
 	for i in rows.size():
-		_list.add_child(_entry(rows[i], picked == i + 1, i + 1))
+		_list.add_child(_entry(rows[i], picked == i + 2, i + 2))
 
 
 func _replace_note(row: Dictionary) -> String:
@@ -202,6 +246,34 @@ func _replace_note(row: Dictionary) -> String:
 	if slot < 0:
 		return ""
 	return "   REPLACES HOLE %d" % (slot + 1)
+
+
+func _tutorial_entry(selected: bool) -> Button:
+	var button := LobbyChrome.button("Tutorial")
+	button.custom_minimum_size = Vector2(460.0, 40.0)
+	button.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	button.add_theme_color_override("font_color", Palette.SUN if selected else Palette.AMBER)
+	button.add_theme_stylebox_override("normal", _option_style(selected))
+	button.add_theme_stylebox_override("hover", _option_style(true))
+	button.add_theme_stylebox_override("pressed", _option_style(true))
+	button.pressed.connect(func() -> void:
+		if not _open:
+			return
+		if picking_tutorial():
+			start_tutorial()
+			return
+		picked = 0
+		_refresh()
+	)
+	return button
+
+
+func _divider() -> ColorRect:
+	var line := ColorRect.new()
+	line.custom_minimum_size = Vector2(460.0, 2.0)
+	line.color = Color(Palette.CYAN, 0.55)
+	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return line
 
 
 func _new_entry(selected: bool) -> Button:
@@ -218,7 +290,7 @@ func _new_entry(selected: bool) -> Button:
 		if picking_new():
 			create()
 			return
-		picked = 0
+		picked = 1
 		_refresh()
 	)
 	return button
@@ -228,7 +300,7 @@ func _entry(row: Dictionary, selected: bool, index: int) -> Button:
 	var button := LobbyChrome.button(String(row["title"]))
 	button.custom_minimum_size = Vector2(460.0, 40.0)
 	button.alignment = HORIZONTAL_ALIGNMENT_CENTER
-	button.add_theme_color_override("font_color", Palette.MAGENTA if selected else Palette.ICE)
+	button.add_theme_color_override("font_color", Palette.ORANGE if selected else Palette.ICE)
 	button.add_theme_stylebox_override("normal", _option_style(selected))
 	button.add_theme_stylebox_override("hover", _option_style(true))
 	button.add_theme_stylebox_override("pressed", _option_style(true))
@@ -263,7 +335,7 @@ func _build() -> void:
 
 	var title := Label.new()
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.label_settings = HudStyle.banner(Palette.MAGENTA, 44)
+	title.label_settings = HudStyle.banner(Palette.ORANGE, 44)
 	title.text = HudStyle.chrome("Course Creator")
 	root.add_child(title)
 
@@ -294,6 +366,10 @@ func _build() -> void:
 	)
 	root.add_child(hint)
 
+	_confirm = CreatorConfirm.create()
+	_confirm.confirmed.connect(erase)
+	add_child(_confirm)
+
 
 func _panel_style() -> StyleBoxFlat:
 	var box := StyleBoxFlat.new()
@@ -310,8 +386,8 @@ func _panel_style() -> StyleBoxFlat:
 
 func _option_style(selected: bool) -> StyleBoxFlat:
 	var box := StyleBoxFlat.new()
-	box.bg_color = Color(Palette.MAGENTA, 0.18) if selected else Color(0.06, 0.04, 0.1, 0.7)
-	box.border_color = Palette.MAGENTA if selected else Color(Palette.CYAN, 0.35)
+	box.bg_color = Color(Palette.ORANGE, 0.18) if selected else Color(0.04, 0.06, 0.08, 0.7)
+	box.border_color = Palette.ORANGE if selected else Color(Palette.CYAN, 0.35)
 	box.set_border_width_all(2 if selected else 1)
 	box.set_corner_radius_all(3)
 	return box

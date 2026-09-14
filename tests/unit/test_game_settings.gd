@@ -15,6 +15,22 @@ func test_mute_master_silences_and_restores_the_bus() -> void:
 	assert_false(AudioServer.is_bus_mute(AudioServer.get_bus_index("Master")))
 
 
+func test_a_tutorial_playtest_comes_back_to_the_creator() -> void:
+	var hole := CustomHole.create("Tutorial")
+	GameSettings.play_tutorial_hole(hole, 7, 1, GameSettings.TutorialGoal.DRIVE_RAMP)
+	assert_true(GameSettings.is_custom())
+	assert_eq(GameSettings.creator_hole, hole)
+	assert_true(GameSettings.creator_tutorial)
+	assert_eq(GameSettings.creator_lesson_at, 7)
+	assert_eq(GameSettings.tutorial_goal, GameSettings.TutorialGoal.DRIVE_RAMP)
+	assert_true(GameSettings.take_return_to_creator())
+	GameSettings.reset()
+	assert_false(GameSettings.creator_tutorial)
+	assert_eq(GameSettings.creator_lesson_at, 0)
+	assert_false(GameSettings.return_to_creator)
+	assert_eq(GameSettings.tutorial_goal, GameSettings.TutorialGoal.NONE)
+
+
 func test_defaults_to_solo_medium() -> void:
 	GameSettings.reset()
 	assert_true(GameSettings.is_solo())

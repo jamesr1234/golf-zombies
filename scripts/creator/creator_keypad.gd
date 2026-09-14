@@ -197,7 +197,7 @@ func _refresh() -> void:
 	_preview.text = _text if not _text.is_empty() else "_"
 	for i in _cells.size():
 		_cells[i].add_theme_color_override(
-			"font_color", Palette.MAGENTA if i == _pick else Palette.ICE
+			"font_color", Palette.ORANGE if i == _pick else Palette.ICE
 		)
 
 
@@ -208,7 +208,7 @@ func _build() -> void:
 	add_child(column)
 	_heading = CreatorChrome.centered(Palette.AMBER, 18)
 	column.add_child(_heading)
-	_preview = CreatorChrome.centered(Palette.MAGENTA, 22)
+	_preview = CreatorChrome.centered(Palette.ORANGE, 22)
 	column.add_child(_preview)
 	var grid := GridContainer.new()
 	grid.columns = COLS

@@ -366,7 +366,7 @@ static func build_rocket(parent: Node3D, color: Color) -> void:
 	var stock := MeshFactory.box(Vector3(0.05, 0.06, 0.14), metal)
 	stock.position = Vector3(0.0, -0.02, 0.16)
 	parent.add_child(stock)
-	var warhead := MeshFactory.sphere(0.042, Palette.MAGENTA, Palette.GLOW_MEDIUM)
+	var warhead := MeshFactory.sphere(0.042, Palette.ORANGE, Palette.GLOW_MEDIUM)
 	warhead.position.z = -0.32
 	parent.add_child(warhead)
 
