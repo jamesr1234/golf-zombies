@@ -347,6 +347,8 @@ func _nearest_mill() -> CartPathWindmill:
 func _request_toggle(peer_id: int) -> void:
 	if not multiplayer.is_server():
 		return
+	if not NetSession.rpc_speaks_for(multiplayer.get_remote_sender_id(), peer_id):
+		return
 	var who := _player_for(peer_id)
 	if who != null:
 		_toggle(who)
@@ -355,6 +357,12 @@ func _request_toggle(peer_id: int) -> void:
 @rpc("any_peer", "unreliable")
 func _report_stick(stick: Vector2) -> void:
 	if not multiplayer.is_server() or operator == null:
+		return
+	# Only the peer at the desk steers. Anyone else reporting a stick is spinning
+	# a mill they are not standing at, which blocks the path and mows the green.
+	if not NetSession.rpc_speaks_for(
+		multiplayer.get_remote_sender_id(), int(operator.get("peer_id"))
+	):
 		return
 	_steer(stick)
 
