@@ -97,8 +97,110 @@ func test_the_browser_puts_the_tutorial_above_a_divider() -> void:
 	assert_eq(browser._list.get_child(2).text, HudStyle.chrome("New hole"))
 	assert_eq(browser._list.get_child(3).text, HudStyle.chrome("Mine"))
 	assert_eq(browser._blurb.text, HudStyle.chrome("Learn every tool by using it."))
+	assert_eq(browser._hint.text, HudStyle.chrome(HoleBrowser.HINT_START))
 	browser.erase()
 	assert_eq(browser.rows.size(), 1, "the tutorial row cannot be deleted")
+	browser.edit()
+	assert_false(browser._leaving, "edit does not start a fresh lesson")
+	assert_false(browser.confirming())
+	assert_false(GameSettings.creator_tutorial)
+
+
+func test_the_browser_resumes_and_can_start_the_lesson_over() -> void:
+	var hole := CustomHole.create("Tutorial")
+	assert_true(HoleStore.save_lesson(11, CreatorMode.Tool.PLACE, hole))
+	var browser: HoleBrowser = load("res://scenes/creator/hole_browser.tscn").instantiate()
+	add_child_autofree(browser)
+	await wait_frames(1)
+	assert_true(browser.picking_tutorial())
+	assert_eq(
+		browser._blurb.text,
+		HudStyle.chrome("Resume at 12 / %d." % (CreatorLesson.ids().size() - 1))
+	)
+	assert_eq(browser._hint.text, HudStyle.chrome(HoleBrowser.HINT_RESUME))
+	browser.edit()
+	assert_true(browser.confirming())
+	assert_eq(browser._confirm.prompt(), HudStyle.chrome(HoleBrowser.RESTART_PROMPT))
+	browser._confirm._open = true
+	browser._confirm._pick = 1
+	browser._confirm.confirm()
+	assert_false(browser.confirming())
+	assert_true(HoleStore.lesson_resumable())
+	assert_false(browser._leaving)
+	browser._leaving = true
+	browser.play()
+	assert_true(GameSettings.creator_tutorial)
+	assert_eq(GameSettings.creator_lesson_at, 11)
+	assert_eq(GameSettings.creator_hole.id, hole.id)
+
+
+func test_the_browser_lands_on_new_hole_after_the_lesson() -> void:
+	HoleStore.mark_lesson_done()
+	var browser: HoleBrowser = load("res://scenes/creator/hole_browser.tscn").instantiate()
+	add_child_autofree(browser)
+	await wait_frames(1)
+	assert_true(browser.picking_new())
+	assert_false(browser.picking_tutorial())
+	assert_eq(browser._hint.text, HudStyle.chrome(HoleBrowser.HINT_HOLE))
+
+
+func test_starting_over_wipes_the_snapshot() -> void:
+	var hole := CustomHole.create("Tutorial")
+	assert_true(HoleStore.save_lesson(5, 0, hole))
+	var browser: HoleBrowser = load("res://scenes/creator/hole_browser.tscn").instantiate()
+	add_child_autofree(browser)
+	await wait_frames(1)
+	browser.ask_restart()
+	browser._leaving = true
+	browser._confirm._open = true
+	browser._confirm._pick = 0
+	browser._confirm.confirm()
+	assert_false(HoleStore.lesson_resumable())
+	assert_true(GameSettings.creator_tutorial)
+	assert_true(GameSettings.creator_hole.needs_width)
+	assert_true(browser._leaving)
+
+
+func test_the_creator_can_quit_and_resume_the_same_step() -> void:
+	var creator := await _open_tutorial()
+	_skip_to(creator, "look")
+	assert_eq(creator._lesson.id(), "look")
+	creator._snapshot_lesson()
+	assert_true(HoleStore.lesson_resumable())
+	assert_eq(HoleStore.lesson_step(), CreatorLesson.ids().find("look"))
+	assert_eq(HoleStore.lesson_hole().id, creator.hole.id)
+	GameSettings.reset()
+	assert_false(GameSettings.creator_tutorial)
+	assert_true(HoleStore.lesson_resumable())
+	assert_true(GameSettings.resume_tutorial())
+	var again: CreatorMode = load("res://scenes/creator/hole_creator.tscn").instantiate()
+	add_child_autofree(again)
+	await wait_frames(1)
+	assert_not_null(again._lesson)
+	assert_eq(again._lesson.id(), "look")
+	assert_eq(again.hole.id, creator.hole.id)
+
+
+func test_a_praised_step_resumes_on_the_next_one() -> void:
+	var creator := await _open_tutorial()
+	_skip_to(creator, "fly")
+	creator._camera.global_position += Vector3(8.0, 0.0, 0.0)
+	creator._lesson.tick(creator, CreatorLesson.FLY_SECONDS)
+	assert_true(creator._lesson.praising())
+	creator._snapshot_lesson()
+	assert_eq(HoleStore.lesson_step(), CreatorLesson.ids().find("look"))
+
+
+func test_a_lesson_playtest_does_not_list_the_hole() -> void:
+	var creator := await _open_tutorial()
+	_skip_to(creator, "place_obstacles")
+	while not creator.hole.is_playable():
+		creator.hole.append_piece(FairwayPiece.index_of("straight"))
+	creator._leaving = true
+	assert_true(creator._launch_playtest(true))
+	assert_eq(HoleStore.list_holes().size(), 0)
+	assert_true(HoleStore.lesson_resumable())
+	assert_eq(HoleStore.lesson_step(), CreatorLesson.ids().find("place_obstacles") + 1)
 
 
 func test_the_tutorial_waits_until_the_width_is_picked() -> void:
@@ -164,6 +266,8 @@ func test_the_lesson_can_be_walked_to_the_end() -> void:
 	assert_false(creator._lesson.is_live())
 	creator.switch_tool(CreatorMode.Tool.FAIRWAY)
 	assert_eq(creator.tool, CreatorMode.Tool.FAIRWAY, "every command unlocks after the lesson")
+	assert_true(HoleStore.lesson_completed())
+	assert_false(HoleStore.lesson_resumable())
 
 
 func test_surface_snap_is_taught_before_ramps_and_stays_on() -> void:

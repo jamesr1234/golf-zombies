@@ -6,7 +6,10 @@ extends Object
 const RATE := 16000
 const PACKET_MS := 20
 const PACKET_FRAMES := RATE * PACKET_MS / 1000
-const VAD_THRESHOLD := 0.015
+const VAD_THRESHOLD := 0.005
+const VAD_HOLD := 0.4
+const DEFAULT_GAIN := 1.0
+const MAX_GAIN := 1.0
 const LIVE_PATH := "user://voice.cfg"
 const TEST_PATH := "user://voice_test.cfg"
 
@@ -40,14 +43,44 @@ static func rms(frames: PackedVector2Array) -> float:
 	return sqrt(acc / float(frames.size()))
 
 
+static func clamp_gain(amount: float) -> float:
+	return clampf(amount, 0.0, MAX_GAIN)
+
+
+static func gain_label(amount: float) -> String:
+	return "%d%%" % int(round(clamp_gain(amount) * 100.0))
+
+
+static func apply_gain(frames: PackedVector2Array, amount: float) -> PackedVector2Array:
+	var gain := clamp_gain(amount)
+	if frames.is_empty() or is_equal_approx(gain, 1.0):
+		return frames
+	var out := PackedVector2Array()
+	out.resize(frames.size())
+	for i in frames.size():
+		out[i] = Vector2(
+			clampf(frames[i].x * gain, -1.0, 1.0),
+			clampf(frames[i].y * gain, -1.0, 1.0)
+		)
+	return out
+
+
+static func meter_level(energy: float) -> float:
+	return clampf(sqrt(maxf(energy, 0.0) / 0.08), 0.0, 1.0)
+
+
 static func is_speech(frames: PackedVector2Array, threshold := VAD_THRESHOLD) -> bool:
 	return rms(frames) >= threshold
 
 
-static func should_transmit(muted: bool, open_mic: bool, ptt: bool, speech: bool) -> bool:
+static func should_transmit(
+	muted: bool, open_mic: bool, ptt: bool, speech: bool, hold := 0.0
+) -> bool:
 	if muted:
 		return false
-	return speech if open_mic else ptt
+	if not open_mic:
+		return ptt
+	return speech or hold > 0.0
 
 
 static func accepts_peer(peer_id: int) -> bool:
@@ -93,22 +126,32 @@ static func device_choices(listed: PackedStringArray, current := "") -> PackedSt
 	return out
 
 
-static func write_prefs(path: String, muted: bool, open_mic: bool, mic: String, speakers: String) -> void:
+static func write_prefs(
+	path: String, muted: bool, open_mic: bool, mic: String, speakers: String, gain := DEFAULT_GAIN
+) -> void:
 	var cfg := ConfigFile.new()
 	cfg.set_value("voice", "muted", muted)
 	cfg.set_value("voice", "open_mic", open_mic)
 	cfg.set_value("voice", "mic", mic)
 	cfg.set_value("voice", "speakers", speakers)
+	cfg.set_value("voice", "gain", clamp_gain(gain))
 	cfg.save(path)
 
 
 static func read_prefs(path: String) -> Dictionary:
 	var cfg := ConfigFile.new()
-	var out := {"muted": false, "open_mic": false, "mic": "", "speakers": ""}
+	var out := {
+		"muted": false,
+		"open_mic": false,
+		"mic": "",
+		"speakers": "",
+		"gain": DEFAULT_GAIN,
+	}
 	if cfg.load(path) != OK:
 		return out
 	out.muted = bool(cfg.get_value("voice", "muted", false))
 	out.open_mic = bool(cfg.get_value("voice", "open_mic", false))
 	out.mic = str(cfg.get_value("voice", "mic", ""))
 	out.speakers = str(cfg.get_value("voice", "speakers", ""))
+	out.gain = clamp_gain(float(cfg.get_value("voice", "gain", DEFAULT_GAIN)))
 	return out

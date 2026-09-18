@@ -99,7 +99,6 @@ func tick(player: Player, delta: float) -> void:
 		and not player.is_swimming() and not player.is_shielding() and not player.is_placing()
 		and not player.is_climbing()
 		and not player.is_ziplining()
-		and not player.is_milling()
 		and not player.is_in_mech()
 		and not player.is_holding_beer() and not player.is_holding_mines()
 		and not player.weapon.is_scoped() and not player.is_celebrating()
@@ -112,5 +111,13 @@ func tick(player: Player, delta: float) -> void:
 	if show_gun:
 		player.raygun.show_gun(player.weapon.stats().visual)
 		player.raygun.animate(delta, travel, player.weapon.is_firing(), player.weapon.reload_fraction())
+		if player.weapon.stats().is_mill():
+			var stick := player.input.move_vector() if player.input != null else Vector2.ZERO
+			var rad := 0.0
+			if player.mill_desk != null and is_instance_valid(player.mill_desk):
+				var mill = player.mill_desk.mill()
+				if mill != null:
+					rad = mill.rotor_rad()
+			player.raygun.pose_mill(stick, rad)
 	player.beer.animate(player, delta)
 	player._draw_grapple_line()

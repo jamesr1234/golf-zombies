@@ -176,6 +176,51 @@ func test_a_placed_zipline_spans_the_two_points() -> void:
 	assert_eq(line.low_mark(), line.end_mark())
 
 
+func test_two_players_can_ride_the_same_line() -> void:
+	var line := _spawn()
+	var first := _player_at(line.board_at())
+	var second := _player_at(line.board_at())
+	assert_true(line.try_board(first))
+	assert_true(line.try_board(second))
+	assert_true(first.is_ziplining())
+	assert_true(second.is_ziplining())
+	assert_eq(first.zipliner.line, line)
+	assert_eq(second.zipliner.line, line)
+	assert_gt(first.global_position.distance_to(second.global_position), 0.8)
+	assert_gt(second.zipliner.t, first.zipliner.t)
+
+
+func test_a_melee_knocks_a_nearby_rider_off() -> void:
+	var line := _spawn()
+	var attacker := _player_at(line.board_at())
+	var victim := _player_at(line.board_at())
+	attacker.input = CpuInput.new("p1", true)
+	assert_true(line.try_board(attacker))
+	assert_true(line.try_board(victim))
+	(attacker.input as CpuInput).tap("melee")
+	attacker.combat.tick(attacker, 0.05)
+	assert_true(attacker.is_ziplining())
+	assert_false(victim.is_ziplining(), "a swing knocks the rider beside you off")
+	assert_gt(victim.velocity.length(), 1.0)
+	assert_true("zipline_drop" in Sfx.play_log)
+	assert_true("melee_swing" in Sfx.play_log)
+
+
+func test_a_melee_leaves_a_far_rider_on_the_line() -> void:
+	var line := _spawn()
+	var attacker := _player_at(line.board_at())
+	var victim := _player_at(line.board_at())
+	attacker.input = CpuInput.new("p1", true)
+	assert_true(line.try_board(attacker))
+	assert_true(line.try_board(victim))
+	victim.zipliner.t = 0.95
+	victim.global_position = line.ride_at(0.95)
+	(attacker.input as CpuInput).tap("melee")
+	attacker.combat.tick(attacker, 0.05)
+	assert_true(attacker.is_ziplining())
+	assert_true(victim.is_ziplining(), "out of reach stays on the cable")
+
+
 func test_the_prompt_names_the_zipline() -> void:
 	var line := _spawn()
 	var player := _player_at(line.board_at())

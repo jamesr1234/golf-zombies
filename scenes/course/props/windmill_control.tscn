@@ -2,5 +2,5 @@
 
 [ext_resource type="Script" path="res://scripts/course/windmill_control.gd" id="1_desk"]
 
-[node name="WindmillControl" type="StaticBody3D"]
+[node name="WindmillControl" type="Area3D"]
 script = ExtResource("1_desk")

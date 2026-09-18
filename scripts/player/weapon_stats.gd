@@ -5,7 +5,7 @@ extends Resource
 
 @export var display_name := "Rifle"
 ## Which first-person mesh the raygun should show. "rifle", "shotgun", "rocket",
-## "net", "sniper", "flare", "nailer", "door", "remote".
+## "net", "sniper", "flare", "nailer", "door", "remote", "mill".
 @export var visual := "rifle"
 @export var damage := 24.0
 @export var pellets := 1
@@ -75,6 +75,10 @@ func is_door() -> bool:
 
 func is_drop() -> bool:
 	return drop_count > 0
+
+
+func is_mill() -> bool:
+	return visual == "mill"
 
 
 func zoom_at(step: int) -> float:

@@ -96,6 +96,18 @@ func tick(player: Player, delta: float) -> void:
 		elif player.input.just_pressed("shoot"):
 			player.place.confirm(player)
 		return
+	if player.is_holding_mill():
+		player.aiming = false
+		if player.weapon != null:
+			player.weapon.zoom_step = -1
+		player.weapon.tick(delta, player.head.global_transform, false, false, false)
+		if player.input.just_pressed("swap_weapon"):
+			player.beer.cycle_held(player, 1)
+		elif player.input.just_pressed("swap_weapon_prev"):
+			player.beer.cycle_held(player, -1)
+		if player.input.just_pressed("swap_gear") or player.input.just_pressed("swap_gear_prev"):
+			player.place.swap_gear(player)
+		return
 	# Riding shotgun you can still shoot. The driver is on the wheel. Grappling
 	# tows you along the rope but your hands are free. Water is a swim: R2 dives
 	# or throws the ball instead of firing.
@@ -131,6 +143,8 @@ func tick(player: Player, delta: float) -> void:
 				player.beer.cycle_held(player, -1)
 		if player.is_carrying_ball() and not player.is_underwater() and player.input.just_pressed("shoot"):
 			player.swim.throw_ball(player)
+		if player.is_ziplining() and player.input.just_pressed("melee"):
+			try_melee(player)
 		return
 	if player.is_holding_mines():
 		player.aiming = false

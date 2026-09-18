@@ -112,6 +112,141 @@ func test_the_ground_does_not_open() -> void:
 	assert_eq(ground.get_node_or_null("WallCrater"), null)
 
 
+func test_a_downward_hole_stays_local() -> void:
+	var bites := WallBreak.crater(Vector3(0.0, 4.0, 0.0), Vector3.UP, 11, 1.35)
+	var main: Vector3 = bites[0]["scale"]
+	assert_gte(main.y, 1.1, "the blast has to punch through the slab")
+	assert_lt(main.x, 2.0, "a deck hole must not stretch across the whole pad")
+	assert_lt(main.z, 2.0)
+
+
+func test_a_thin_deck_blows_through() -> void:
+	var deck := BoxProp.create({
+		"kind": "wall",
+		"position": Vector3.ZERO,
+		"size": Vector3(8.0, 0.4, 8.0),
+		"yaw": 0.0,
+	})
+	add_child_autofree(deck)
+	await wait_physics_frames(1)
+	var at := Vector3(0.0, 0.4, 0.0)
+	assert_eq(WallBreak.punch(deck, at, deck, Vector3.UP, 21), 1)
+	await wait_physics_frames(3)
+	assert_true(
+		_ray_clear(deck, Vector3(0.0, 2.0, 0.0), Vector3(0.0, -1.0, 0.0)),
+		"a thin deck has to blow through"
+	)
+	assert_false(
+		_ray_clear(deck, Vector3(3.2, 2.0, 0.0), Vector3(3.2, -1.0, 0.0)),
+		"the rest of the deck stays up"
+	)
+
+
+func test_a_thick_hit_stays_a_dent() -> void:
+	var bites := WallBreak.crater(Vector3(0.0, 8.0, 0.0), Vector3.UP, 11, 12.0)
+	var main: Vector3 = bites[0]["scale"]
+	var centre: Vector3 = bites[0]["at"]
+	assert_lt(main.y, 2.0, "a dent must not become a tunnel")
+	assert_gt(centre.y, 7.0, "the bite stays near the face")
+
+
+func test_a_thick_block_takes_a_dent() -> void:
+	var block := BoxProp.create({
+		"kind": "wall",
+		"position": Vector3.ZERO,
+		"size": Vector3(8.0, 8.0, 8.0),
+		"yaw": 0.0,
+	})
+	add_child_autofree(block)
+	await wait_physics_frames(1)
+	var at := Vector3(0.0, 8.0, 0.0)
+	assert_eq(WallBreak.punch(block, at, block, Vector3.UP, 21), 1)
+	await wait_physics_frames(3)
+	assert_not_null(block.get_node_or_null("WallCrater"))
+	assert_true(
+		_ray_clear(block, at + Vector3.UP * 0.3, at + Vector3.DOWN * 0.35),
+		"the face has to take a scar"
+	)
+	assert_false(
+		_ray_clear(block, at + Vector3.UP * 0.3, at + Vector3.DOWN * 8.5),
+		"too thick to blow through"
+	)
+
+
+func test_an_extra_large_cube_dents_but_stays_up() -> void:
+	var cube: Node3D = (load("res://assets/obstacles/cube_extra_large.glb") as PackedScene).instantiate()
+	add_child_autofree(cube)
+	await wait_physics_frames(1)
+	var body := _first_body(cube)
+	assert_not_null(body)
+	var box := _body_box(body)
+	var at := Vector3(box.get_center().x, box.end.y, box.get_center().z)
+	assert_eq(WallBreak.punch(cube, at, body, Vector3.UP, 8), 1)
+	await wait_physics_frames(3)
+	assert_true(
+		_ray_clear(cube, at + Vector3.UP * 0.3, at + Vector3.DOWN * 0.35),
+		"the extra large cube has to take a scar"
+	)
+	assert_false(
+		_ray_clear(cube, at + Vector3.UP * 0.3, at + Vector3.DOWN * (box.size.y + 1.0)),
+		"a block this thick stays solid"
+	)
+
+
+func test_a_kit_ramp_stays_uncut() -> void:
+	var ramp: Node3D = (load("res://assets/obstacles/ramp_small.glb") as PackedScene).instantiate()
+	add_child_autofree(ramp)
+	await wait_physics_frames(1)
+	var body := _first_body(ramp)
+	assert_not_null(body)
+	var box := _body_box(body)
+	assert_eq(WallBreak.punch(ramp, box.get_center(), body, Vector3.UP, 8), 0)
+	assert_eq(body.get_node_or_null("WallCrater"), null)
+
+
+func test_a_jump_ramp_stays_uncut() -> void:
+	var ramp := JumpRamp.create({
+		"position": Vector3.ZERO,
+		"yaw": 0.0,
+		"width": JumpRamp.WIDTH,
+		"length": JumpRamp.LENGTH,
+		"angle_deg": JumpRamp.ANGLE_DEG,
+	})
+	add_child_autofree(ramp)
+	await wait_physics_frames(1)
+	assert_eq(WallBreak.punch(ramp, ramp.global_position + Vector3.UP, ramp, Vector3.UP, 5), 0)
+	assert_eq(ramp.get_node_or_null("WallCrater"), null)
+
+
+func test_a_kit_platform_keeps_its_colour() -> void:
+	var deck: Node3D = (load("res://assets/obstacles/platform_medium.glb") as PackedScene).instantiate()
+	add_child_autofree(deck)
+	await wait_physics_frames(1)
+	var body := _first_body(deck)
+	assert_not_null(body)
+	var box := _body_box(body)
+	var at := Vector3(box.get_center().x, box.end.y, box.get_center().z)
+	assert_eq(WallBreak.punch(deck, at, body, Vector3.UP, 8), 1)
+	await wait_physics_frames(3)
+	assert_true(
+		_ray_clear(deck, at + Vector3.UP * 2.0, at + Vector3.DOWN * 2.0),
+		"the kit platform has to blow through"
+	)
+	var aside := at + Vector3(2.8, 0.0, 0.0)
+	assert_false(
+		_ray_clear(deck, aside + Vector3.UP * 2.0, aside + Vector3.DOWN * 2.0),
+		"the rest of the deck stays up"
+	)
+	var crater := body.get_node_or_null("WallCrater") as CSGCombiner3D
+	assert_not_null(crater)
+	var hull := crater.get_child(0) as CSGShape3D
+	assert_not_null(hull)
+	var mat := hull.material as StandardMaterial3D
+	assert_not_null(mat)
+	assert_gt(mat.albedo_color.r, 0.5, "cream, not the black wall fill")
+	assert_gt(mat.albedo_color.g, 0.4)
+
+
 func _wall(at: Vector3) -> BoxProp:
 	var wall := BoxProp.create({
 		"kind": "wall",
@@ -160,6 +295,25 @@ func _first_body(node: Node) -> StaticBody3D:
 		if body != null:
 			return body
 	return null
+
+
+func _body_box(body: StaticBody3D) -> AABB:
+	var box := AABB()
+	var started := false
+	for owner_id in body.get_shape_owners():
+		for i in body.shape_owner_get_shape_count(owner_id):
+			var shape := body.shape_owner_get_shape(owner_id, i)
+			var local := shape.get_debug_mesh().get_aabb() if shape != null else AABB()
+			var xf := body.global_transform * body.shape_owner_get_transform(owner_id)
+			var world := AABB(xf * local.position, Vector3.ZERO)
+			for e in 8:
+				world = world.expand(xf * local.get_endpoint(e))
+			if not started:
+				box = world
+				started = true
+			else:
+				box = box.merge(world)
+	return box
 
 
 func _crater_key(bites: Array[Dictionary]) -> String:

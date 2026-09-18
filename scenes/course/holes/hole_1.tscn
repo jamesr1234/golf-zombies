@@ -10,6 +10,7 @@
 [ext_resource type="PackedScene" uid="uid://pitdo3yy0w2j" path="res://assets/obstacles/pillar_large.glb" id="8_bkbyh"]
 [ext_resource type="PackedScene" uid="uid://bqv1kqkcvufhw" path="res://assets/obstacles/pillar_extra_large.glb" id="9_p38qk"]
 [ext_resource type="PackedScene" path="res://scenes/course/props/windmill.tscn" id="10_qfol4"]
+[ext_resource type="PackedScene" path="res://scenes/course/props/windmill_control.tscn" id="10_millctl"]
 [ext_resource type="PackedScene" uid="uid://dv5k5mdbki4t5" path="res://assets/obstacles/ramp_extra_large.glb" id="11_o10em"]
 [ext_resource type="PackedScene" path="res://scenes/vehicles/golf_cart.tscn" id="12_o10em"]
 [ext_resource type="PackedScene" uid="uid://n0e37lj7av6y" path="res://assets/obstacles/escalator_large.glb" id="13_esc"]
@@ -91,6 +92,9 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.2, 0, -8.1)
 [node name="Windmill" parent="." unique_id=619784759 instance=ExtResource("10_qfol4")]
 transform = Transform3D(-0.96592575, 0, -0.2588191, 0, 1, 0, 0.2588191, 0, -0.96592575, -17.550001, 0, -117.45)
 sync_rotor = 2619.8834878051875
+
+[node name="WindmillControl" parent="." unique_id=619784760 instance=ExtResource("10_millctl")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14.85, 0.55, -111.15)
 
 [node name="ramp_extra_large" parent="." unique_id=1111634097 instance=ExtResource("11_o10em")]
 transform = Transform3D(-0.5, 0, 0.8660253, 0, 1, 0, -0.8660253, 0, -0.5, -7.508939, 0, -94.5)

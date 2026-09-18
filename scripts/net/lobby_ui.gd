@@ -290,15 +290,15 @@ func _seat_name(seat: int) -> String:
 
 func _build_seats() -> VBoxContainer:
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 6)
+	box.add_theme_constant_override("separation", 4)
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	var heading := LobbyChrome.heading("Pick a team seat")
+	var heading := LobbyChrome.heading("Pick a team seat", true)
 	heading.name = "SeatHeading"
 	box.add_child(heading)
 	var grid := GridContainer.new()
 	grid.columns = 2
-	grid.add_theme_constant_override("h_separation", 18)
-	grid.add_theme_constant_override("v_separation", 6)
+	grid.add_theme_constant_override("h_separation", 12)
+	grid.add_theme_constant_override("v_separation", 4)
 	box.add_child(grid)
 	_seat_buttons.clear()
 	for team in CoopVs.TEAM_COUNT:
@@ -307,12 +307,12 @@ func _build_seats() -> VBoxContainer:
 		row.add_child(LobbyChrome.color_chip(color))
 		var name := Label.new()
 		name.text = HudStyle.chrome(CoopVs.team_name(team))
-		name.label_settings = HudStyle.readout(color, 14)
+		name.label_settings = HudStyle.readout(color, 12)
 		row.add_child(name)
 		for slot in CoopVs.TEAM_SIZE:
 			var seat := CoopVs.seat_for_team(team, slot)
 			var letter := "A" if slot == 0 else "B"
-			var button := LobbyChrome.seat_button(letter, color)
+			var button := LobbyChrome.seat_button(letter, color, true)
 			button.pressed.connect(_on_seat_pressed.bind(seat))
 			row.add_child(button)
 			_seat_buttons.append(button)
@@ -368,70 +368,69 @@ func _build() -> void:
 	add_child(night)
 	var root := VBoxContainer.new()
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
-	root.offset_left = 120.0
-	root.offset_top = 70.0
-	root.offset_right = -120.0
-	root.offset_bottom = -70.0
+	root.offset_left = 80.0
+	root.offset_top = 18.0
+	root.offset_right = -80.0
+	root.offset_bottom = -18.0
 	root.alignment = BoxContainer.ALIGNMENT_CENTER
-	root.add_theme_constant_override("separation", 14)
+	root.add_theme_constant_override("separation", 6)
 	add_child(root)
 	_title = Label.new()
 	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_title.label_settings = HudStyle.banner(Palette.ORANGE, 52)
+	_title.label_settings = HudStyle.banner(Palette.ORANGE, 32)
 	_title.text = HudStyle.chrome(_title_copy())
 	root.add_child(_title)
 	_status = Label.new()
 	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_status.label_settings = HudStyle.readout(Palette.CYAN, 16)
+	_status.label_settings = HudStyle.readout(Palette.CYAN, 13)
 	root.add_child(_status)
 	root.add_child(_fields())
 	root.add_child(VoicePad.new())
 	_list = Label.new()
 	_list.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_list.label_settings = HudStyle.readout(Palette.ICE, 16)
+	_list.label_settings = HudStyle.readout(Palette.ICE, 13)
 	root.add_child(_list)
 	_seat_box = _build_seats()
 	root.add_child(_seat_box)
-	_start_btn = LobbyChrome.button("Start match")
+	_start_btn = LobbyChrome.button("Start match", true)
 	_start_btn.pressed.connect(_start)
 	root.add_child(_start_btn)
-	_back_btn = LobbyChrome.button("Back")
+	_back_btn = LobbyChrome.button("Back", true)
 	_back_btn.pressed.connect(_back)
 	root.add_child(_back_btn)
 
 
 func _fields() -> VBoxContainer:
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 8)
+	box.add_theme_constant_override("separation", 4)
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	_diff = OptionButton.new()
-	_diff.custom_minimum_size = Vector2(360.0, 36.0)
+	_diff = LobbyChrome.menu(true)
 	for label in GameSettings.LABELS:
 		_diff.add_item(label)
 	_diff.selected = int(GameSettings.difficulty)
 	box.add_child(_diff)
-	box.add_child(LobbyChrome.heading("Steam"))
-	_lobby_id = LobbyChrome.field("Steam lobby ID")
+	box.add_child(LobbyChrome.heading("Steam", true))
+	_lobby_id = LobbyChrome.field("Steam lobby ID", "", true)
 	box.add_child(_lobby_id)
-	_steam_btn = LobbyChrome.button("Host on Steam")
+	_steam_btn = LobbyChrome.button("Host on Steam", true)
 	_steam_btn.pressed.connect(_host_steam)
-	_steam_join_btn = LobbyChrome.button("Join Steam")
+	_steam_join_btn = LobbyChrome.button("Join Steam", true)
 	_steam_join_btn.pressed.connect(_join_steam)
-	_invite_btn = LobbyChrome.button("Invite friends")
+	_invite_btn = LobbyChrome.button("Invite friends", true)
 	_invite_btn.pressed.connect(_invite)
-	box.add_child(LobbyChrome.row([_steam_btn, _steam_join_btn, _invite_btn]))
-	box.add_child(LobbyChrome.heading("LAN  ·  testing"))
-	_ip = LobbyChrome.field("Host IP", NetSession.join_ip)
+	box.add_child(LobbyChrome.row([_steam_btn, _steam_join_btn, _invite_btn], true))
+	box.add_child(LobbyChrome.heading("LAN  ·  testing", true))
+	_ip = LobbyChrome.field("Host IP", NetSession.join_ip, true)
 	box.add_child(_ip)
-	_port = LobbyChrome.field("Port", str(NetSession.DEFAULT_PORT))
+	_port = LobbyChrome.field("Port", str(NetSession.DEFAULT_PORT), true)
 	box.add_child(_port)
-	_host_btn = LobbyChrome.button("Host")
+	_host_btn = LobbyChrome.button("Host", true)
 	_host_btn.pressed.connect(_host)
-	_join_btn = LobbyChrome.button("Join")
+	_join_btn = LobbyChrome.button("Join", true)
 	_join_btn.pressed.connect(_join)
-	_test_btn = LobbyChrome.button("Test LAN")
+	_test_btn = LobbyChrome.button("Test LAN", true)
 	_test_btn.pressed.connect(_test_lan)
-	box.add_child(LobbyChrome.row([_host_btn, _join_btn, _test_btn]))
+	box.add_child(LobbyChrome.row([_host_btn, _join_btn, _test_btn], true))
 	return box
 
 

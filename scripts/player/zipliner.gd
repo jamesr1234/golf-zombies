@@ -9,6 +9,8 @@ const CAM_SIDE := 1.55
 const CAM_HEIGHT := 1.85
 const CAM_LOOK := 1.4
 const CAM_FOV := 70.0
+## Space between riders on the same cable so they hang next to each other.
+const RIDER_GAP := 1.15
 
 var line: Zipline
 var t := 0.0
@@ -22,9 +24,9 @@ func is_active() -> bool:
 func latch(player: Player, on: Zipline) -> bool:
 	if on == null:
 		return false
+	t = _open_t(on)
 	line = on
-	t = 0.0
-	player.global_position = on.ride_at(0.0)
+	player.global_position = on.ride_at(t)
 	player.velocity = Vector3.ZERO
 	player.set_look_yaw(on.land_yaw())
 	_spawn_trolley()
@@ -91,6 +93,31 @@ func view_transform(player: Player) -> Transform3D:
 		+ Vector3.UP * (CAM_HEIGHT + sin(pitch_r) * CAM_BACK)
 	)
 	return Transform3D(Basis(), eye).looking_at(target, Vector3.UP)
+
+
+func _open_t(on: Zipline) -> float:
+	var gap := RIDER_GAP / maxf(on.cable_length(), 0.01)
+	var start := 0.0
+	var moved := true
+	while moved:
+		moved = false
+		for who in _riders(on):
+			if absf(start - who.zipliner.t) < gap - 0.0001:
+				start = who.zipliner.t + gap
+				moved = true
+				break
+	return clampf(start, 0.0, 0.85)
+
+
+static func _riders(on: Zipline) -> Array[Player]:
+	var found: Array[Player] = []
+	if on == null or not on.is_inside_tree():
+		return found
+	for node in on.get_tree().get_nodes_in_group("players"):
+		var who := node as Player
+		if who != null and who.is_ziplining() and who.zipliner.line == on:
+			found.append(who)
+	return found
 
 
 func _spawn_trolley() -> void:

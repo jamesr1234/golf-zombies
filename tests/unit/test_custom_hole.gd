@@ -6,6 +6,7 @@ const CUBE := "res://assets/obstacles/cube_large.glb"
 const ARCH := "res://assets/obstacles/arch_large.glb"
 const RIFLE := "res://resources/weapons/rifle.tres"
 const ZIP := "res://scenes/course/props/zipline.tscn"
+const MILL := "res://scenes/course/props/windmill.tscn"
 
 
 func before_each() -> void:
@@ -78,6 +79,33 @@ func test_a_spawn_pack_survives_a_trip_through_json() -> void:
 	assert_eq(int(counts["runner"]), 1)
 	assert_eq(int(counts["gunner"]), 2)
 	assert_eq(int(counts["brute"]), 0)
+
+
+func test_a_windmill_keeps_the_speed_it_was_given() -> void:
+	var hole := CustomHole.create("Mill")
+	hole.add_placement(MILL, Vector3(0.0, 0.0, -24.0))
+	hole.placements[0][CustomHole.SPIN] = 480.0
+	var back := CustomHole.from_dict(JSON.parse_string(JSON.stringify(hole.to_dict())))
+	assert_true(CustomHole.is_windmill(String(back.placements[0][CustomHole.PATH])))
+	assert_almost_eq(CustomHole.spin_of(back.placements[0]), 480.0, 0.001)
+	var overlay := CustomOverlay.build(back)
+	autofree(overlay)
+	assert_eq(overlay.get_child_count(), 1)
+	var mill := overlay.get_child(0) as CartPathWindmill
+	assert_not_null(mill)
+	assert_almost_eq(mill.spin_deg, 480.0, 0.001)
+
+
+func test_a_saved_windmill_without_a_speed_gets_the_default() -> void:
+	var legacy := {
+		"version": 2, "id": "old_mill", "title": "Old Mill", "created_at": 0,
+		"pieces": [0, 0],
+		"placements": [{
+			"path": MILL, "position": [0.0, 0.0, -24.0], "yaw": 0.0, "gate": -1.0,
+		}],
+	}
+	var hole := CustomHole.from_dict(legacy)
+	assert_almost_eq(CustomHole.spin_of(hole.placements[0]), CartPathWindmill.SPIN_DEFAULT, 0.001)
 
 
 func test_every_spawn_pack_keeps_its_own_yard() -> void:
@@ -180,6 +208,29 @@ func test_a_saved_hole_comes_back_off_disk() -> void:
 	assert_null(HoleStore.load_hole(hole.id))
 
 
+func test_a_lesson_snapshot_is_not_a_listed_hole() -> void:
+	var hole := CustomHole.create("Tutorial")
+	assert_true(HoleStore.save_lesson(4, 1, hole))
+	assert_true(HoleStore.lesson_resumable())
+	assert_false(HoleStore.lesson_completed())
+	assert_eq(HoleStore.lesson_step(), 4)
+	assert_eq(HoleStore.lesson_tool(), 1)
+	assert_eq(HoleStore.lesson_hole().id, hole.id)
+	assert_eq(HoleStore.list_holes().size(), 0)
+	HoleStore.mark_lesson_done()
+	assert_true(HoleStore.lesson_completed())
+	assert_false(HoleStore.lesson_resumable())
+	HoleStore.save_lesson(2, 0, hole)
+	assert_true(HoleStore.lesson_completed(), "a later snapshot keeps the finished flag")
+	assert_true(HoleStore.lesson_resumable())
+	HoleStore.clear_lesson_progress()
+	assert_true(HoleStore.lesson_completed())
+	assert_false(HoleStore.lesson_resumable())
+	HoleStore.clear_sandbox()
+	assert_false(HoleStore.lesson_completed())
+	assert_false(HoleStore.lesson_resumable())
+
+
 func test_a_missing_hole_reads_as_nothing() -> void:
 	assert_null(HoleStore.load_hole("nothing_here"))
 	assert_false(HoleStore.delete_hole("nothing_here"))
@@ -217,6 +268,13 @@ func test_the_layout_paints_a_fairway_a_tee_and_a_green() -> void:
 		kinds[patch["type"]] = int(kinds.get(patch["type"], 0)) + 1
 	assert_eq(int(kinds.get(Surface.Type.FAIRWAY, 0)), hole.pieces.size() + 1)
 	assert_gte(int(kinds.get(Surface.Type.TEE, 0)), 1)
+	var tee := {}
+	for patch in data.patches:
+		if patch["type"] == Surface.Type.TEE:
+			tee = patch
+			break
+	assert_false(tee.is_empty())
+	assert_almost_eq(tee["size"].x, hole.width(), 0.01)
 	assert_gte(int(kinds.get(Surface.Type.GREEN, 0)), 1)
 	assert_gte(int(kinds.get(Surface.Type.FRINGE, 0)), 1)
 	var along := data.along_cup()
@@ -241,6 +299,8 @@ func test_a_wide_custom_hole_paints_a_wider_strip() -> void:
 	var small_patch := _first_fairway(small_data)
 	var wide_patch := _first_fairway(wide_data)
 	assert_almost_eq(float(wide_patch["size"].x), float(small_patch["size"].x) * 2.0, 0.01)
+	assert_almost_eq(_tee_width(wide_data), wide.width(), 0.01)
+	assert_almost_eq(_tee_width(small_data), small.width(), 0.01)
 
 
 func test_a_wide_strip_stays_flat_past_the_regular_lip() -> void:
@@ -399,6 +459,28 @@ func test_a_group_is_stored_around_its_own_middle() -> void:
 	assert_almost_eq((middle / float(stored.size())).length(), 0.0, 0.01)
 
 
+func test_a_grouped_windmill_keeps_its_speed() -> void:
+	var mill := CustomHole.placement(MILL, Vector3(1.35, 0.0, 0.0))
+	mill[CustomHole.SPIN] = 720.0
+	var path := HoleStore.save_structure("Mill Pair", [
+		CustomHole.placement(CUBE, Vector3.ZERO),
+		mill,
+	])
+	var stored := HoleStore.structure_parts(path)
+	var found := {}
+	for part in stored:
+		if CustomHole.is_windmill(String(part[CustomHole.PATH])):
+			found = part
+	assert_false(found.is_empty())
+	assert_almost_eq(CustomHole.spin_of(found), 720.0, 0.001)
+	var flat := CustomOverlay.expand(CustomHole.placement(path, Vector3(10.0, 0.0, -20.0)))
+	var moved := {}
+	for part in flat:
+		if CustomHole.is_windmill(String(part[CustomHole.PATH])):
+			moved = part
+	assert_almost_eq(CustomHole.spin_of(moved), 720.0, 0.001)
+
+
 func test_a_grouped_zipline_keeps_its_end() -> void:
 	var start := Vector3(0.0, 2.7, 0.0)
 	var finish := Vector3(5.4, 0.0, 0.0)
@@ -437,3 +519,10 @@ func _first_fairway(data: HoleData) -> Dictionary:
 		if patch["type"] == Surface.Type.FAIRWAY:
 			return patch
 	return {}
+
+
+func _tee_width(data: HoleData) -> float:
+	for patch in data.patches:
+		if patch["type"] == Surface.Type.TEE:
+			return patch["size"].x
+	return 0.0

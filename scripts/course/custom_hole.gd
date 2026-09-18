@@ -26,6 +26,8 @@ const NO_END := Vector3.INF
 ## a placement would otherwise drag a @tool script into its own parse.
 const WEAPON_DIR := "res://resources/weapons"
 const ZIPLINE := "res://scenes/course/props/zipline.tscn"
+const WINDMILL := "res://scenes/course/props/windmill.tscn"
+const SPIN := "spin"
 ## Token path, not a scene. The creator draws the yard; play plants the pack.
 const SPAWN := "spawn"
 const RADIUS := "radius"
@@ -70,6 +72,14 @@ static func is_weapon(path: String) -> bool:
 
 static func is_zipline(path: String) -> bool:
 	return path == ZIPLINE
+
+
+static func is_windmill(path: String) -> bool:
+	return path == WINDMILL
+
+
+static func spin_of(entry: Dictionary) -> float:
+	return CartPathWindmill.clamp_spin(float(entry.get(SPIN, CartPathWindmill.SPIN_DEFAULT)))
 
 
 static func is_spawn(path: String) -> bool:
@@ -208,6 +218,10 @@ func to_dict() -> Dictionary:
 			row[RADIUS] = float(entry.get(RADIUS, DEFAULT_RADIUS))
 			row[AGGRO] = float(entry.get(AGGRO, DEFAULT_AGGRO))
 			row[COUNTS] = spawn_counts(entry.get(COUNTS, {}))
+		if is_windmill(String(entry[PATH])) or entry.has(SPIN):
+			row[SPIN] = CartPathWindmill.clamp_spin(
+				float(entry.get(SPIN, CartPathWindmill.SPIN_DEFAULT))
+			)
 		listed.append(row)
 	return {
 		"version": VERSION,
@@ -245,6 +259,10 @@ static func from_dict(body: Dictionary) -> CustomHole:
 			row[RADIUS] = float(entry.get(RADIUS, DEFAULT_RADIUS))
 			row[AGGRO] = float(entry.get(AGGRO, DEFAULT_AGGRO))
 			row[COUNTS] = spawn_counts(entry.get(COUNTS, {}))
+		if is_windmill(String(row[PATH])) or entry.has(SPIN):
+			row[SPIN] = CartPathWindmill.clamp_spin(
+				float(entry.get(SPIN, CartPathWindmill.SPIN_DEFAULT))
+			)
 		hole.placements.append(row)
 	if int(body.get("version", 1)) < VERSION:
 		PieceLadder.remap_centers(hole.placements)

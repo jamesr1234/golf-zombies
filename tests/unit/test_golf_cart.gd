@@ -601,6 +601,21 @@ func test_a_boost_stripe_outpaces_the_trigger() -> void:
 	pad.free()
 
 
+func test_a_fan_holds_the_cart_up_without_killing_speed() -> void:
+	var cart := GolfCart.new()
+	assert_false(cart.on_fan())
+	cart.enter_fan()
+	assert_true(cart.on_fan())
+	cart.drive_speed = 28.0
+	cart.velocity = Vector3(0.0, -20.0, -28.0)
+	cart._apply_air(0.2)
+	assert_gt(cart.velocity.y, -20.0)
+	assert_almost_eq(cart.velocity.z, -28.0, 0.001)
+	cart.exit_fan()
+	assert_false(cart.on_fan())
+	cart.free()
+
+
 func test_a_boost_stripe_hurls_a_player_down_the_lane() -> void:
 	var next := _Boost.player_velocity(Vector3.ZERO, Vector3.FORWARD, 0.5)
 	assert_lt(next.z, 0.0, "Godot forward is -Z")

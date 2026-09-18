@@ -16,15 +16,15 @@ config/features=PackedStringArray("4.6", "Forward Plus")
 run/low_processor_mode=true
 config/icon="res://icon.png"
 
+[audio]
+
+driver/enable_input=true
+
 [autoload]
 
 SteamLobby="*res://scripts/net/steam_lobby.gd"
 NetSession="*res://scripts/net/net_session.gd"
 VoiceChat="*res://scripts/net/voice_chat.gd"
-
-[audio]
-
-driver/enable_input=true
 
 [display]
 

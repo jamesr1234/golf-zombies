@@ -15,7 +15,9 @@ func text(player: Player) -> String:
 	if player.talking:
 		return "%s to move on" % player.input.hint("interact")
 	if player.is_ziplining():
-		return "Riding the line   %s to drop" % player.input.hint("jump")
+		return "Riding the line   %s to drop   %s to shove" % [
+			player.input.hint("jump"), player.input.hint("melee")
+		]
 	if player.is_grappling():
 		if player.grappler.is_point():
 			return "Reeling in   %s to let go" % player.input.hint("jump")
@@ -23,7 +25,7 @@ func text(player: Player) -> String:
 			player.input.hint("jump"), player.input.hint("sprint")
 		]
 	if player.is_climbing():
-		if player.climber.wall is LeanLadder:
+		if player.climber.wall != null and player.climber.wall.is_rail_climb():
 			return "stick up the ladder   jump to hop off"
 		return "hold %s left   hold %s right   sticks reach   jump drop" % [
 			player.input.hint("melee"), player.input.hint("shield")
@@ -40,9 +42,9 @@ func text(player: Player) -> String:
 			player.input.hint("melee"), player.input.hint("shield"),
 			player.input.hint("aim"), player.input.hint("interact")
 		]
-	if player.is_milling():
-		return "Rotate %s   %s to step away" % [
-			player.input.hint("move"), player.input.hint("interact")
+	if player.is_holding_mill():
+		return "Mill remote   rotate %s   %s for gun" % [
+			player.input.hint("move"), player.input.hint("swap_weapon")
 		]
 	if player.shopping:
 		return player.shop.prompt(player)
@@ -109,13 +111,11 @@ func text(player: Player) -> String:
 		return "%s to ride the zipline" % player.input.hint("interact")
 	if player.motion.can_latch_climb(player):
 		var wall := ClimbingWall.nearest(player)
-		if wall is LeanLadder:
+		if wall != null and wall.is_rail_climb():
 			return "walk in to climb   %s or %s to grab" % [
 				player.input.hint("melee"), player.input.hint("shield")
 			]
 		return "%s or %s to climb" % [player.input.hint("melee"), player.input.hint("shield")]
-	if player.mill_control() != null:
-		return "%s to run the mill" % player.input.hint("interact")
 	var lift = _Elevator.nearest(player)
 	if lift != null:
 		return "%s to ride to %s" % [player.input.hint("interact"), lift.dest_name(player)]

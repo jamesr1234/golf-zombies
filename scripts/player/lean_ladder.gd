@@ -125,6 +125,10 @@ func set_ghost_visible(on: bool) -> void:
 	visible = on
 
 
+func is_rail_climb() -> bool:
+	return true
+
+
 func face_normal() -> Vector3:
 	var away := -global_transform.basis.z
 	away.y = 0.0

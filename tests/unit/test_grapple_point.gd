@@ -60,14 +60,32 @@ func test_nearest_finds_a_target_in_range() -> void:
 	assert_eq(_Point.FIND, Grappler.RANGE)
 
 
-func test_the_pad_is_on_the_deck_under_the_target() -> void:
+func test_the_pad_is_at_the_target() -> void:
 	var point = _Point.create()
 	add_child_autofree(point)
 	var pad: Vector3 = point.land_at()
 	var aim: Vector3 = point.aim_at()
-	assert_lt(pad.y, aim.y - 2.0, "the stand is the deck, not the bullseye")
-	assert_almost_eq(pad.y, point.global_position.y, 0.15)
+	assert_gt(pad.y, 2.0, "you arrive at the target, not the fairway")
+	assert_almost_eq(pad.y, aim.y - _Point.LAND_DROP, 0.2)
 	assert_gt(pad.z, point.global_position.z, "in front of the post")
+
+
+func test_a_high_target_does_not_drop_you_on_the_fairway() -> void:
+	var floor := StaticBody3D.new()
+	floor.collision_layer = Layers.WORLD
+	floor.collision_mask = 0
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(40.0, 0.4, 40.0)
+	shape.shape = box
+	floor.add_child(shape)
+	floor.position = Vector3(0.0, -0.2, 0.0)
+	add_child_autofree(floor)
+	var point = _Point.create(Vector3(0.0, 12.0, 0.0))
+	add_child_autofree(point)
+	await wait_physics_frames(1)
+	var pad: Vector3 = point.land_at()
+	assert_gt(pad.y, 10.0, "a high post must not reel you to the ground")
 
 
 func test_the_rope_reels_you_up_to_the_target() -> void:
@@ -98,8 +116,9 @@ func test_the_rope_reels_you_up_to_the_target() -> void:
 		if not player.is_grappling():
 			break
 	assert_false(player.is_grappling(), "arrival drops you on your feet")
-	assert_lt(player.global_position.distance_to(pad), 0.2, "you finish on the deck")
+	assert_lt(player.global_position.distance_to(pad), 0.2, "you finish at the target")
 	assert_almost_eq(player.global_position.y, pad.y, 0.15)
+	assert_gt(player.global_position.y, start.y + 0.8, "the yank has to lift you")
 
 
 func test_the_prompt_names_the_target() -> void:

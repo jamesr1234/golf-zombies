@@ -152,11 +152,57 @@ func test_a_ladder_has_rungs_you_can_latch() -> void:
 	var node: Node3D = _spawn("res://assets/obstacles/ladder_medium.glb")
 	var climb := ClimbLadder.attach(node)
 	assert_not_null(climb)
+	assert_true(climb.is_rail_climb())
 	assert_gte(climb.hold_locals().size(), 6)
 	var dummy := Node3D.new()
 	add_child_autofree(dummy)
 	dummy.global_position = climb.to_global(Vector3(0.0, -climb._h * 0.35, -0.7))
 	assert_true(climb.can_latch(dummy), "walk up to the rungs to start climbing")
+	dummy.global_position = climb.to_global(Vector3(0.0, -climb._h * 0.35, 0.7))
+	assert_true(climb.can_latch(dummy), "the back of the ladder latches too")
+
+
+func test_adopt_binds_ladders_before_the_hole_enters_the_tree() -> void:
+	var host := Node3D.new()
+	var packed := load("res://assets/obstacles/ladder_medium.glb") as PackedScene
+	var ladder: Node3D = packed.instantiate()
+	host.add_child(ladder)
+	assert_false(host.is_inside_tree())
+	ClimbLadder.adopt(host)
+	assert_not_null(ladder.get_node_or_null("Climb"), "bind the overlay even before add_child")
+	host.free()
+
+
+func test_adopt_binds_a_ladder_added_after_the_first_scan() -> void:
+	var host := Node3D.new()
+	add_child_autofree(host)
+	ClimbLadder.adopt(host)
+	var ladder: Node3D = (load("res://assets/obstacles/ladder_small.glb") as PackedScene).instantiate()
+	host.add_child(ladder)
+	ClimbLadder.adopt(host)
+	assert_not_null(ladder.get_node_or_null("Climb"), "a later hole still gets rails")
+
+
+func test_you_slide_up_a_placed_ladder() -> void:
+	var node: Node3D = _spawn("res://assets/obstacles/ladder_medium.glb")
+	var climb := ClimbLadder.attach(node)
+	var player: Player = (load("res://scenes/players/player.tscn") as PackedScene).instantiate()
+	add_child_autofree(player)
+	await wait_physics_frames(1)
+	player.input = CpuInput.new(player.input_prefix, false)
+	player.global_position = climb.to_global(Vector3(0.0, -climb._h * 0.35, -0.7))
+	assert_true(climb.can_latch(player))
+	assert_true(player._start_climb())
+	assert_true(player.is_climbing())
+	assert_true(player.climber.wall is ClimbLadder)
+	var start_y := player.global_position.y
+	var pad := player.input as CpuInput
+	for _i in 20:
+		pad.begin_frame()
+		pad.move = Vector2(0.0, -1.0)
+		player._move(1.0 / 60.0)
+	assert_gt(player.global_position.y, start_y + 1.2, "stick up is a fast climb")
+	assert_true(player.is_climbing())
 
 
 func test_a_platform_covers_the_same_size_cube() -> void:

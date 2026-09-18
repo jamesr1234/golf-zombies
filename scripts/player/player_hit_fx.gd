@@ -3,8 +3,8 @@ extends RefCounted
 ## Hit flash, ragdoll flop, and the downed / revived body reactions.
 
 const HIT_FLASH_TIME := 0.16
-## Long enough to cover one club swing, so a brute that lands four times in the
-## follow-through cannot dump a full bar and end a solo run.
+## Long enough to cover one club swing, so follow-through contacts do not
+## land as a second hit.
 const HURT_LOCK := 0.5
 const BODY_RADIUS := 0.4
 const STAND_HEAD_HEIGHT := 1.55

@@ -87,7 +87,7 @@ static func attach_cart(node: Node) -> MultiplayerSynchronizer:
 	return attach(node, PackedStringArray([
 		":sync_xform", ":sync_stick", ":sync_boost", ":sync_brake", ":sync_brake_pitch",
 		":sync_tipped", ":sync_tip_sign", ":sync_right",
-		":turbo", ":ram_plate", ":armored", ":mines",
+		":turbo", ":ram_plate", ":armored", ":mines", ":sync_wrecked",
 	]), CART_HZ)
 
 

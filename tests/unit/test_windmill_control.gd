@@ -1,6 +1,6 @@
 extends GutTest
-## A table-side joystick. Analog rotation is the mill: one stick circle is one
-## turn of the blades, and the world stick leans the same way.
+## A handheld mill remote. Analog rotation is the mill: one stick circle is one
+## turn of the blades, and the stick on the remote leans the same way.
 
 const PLAYER := preload("res://scenes/players/player.tscn")
 const _Desk := preload("res://scripts/course/windmill_control.gd")
@@ -40,7 +40,7 @@ func test_stick_right_is_zero_and_forward_is_a_quarter_turn() -> void:
 	assert_almost_eq(_Desk.turn_delta(0.1, -0.1), -0.2, 0.001)
 
 
-func test_the_desk_is_a_table_with_a_joystick() -> void:
+func test_the_control_is_a_handheld_pickup() -> void:
 	var mill := _mill()
 	add_child_autofree(mill)
 	var desk := _Desk.create({
@@ -49,14 +49,18 @@ func test_the_desk_is_a_table_with_a_joystick() -> void:
 	})
 	add_child_autofree(desk)
 	assert_true(desk.is_in_group("mill_controls"))
-	assert_eq(desk.collision_layer, Layers.PROP)
-	assert_not_null(desk.get_node_or_null("StickPivot"))
-	assert_not_null(desk.get_node_or_null("StickPivot/Shaft/Knob"))
+	assert_true(desk is Area3D)
+	assert_eq(desk.collision_layer, Layers.PICKUP)
+	assert_eq(desk.collision_mask, Layers.PLAYER)
+	assert_not_null(desk.find_child("StickPivot", true, false))
+	assert_not_null(desk.find_child("Knob", true, false))
 	assert_eq(String(desk.to_prop()["kind"]), "mill_control")
 	assert_eq(desk.mill(), mill)
+	assert_true(_Desk.STATS.is_mill())
+	assert_eq(_Desk.STATS.visual, "mill")
 
 
-func test_you_have_to_walk_up_to_use_it() -> void:
+func test_walking_in_puts_the_remote_in_the_bag() -> void:
 	var mill := _mill()
 	add_child_autofree(mill)
 	var desk := _Desk.create({
@@ -64,12 +68,28 @@ func test_you_have_to_walk_up_to_use_it() -> void:
 		"yaw": 0.0,
 	})
 	add_child_autofree(desk)
-	var dummy := Node3D.new()
-	add_child_autofree(dummy)
-	dummy.global_position = Vector3(0.0, 0.0, 1.0)
-	assert_true(desk.can_use(dummy))
-	dummy.global_position = Vector3(0.0, 0.0, 8.0)
-	assert_false(desk.can_use(dummy), "the latch is at the table, not across the green")
+	var pair := await _with_player(desk)
+	var player: Player = pair[0]
+	assert_true(desk.try_pick(player))
+	assert_true(player.weapon.has_gun(_Desk.STATS))
+	assert_true(player.is_holding_mill())
+	assert_true(desk.is_carried_by(player))
+	assert_false(desk.get_node("Mesh").visible)
+
+
+func test_a_second_touch_leaves_it_for_someone_else() -> void:
+	var mill := _mill()
+	add_child_autofree(mill)
+	var desk := _Desk.create({
+		"position": Vector3.ZERO,
+		"yaw": 0.0,
+	})
+	add_child_autofree(desk)
+	var pair := await _with_player(desk)
+	var player: Player = pair[0]
+	assert_true(player.weapon.add_gun(_Desk.STATS))
+	assert_false(desk.try_pick(player), "the partner still needs a shot at it")
+	assert_false(desk.is_carried_by(player))
 
 
 func test_taking_control_stops_the_auto_spin() -> void:
@@ -84,9 +104,10 @@ func test_taking_control_stops_the_auto_spin() -> void:
 	var before := mill.rotor_rad()
 	mill._physics_process(STEP)
 	assert_gt(mill.rotor_rad(), before, "idle mills keep turning")
-	var pair := await _at_desk(desk)
+	var pair := await _with_player(desk)
 	var player: Player = pair[0]
-	desk.try_toggle(player)
+	assert_true(desk.try_pick(player))
+	player._sync_mill_remote(STEP)
 	assert_true(player.is_milling())
 	assert_true(mill.is_driven())
 	var held := mill.rotor_rad()
@@ -102,10 +123,11 @@ func test_the_stick_and_the_mill_share_the_analog_turn() -> void:
 		"yaw": 0.0,
 	})
 	add_child_autofree(desk)
-	var pair := await _at_desk(desk)
+	var pair := await _with_player(desk)
 	var player: Player = pair[0]
 	var pad: CpuInput = pair[1]
-	desk.try_toggle(player)
+	assert_true(desk.try_pick(player))
+	player._sync_mill_remote(STEP)
 	var start := mill.rotor_rad()
 	var samples := 24
 	for i in samples + 1:
@@ -114,13 +136,37 @@ func test_the_stick_and_the_mill_share_the_analog_turn() -> void:
 		pad.move = Vector2(cos(t), -sin(t))
 		desk.tick(player, STEP)
 	assert_almost_eq(mill.rotor_rad() - start, -TAU, 0.12)
-	var pivot := desk.get_node("StickPivot") as Node3D
+	var pivot := desk.find_child("StickPivot", true, false) as Node3D
 	assert_almost_eq(pivot.rotation.z, -cos(TAU) * _Desk.MAX_TILT, 0.05)
-	var knob := desk.get_node("StickPivot/Shaft/Knob") as Node3D
+	var knob := desk.find_child("Knob", true, false) as Node3D
 	assert_almost_eq(knob.rotation.y, mill.rotor_rad(), 0.05, "the ball marker sits on the mill")
 
 
-func test_interact_takes_the_desk_and_steps_you_away() -> void:
+func test_selecting_the_remote_drives_the_mill() -> void:
+	var mill := _mill()
+	add_child_autofree(mill)
+	var rifle: WeaponStats = preload("res://resources/weapons/rifle.tres")
+	var desk := _Desk.create({
+		"position": Vector3(0.0, 0.0, 0.0),
+		"yaw": 0.0,
+	})
+	add_child_autofree(desk)
+	var pair := await _with_player(desk)
+	var player: Player = pair[0]
+	assert_true(player.weapon.add_gun(rifle))
+	assert_true(desk.try_pick(player))
+	assert_true(player.is_holding_mill())
+	player._sync_mill_remote(STEP)
+	assert_true(player.is_milling())
+	assert_true(desk.is_used_by(player))
+	player.weapon.swap(1)
+	assert_false(player.is_holding_mill())
+	player._sync_mill_remote(STEP)
+	assert_false(player.is_milling())
+	assert_false(mill.is_driven())
+
+
+func test_you_can_walk_while_running_the_mill() -> void:
 	var mill := _mill()
 	add_child_autofree(mill)
 	var desk := _Desk.create({
@@ -128,22 +174,25 @@ func test_interact_takes_the_desk_and_steps_you_away() -> void:
 		"yaw": 0.0,
 	})
 	add_child_autofree(desk)
-	var pair := await _at_desk(desk)
+	var pair := await _with_player(desk)
 	var player: Player = pair[0]
 	var pad: CpuInput = pair[1]
-	pad.begin_frame()
-	pad.tap("interact")
-	player._interact(STEP)
+	assert_true(desk.try_pick(player))
+	player._sync_mill_remote(STEP)
 	assert_true(player.is_milling())
-	assert_true(desk.is_used_by(player))
+	var start := player.global_position
 	pad.begin_frame()
-	pad.tap("interact")
-	player._interact(STEP)
-	assert_false(player.is_milling())
-	assert_false(mill.is_driven())
+	pad.move = Vector2(0.0, -1.0)
+	player.motion.tick(player, STEP)
+	assert_gt(
+		Vector2(player.velocity.x, player.velocity.z).length(),
+		0.1,
+		"the remote is mobile; the stick still walks you"
+	)
+	assert_false(start.is_equal_approx(player.global_position) and player.velocity.is_zero_approx())
 
 
-func test_the_builder_makes_a_desk_from_hole_data() -> void:
+func test_the_builder_makes_a_remote_from_hole_data() -> void:
 	var desk := HoleBuilder.create_prop({
 		"kind": "mill_control",
 		"position": Vector3(3.0, 0.0, 5.0),
@@ -166,9 +215,9 @@ func test_a_replicated_stick_turns_the_mill_and_the_knob() -> void:
 	desk.take_wire(Vector2(1.0, 0.0), 1.25, true)
 	assert_true(mill.is_driven())
 	assert_almost_eq(mill.rotor_rad(), 1.25, 0.001)
-	var pivot := desk.get_node("StickPivot") as Node3D
+	var pivot := desk.find_child("StickPivot", true, false) as Node3D
 	assert_almost_eq(pivot.rotation.z, -_Desk.MAX_TILT, 0.001, "the shaft leans with the analog")
-	var knob := desk.get_node("StickPivot/Shaft/Knob") as Node3D
+	var knob := desk.find_child("Knob", true, false) as Node3D
 	assert_almost_eq(knob.rotation.y, 1.25, 0.001, "the ball marker sits on the mill")
 
 
@@ -227,11 +276,11 @@ func _mill() -> CartPathWindmill:
 	return CartPathWindmill.create(Vector3(6.0, 0.0, 0.0), Vector3.FORWARD)
 
 
-func _at_desk(desk) -> Array:
+func _with_player(desk) -> Array:
 	var player: Player = PLAYER.instantiate()
+	player.position = desk.global_position + Vector3(0.0, 0.0, 8.0)
 	add_child_autofree(player)
 	await wait_physics_frames(1)
 	var pad := CpuInput.new("p1", true)
 	player.input = pad
-	player.global_position = desk.stand_at()
 	return [player, pad]

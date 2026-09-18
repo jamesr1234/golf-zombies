@@ -11,6 +11,7 @@ const FLARE: WeaponStats = preload("res://resources/weapons/flare_driver.tres")
 const NAILER: WeaponStats = preload("res://resources/weapons/cart_nailer.tres")
 const DOOR: WeaponStats = preload("res://resources/weapons/warp_door.tres")
 const REMOTE: WeaponStats = preload("res://resources/weapons/shape_remote.tres")
+const MILL: WeaponStats = preload("res://resources/course/mill_remote.tres")
 
 
 func test_the_rifle_still_waits_its_full_interval_after_every_shot() -> void:
@@ -157,6 +158,19 @@ func test_the_warp_door_is_a_gun_you_can_add() -> void:
 	assert_true(gun.add_gun(DOOR))
 	assert_true(gun.has_gun(DOOR))
 	assert_false(gun.add_gun(DOOR), "owning it once is enough")
+
+
+func test_the_mill_remote_is_a_gun_you_can_add() -> void:
+	var gun := _gun()
+	assert_true(MILL.is_mill())
+	assert_false(MILL.is_net())
+	assert_false(MILL.is_drop())
+	assert_eq(MILL.visual, "mill")
+	assert_true(gun.add_gun(MILL))
+	assert_true(gun.has_gun(MILL))
+	assert_false(gun.add_gun(MILL), "owning it once is enough")
+	gun.tick(0.1, Transform3D.IDENTITY, true, true, false)
+	assert_false(gun.is_firing(), "the remote steers a mill; it does not shoot")
 
 
 func test_the_shape_remote_is_a_gun_you_can_add() -> void:

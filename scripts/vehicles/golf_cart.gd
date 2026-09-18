@@ -46,6 +46,7 @@ const PITCH_CATCH := 10.0
 ## instead of hanging over the pond.
 const AIR_GRAVITY := 26.0
 const _Boost := preload("res://scripts/course/cart_path_boost.gd")
+const _Fan := preload("res://scripts/course/fan.gd")
 const _TireMarks := preload("res://scripts/fx/tire_marks.gd")
 const _Stance := preload("res://scripts/vehicles/cart_stance.gd")
 const _Wobble := preload("res://scripts/vehicles/cart_wobble.gd")
@@ -84,6 +85,15 @@ var passenger: Player
 @export var sync_tipped := false
 @export var sync_tip_sign := 1.0
 @export var sync_right := -1.0
+@export var sync_wrecked := false:
+	set(value):
+		if sync_wrecked == value:
+			return
+		sync_wrecked = value
+		if value:
+			_enter_wreck()
+		else:
+			_leave_wreck()
 ## Signed speed along the cart's own forward axis; negative is reverse.
 var drive_speed := 0.0
 @export var turbo := false
@@ -111,6 +121,7 @@ var _net_interp := NetInterp.new()
 ## 1 while drifting, then falls to 0 over DRIFT_RECOVER after you let go.
 var _drift := 0.0
 var _boost_count := 0
+var _fan_count := 0
 var _fling_left := 0.0
 var _predicting := false
 var _predict := NetPredict.new()
@@ -245,6 +256,7 @@ func recover_at(at: Vector3, facing_yaw: float) -> void:
 	drive_speed = 0.0
 	_drift = 0.0
 	_boost_count = 0
+	_fan_count = 0
 	_fling_left = 0.0
 	_airborne = false
 	_land_age = -1.0
@@ -254,6 +266,7 @@ func recover_at(at: Vector3, facing_yaw: float) -> void:
 	_step_y = -1.0
 	_reset_wobble()
 	_hit.clear()
+	sync_wrecked = false
 	if _marks != null:
 		_marks.clear()
 
@@ -300,7 +313,7 @@ func is_righting() -> bool:
 
 
 func can_right(player: Player) -> bool:
-	if player == null or not is_overturned() or not player.health.is_alive():
+	if player == null or is_wrecked() or not is_overturned() or not player.health.is_alive():
 		return false
 	if is_riding(player):
 		return false
@@ -310,7 +323,7 @@ func can_right(player: Player) -> bool:
 
 
 func can_board(player: Player) -> bool:
-	if is_overturned() or is_righting():
+	if is_wrecked() or is_overturned() or is_righting():
 		return false
 	if is_riding(player) or not player.health.is_alive():
 		return false
@@ -437,7 +450,67 @@ func exit_point(side: float) -> Vector3:
 	return _ground_at(_clamp_exit_to_fairway(global_position + right * side * exit_side))
 
 
+func wreck() -> void:
+	if is_wrecked():
+		return
+	eject_all()
+	drive_speed = 0.0
+	velocity = Vector3.ZERO
+	_fling_left = 0.0
+	_blast_wreck()
+	sync_wrecked = true
+
+
+func take_rocket(from: Player = null) -> void:
+	if is_wrecked() or not hostile_rocket(from):
+		return
+	if NetSession.is_active() and not is_multiplayer_authority():
+		_request_rocket_wreck.rpc_id(1, _peer_of(from))
+		return
+	wreck()
+
+
+func hostile_rocket(from: Player) -> bool:
+	if from == null or not GameSettings.is_online():
+		return false
+	if is_riding(from):
+		return false
+	return from.partner == null or not is_riding(from.partner)
+
+
+func is_wrecked() -> bool:
+	return sync_wrecked
+
+
+func _enter_wreck() -> void:
+	visible = false
+	collision_layer = 0
+	collision_mask = 0
+	if crush_area != null:
+		crush_area.monitoring = false
+
+
+func _leave_wreck() -> void:
+	visible = true
+	collision_layer = Layers.VEHICLE
+	collision_mask = Layers.VEHICLE_MASK
+	if crush_area != null:
+		crush_area.monitoring = true
+
+
+func _blast_wreck() -> void:
+	if not is_inside_tree():
+		return
+	var root: Node = get_tree().get_first_node_in_group("fx_root")
+	if root == null:
+		root = get_tree().current_scene
+	HitFx.blast(root, global_position + Vector3.UP * 0.8, 4.2, Palette.AMBER)
+	Sfx.play("rocket_explode", self)
+
+
 func _physics_process(delta: float) -> void:
+	if is_wrecked():
+		return
 	var owned := NetSession.should_simulate(self)
 	var predicting := not owned and predicts_locally()
 	if predicting != _predicting:
@@ -520,7 +593,7 @@ func is_flung() -> bool:
 func _drive(delta: float) -> void:
 	if _fling_left > 0.0:
 		_fling_left = maxf(0.0, _fling_left - delta)
-		velocity.y -= AIR_GRAVITY * delta
+		_apply_air(delta)
 		move_and_slide()
 		return
 	var throttle := 0.0
@@ -635,7 +708,13 @@ func _drive(delta: float) -> void:
 	if _airborne and grounded:
 		_begin_land(-velocity.y)
 	_airborne = not grounded
-	if planted or is_on_floor():
+	if _fan_count > 0:
+		floor_snap_length = 0.0
+		var fan_along := nose * drive_speed
+		velocity.x = lerpf(velocity.x, fan_along.x, slip)
+		velocity.z = lerpf(velocity.z, fan_along.z, slip)
+		velocity.y = _Fan.next_vertical(velocity.y, delta)
+	elif planted or is_on_floor():
 		# Axle probes hold the ride height. Snap would pull the midpoint into
 		# the crease and lift the rear tires off a ramp.
 		floor_snap_length = 0.0 if planted else snap_length(floor_n, nose, drive_speed)
@@ -648,7 +727,7 @@ func _drive(delta: float) -> void:
 		var wanted := nose * drive_speed
 		velocity.x = lerpf(velocity.x, wanted.x, slip)
 		velocity.z = lerpf(velocity.z, wanted.z, slip)
-		velocity.y -= AIR_GRAVITY * delta
+		_apply_air(delta)
 	_align_stance(delta, front, rear, planted)
 	_hold_step(rear)
 	move_and_slide()
@@ -935,13 +1014,19 @@ func _seat_riders() -> void:
 
 
 func _run_over() -> void:
-	if absf(drive_speed) < CRUSH_MIN_SPEED:
-		# Slowed down: the next time the cart gets going is a fresh pass.
-		_hit.clear()
-		return
-	var direction := -global_transform.basis.z * signf(drive_speed)
+	var crushing := absf(drive_speed) >= CRUSH_MIN_SPEED
+	if not crushing:
+		# Slowed down: the next pass is a fresh crush. A brute still wrecks
+		# the ride on contact, even a crawl into its club.
+		if not CartBrute.overlapping(self):
+			_hit.clear()
+			return
+	var direction := -global_transform.basis.z * signf(drive_speed if drive_speed != 0.0 else 1.0)
 	direction.y = 0.0
-	direction = direction.normalized()
+	if direction.length_squared() > 0.0001:
+		direction = direction.normalized()
+	else:
+		direction = -global_transform.basis.z
 	for body in crush_area.get_overlapping_bodies():
 		if _hit.has(body.get_instance_id()):
 			continue
@@ -949,13 +1034,18 @@ func _run_over() -> void:
 		if zombie != null:
 			if zombie.is_allied():
 				continue
-			_hit[zombie.get_instance_id()] = true
 			if CartBrute.try_swat(self, zombie):
+				_hit[zombie.get_instance_id()] = true
 				continue
+			if not crushing:
+				continue
+			_hit[zombie.get_instance_id()] = true
 			var hit := zombie.global_position + Vector3.UP * zombie.stats.height * 0.22
 			zombie.take_damage(crush_damage(drive_speed, ram_mult(), crush_damage_per_speed), direction, hit)
 			zombie.stagger(direction * crush_push)
 			Sfx.play("crush", self)
+			continue
+		if not crushing:
 			continue
 		var crate := body as RigidBody3D
 		if crate == null or crate_impulse <= 0.0:
@@ -980,6 +1070,27 @@ func exit_boost() -> void:
 
 func on_boost_pad() -> bool:
 	return _boost_count > 0
+
+
+func enter_fan() -> void:
+	_fan_count += 1
+	if _fan_count == 1:
+		Sfx.play("fan", self)
+
+
+func exit_fan() -> void:
+	_fan_count = maxi(0, _fan_count - 1)
+
+
+func on_fan() -> bool:
+	return _fan_count > 0
+
+
+func _apply_air(delta: float) -> void:
+	if _fan_count > 0:
+		velocity.y = _Fan.next_vertical(velocity.y, delta)
+		return
+	velocity.y -= AIR_GRAVITY * delta
 
 
 func install_turbo() -> void:
@@ -1160,7 +1271,7 @@ static func turn_rate_deg(
 
 
 ## Damage from being hit by the cart. Cruising speed flattens a walker or a runner
-## outright. Brutes ignore this and swat the cart into the air instead.
+## outright. Brutes ignore this and wreck the cart instead.
 static func crush_damage(speed: float, ram := 1.0, per_speed := CRUSH_DAMAGE_PER_SPEED) -> float:
 	if absf(speed) < CRUSH_MIN_SPEED:
 		return 0.0
@@ -1324,6 +1435,13 @@ func _request_eject(peer_id: int) -> void:
 	if player != null:
 		_do_eject(player)
 		_broadcast_seats()
+
+
+@rpc("any_peer", "reliable")
+func _request_rocket_wreck(peer_id: int) -> void:
+	if not is_multiplayer_authority():
+		return
+	take_rocket(_player_by_peer(peer_id))
 
 
 @rpc("authority", "call_remote", "reliable")

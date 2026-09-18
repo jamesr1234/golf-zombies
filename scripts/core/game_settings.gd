@@ -131,6 +131,24 @@ static func start_tutorial() -> void:
 	creator_tutorial = true
 
 
+static func resume_tutorial() -> bool:
+	var hole := HoleStore.lesson_hole()
+	if hole == null:
+		return false
+	var at := HoleStore.lesson_step()
+	var tool := HoleStore.lesson_tool()
+	edit_custom(hole)
+	creator_tutorial = true
+	creator_lesson_at = maxi(at, 0)
+	creator_lesson_tool = tool
+	return true
+
+
+static func restart_tutorial() -> void:
+	HoleStore.clear_lesson_progress()
+	start_tutorial()
+
+
 static func take_creator_hole() -> CustomHole:
 	var hole := creator_hole if creator_hole != null else CustomHole.create()
 	creator_hole = null

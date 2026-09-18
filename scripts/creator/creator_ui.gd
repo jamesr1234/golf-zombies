@@ -14,6 +14,8 @@ signal width_picked(size: FairwayPiece.Width)
 signal width_cancelled
 signal spawn_picked(counts: Dictionary)
 signal spawn_cancelled
+signal mill_picked(deg: float)
+signal mill_cancelled
 signal undo_requested
 signal redo_requested
 signal erase_requested
@@ -33,6 +35,7 @@ var _palette: VBoxContainer
 var _keypad: CreatorKeypad
 var _width: CreatorWidth
 var _spawn: CreatorSpawn
+var _mill: CreatorWindmill
 var _confirm: CreatorConfirm
 var _menu: PanelContainer
 var _help: CreatorHelp
@@ -82,12 +85,16 @@ func picking_spawn() -> bool:
 	return _spawn != null and _spawn.is_open()
 
 
+func picking_mill() -> bool:
+	return _mill != null and _mill.is_open()
+
+
 func confirming() -> bool:
 	return _confirm != null and _confirm.is_open()
 
 
 func is_blocking() -> bool:
-	return picking_width() or picking_spawn() or confirming()
+	return picking_width() or picking_spawn() or picking_mill() or confirming()
 
 
 func ask_width() -> void:
@@ -96,6 +103,10 @@ func ask_width() -> void:
 
 func ask_spawn() -> void:
 	_spawn.open()
+
+
+func ask_mill(start := CartPathWindmill.SPIN_DEFAULT) -> void:
+	_mill.open(start)
 
 
 func ask_erase() -> void:
@@ -283,6 +294,10 @@ func _build() -> void:
 	_spawn.picked.connect(spawn_picked.emit)
 	_spawn.cancelled.connect(spawn_cancelled.emit)
 	root.add_child(_spawn)
+	_mill = CreatorWindmill.create()
+	_mill.picked.connect(mill_picked.emit)
+	_mill.cancelled.connect(mill_cancelled.emit)
+	root.add_child(_mill)
 	_confirm = CreatorConfirm.create()
 	_confirm.confirmed.connect(erase_requested.emit)
 	_confirm.cancelled.connect(erase_cancelled.emit)

@@ -12,6 +12,8 @@ var config_path := VoiceCodec.LIVE_PATH
 var muted := false
 var open_mic := false
 var talking := false
+var mic_gain := VoiceCodec.DEFAULT_GAIN
+var input_level := 0.0
 var last_packet := PackedByteArray()
 var send_count := 0
 var speaking: Dictionary = {}
@@ -21,6 +23,8 @@ var _rack := VoiceRack.new()
 var _mic: AudioStreamPlayer
 var _pending := PackedVector2Array()
 var _capturing := false
+var _preview := false
+var _speech_hold := 0.0
 
 
 func _ready() -> void:
@@ -34,16 +38,14 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_decay_speaking(delta)
-	if not NetSession.is_active():
-		_stop_capture()
-		return
-	if muted:
-		talking = false
-		return
-	if open_mic or _ptt_held():
+	if _should_listen():
 		_ensure_capture()
-		_capture_and_send()
-	else:
+		_capture_and_send(delta)
+		return
+	if _capturing:
+		_stop_capture()
+	input_level = move_toward(input_level, 0.0, delta * 3.0)
+	if not NetSession.is_active() or muted:
 		talking = false
 
 
@@ -79,6 +81,7 @@ func set_muted(on: bool) -> void:
 	muted = on
 	if muted:
 		talking = false
+		_speech_hold = 0.0
 	_save_prefs()
 	prefs_changed.emit()
 
@@ -92,6 +95,8 @@ func set_open_mic(on: bool) -> void:
 func set_input_device(name: String) -> void:
 	_mic_name = "" if name == "Default" else name
 	_apply_devices()
+	if _capturing:
+		_restart_mic()
 	_save_prefs()
 	prefs_changed.emit()
 
@@ -101,6 +106,23 @@ func set_output_device(name: String) -> void:
 	_apply_devices()
 	_save_prefs()
 	prefs_changed.emit()
+
+
+func set_mic_gain(amount: float) -> void:
+	mic_gain = VoiceCodec.clamp_gain(amount)
+	_save_prefs()
+	prefs_changed.emit()
+
+
+func set_preview(on: bool) -> void:
+	_preview = on
+	if not on and not NetSession.is_active():
+		_stop_capture()
+		input_level = 0.0
+
+
+func is_previewing() -> bool:
+	return _preview
 
 
 func lobby_hint() -> String:
@@ -134,7 +156,12 @@ func hud_line() -> String:
 
 func try_send(frames: PackedVector2Array, ptt: bool) -> bool:
 	var speech := VoiceCodec.is_speech(frames)
-	if not VoiceCodec.should_transmit(muted, open_mic, ptt, speech):
+	var held := _speech_hold
+	if speech:
+		_speech_hold = VoiceCodec.VAD_HOLD
+	else:
+		_speech_hold = maxf(0.0, _speech_hold - float(VoiceCodec.PACKET_MS) / 1000.0)
+	if not VoiceCodec.should_transmit(muted, open_mic, ptt, speech, held):
 		talking = false
 		return false
 	if not NetSession.is_active():
@@ -158,27 +185,51 @@ func reset_for_test() -> void:
 	muted = false
 	open_mic = false
 	talking = false
+	mic_gain = VoiceCodec.DEFAULT_GAIN
+	input_level = 0.0
 	last_packet = PackedByteArray()
 	send_count = 0
 	speaking.clear()
 	_pending = PackedVector2Array()
+	_preview = false
+	_speech_hold = 0.0
 	_stop_capture()
 
 
-func _capture_and_send() -> void:
+func _should_listen() -> bool:
+	if not can_open_mic():
+		return false
+	if _preview:
+		return true
+	if not NetSession.is_active() or muted:
+		return false
+	return open_mic or _ptt_held()
+
+
+func _capture_and_send(delta: float) -> void:
 	if _rack.capture == null or not is_capturing():
+		input_level = move_toward(input_level, 0.0, delta * 3.0)
 		return
 	var avail := _rack.capture.get_frames_available()
 	if avail <= 0:
+		input_level = move_toward(input_level, 0.0, delta * 2.0)
 		return
 	var raw := _rack.capture.get_buffer(avail)
 	var frames := VoiceCodec.downsample(raw, int(AudioServer.get_mix_rate()), VoiceCodec.RATE)
 	_pending.append_array(frames)
 	var ptt := _ptt_held()
 	while _pending.size() >= VoiceCodec.PACKET_FRAMES:
-		var chunk := _pending.slice(0, VoiceCodec.PACKET_FRAMES)
+		var chunk := VoiceCodec.apply_gain(
+			_pending.slice(0, VoiceCodec.PACKET_FRAMES), mic_gain
+		)
 		_pending = _pending.slice(VoiceCodec.PACKET_FRAMES)
+		_note_level(chunk)
 		try_send(chunk, ptt)
+
+
+func _note_level(frames: PackedVector2Array) -> void:
+	var next := VoiceCodec.meter_level(VoiceCodec.rms(frames))
+	input_level = clampf(maxf(next, input_level * 0.82), 0.0, 1.0)
 
 
 func _transmit(packet: PackedByteArray) -> void:
@@ -233,6 +284,14 @@ func _ensure_capture() -> void:
 	_capturing = true
 
 
+func _restart_mic() -> void:
+	if _mic == null:
+		return
+	_mic.stop()
+	_mic.stream = AudioStreamMicrophone.new()
+	_mic.play()
+
+
 func _stop_capture() -> void:
 	if _mic != null:
 		_mic.stop()
@@ -255,8 +314,9 @@ func _load_prefs() -> void:
 	open_mic = bool(prefs.open_mic)
 	_mic_name = str(prefs.mic)
 	_speaker_name = str(prefs.speakers)
+	mic_gain = VoiceCodec.clamp_gain(float(prefs.gain))
 	_apply_devices()
 
 
 func _save_prefs() -> void:
-	VoiceCodec.write_prefs(config_path, muted, open_mic, _mic_name, _speaker_name)
+	VoiceCodec.write_prefs(config_path, muted, open_mic, _mic_name, _speaker_name, mic_gain)

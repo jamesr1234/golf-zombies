@@ -1,8 +1,13 @@
 class_name ClimbLadder
 extends ClimbingWall
-## Rung holds on a placed ladder_*.glb. The mesh is the visual; this is latch only.
+## Rung holds on a placed ladder_*.glb. Walk in and stick up the rails.
 
 const RUNG := 0.45
+const STAND := 0.72
+const MOUNT := 1.45
+
+
+var _stand_z := -STAND
 
 
 func _ready() -> void:
@@ -13,6 +18,50 @@ func _ready() -> void:
 
 func _build() -> void:
 	pass
+
+
+func is_rail_climb() -> bool:
+	return true
+
+
+func is_live() -> bool:
+	return true
+
+
+func set_stand_side(who: Node3D) -> void:
+	if who == null:
+		return
+	_stand_z = -STAND if to_local(who.global_position).z <= 0.0 else STAND
+
+
+func rail_length() -> float:
+	return _h
+
+
+func rail_dir() -> Vector3:
+	return global_transform.basis.y
+
+
+func point_on_rail(t: float) -> Vector3:
+	var y := lerpf(-_h * 0.45, _h * 0.48, clampf(t, 0.0, 1.0))
+	return to_global(Vector3(0.0, y, _stand_z))
+
+
+func rail_t_at(point: Vector3) -> float:
+	var local := to_local(point)
+	return clampf((local.y + _h * 0.45) / maxf(_h * 0.93, 0.01), 0.0, 1.0)
+
+
+func can_latch(who: Node3D) -> bool:
+	if who == null:
+		return false
+	var local := to_local(who.global_position)
+	return (
+		absf(local.x) <= maxf(_w * 0.7, 0.55)
+		and local.y > -_h * 0.55
+		and local.y < _h * 0.22
+		and absf(local.z) <= LATCH_DEPTH + _t
+	)
 
 
 func hold_locals() -> Array[Vector3]:
@@ -27,7 +76,7 @@ func hold_locals() -> Array[Vector3]:
 
 
 func ledge_stand(_who: Node3D = null) -> Vector3:
-	return to_global(Vector3(0.0, _h * 0.5 + 0.2, 0.25))
+	return to_global(Vector3(0.0, _h * 0.5 + 0.2, _stand_z * 0.35))
 
 
 static func is_ladder(node: Node) -> bool:
@@ -36,11 +85,10 @@ static func is_ladder(node: Node) -> bool:
 	return String(node.get("scene_file_path")).contains("/ladder_")
 
 
-static func adopt(tree: SceneTree) -> void:
-	if tree == null or tree.has_meta("_ladders_bound"):
+static func adopt(root: Node) -> void:
+	if root == null:
 		return
-	tree.set_meta("_ladders_bound", true)
-	_walk(tree.root)
+	_walk(root)
 
 
 static func attach(host: Node3D) -> ClimbLadder:
@@ -83,8 +131,9 @@ static func _local_aabb(host: Node3D) -> AABB:
 		var mesh_node := current as MeshInstance3D
 		if mesh_node != null and mesh_node.mesh != null:
 			var local := mesh_node.mesh.get_aabb()
+			var to_host := _xform_in(host, mesh_node)
 			for i in 8:
-				var point: Vector3 = host.to_local(mesh_node.global_transform * local.get_endpoint(i))
+				var point: Vector3 = to_host * local.get_endpoint(i)
 				if not started:
 					box = AABB(point, Vector3.ZERO)
 					started = true
@@ -93,3 +142,13 @@ static func _local_aabb(host: Node3D) -> AABB:
 		for child in current.get_children():
 			stack.append(child)
 	return box
+
+
+static func _xform_in(host: Node3D, node: Node3D) -> Transform3D:
+	var xf := node.transform
+	var walk := node.get_parent()
+	while walk != null and walk != host:
+		if walk is Node3D:
+			xf = (walk as Node3D).transform * xf
+		walk = walk.get_parent()
+	return xf

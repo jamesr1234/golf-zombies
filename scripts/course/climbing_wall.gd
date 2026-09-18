@@ -56,7 +56,6 @@ static func nearest(who: Node3D) -> ClimbingWall:
 	var best_d := INF
 	if who == null or not who.is_inside_tree():
 		return null
-	ClimbLadder.adopt(who.get_tree())
 	for node in who.get_tree().get_nodes_in_group("climb_walls"):
 		var wall := node as ClimbingWall
 		if wall == null:
@@ -131,6 +130,23 @@ func holds() -> Array[Vector3]:
 
 func face_normal() -> Vector3:
 	return -global_transform.basis.z
+
+
+func is_rail_climb() -> bool:
+	return false
+
+
+func rail_length() -> float:
+	return _h
+
+
+func rail_t_at(point: Vector3) -> float:
+	var local := to_local(point)
+	return clampf((local.y + _h * 0.45) / maxf(_h * 0.9, 0.01), 0.0, 1.0)
+
+
+func point_on_rail(t: float) -> Vector3:
+	return to_global(Vector3(0.0, lerpf(-_h * 0.45, _h * 0.45, clampf(t, 0.0, 1.0)), -0.55))
 
 
 func can_latch(who: Node3D) -> bool:

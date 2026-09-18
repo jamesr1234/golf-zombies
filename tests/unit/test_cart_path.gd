@@ -569,6 +569,18 @@ func test_every_windmill_mesh_sits_on_a_physics_body() -> void:
 	assert_not_null(rotor, "spinning sails need a moving body")
 
 
+func test_a_windmill_spin_speed_is_tunable() -> void:
+	var mill := _Windmill.create(Vector3.ZERO, Vector3.FORWARD)
+	add_child_autofree(mill)
+	assert_eq(mill.spin_deg, CartPathWindmill.SPIN_DEFAULT)
+	mill._physics_process(1.0)
+	assert_almost_eq(mill.rotor_rad(), deg_to_rad(CartPathWindmill.SPIN_DEFAULT), 0.0001)
+	mill.spin_deg = 90.0
+	mill.set_rotor_rad(0.0)
+	mill._physics_process(1.0)
+	assert_almost_eq(mill.rotor_rad(), deg_to_rad(90.0), 0.0001)
+
+
 func test_a_windmill_floats_without_a_mast() -> void:
 	var mill := _Windmill.create(Vector3.ZERO, Vector3.FORWARD)
 	add_child_autofree(mill)

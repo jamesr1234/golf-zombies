@@ -21,6 +21,8 @@ func test_the_masks_keep_shots_clear() -> void:
 	assert_eq(Layers.ZOMBIE_MASK & Layers.FORCEFIELD, Layers.FORCEFIELD)
 	assert_eq(Layers.VEHICLE_MASK & Layers.FORCEFIELD, Layers.FORCEFIELD)
 	assert_eq(Layers.BULLET_MASK & Layers.FORCEFIELD, 0, "you still shoot through the lip")
+	assert_eq(Layers.ROCKET_MASK & Layers.FORCEFIELD, 0)
+	assert_eq(Layers.ROCKET_MASK & Layers.VEHICLE, Layers.VEHICLE)
 
 
 func test_a_side_ray_hits_and_the_fairway_stays_open() -> void:

@@ -31,6 +31,36 @@ func test_a_tutorial_playtest_comes_back_to_the_creator() -> void:
 	assert_eq(GameSettings.tutorial_goal, GameSettings.TutorialGoal.NONE)
 
 
+func test_resume_tutorial_reads_the_saved_lesson() -> void:
+	HoleStore.clear_sandbox()
+	var hole := CustomHole.create("Tutorial")
+	hole.needs_width = false
+	assert_true(HoleStore.save_lesson(7, 1, hole))
+	assert_true(GameSettings.resume_tutorial())
+	assert_true(GameSettings.creator_tutorial)
+	assert_eq(GameSettings.creator_lesson_at, 7)
+	assert_eq(GameSettings.creator_lesson_tool, 1)
+	assert_eq(GameSettings.creator_hole.id, hole.id)
+	GameSettings.reset()
+	assert_false(GameSettings.creator_tutorial)
+	assert_eq(GameSettings.creator_lesson_at, 0)
+	assert_true(HoleStore.lesson_resumable())
+	assert_eq(HoleStore.lesson_step(), 7)
+	HoleStore.clear_sandbox()
+
+
+func test_restart_tutorial_wipes_progress_and_starts_fresh() -> void:
+	HoleStore.clear_sandbox()
+	var hole := CustomHole.create("Tutorial")
+	assert_true(HoleStore.save_lesson(7, 1, hole))
+	GameSettings.restart_tutorial()
+	assert_false(HoleStore.lesson_resumable())
+	assert_true(GameSettings.creator_tutorial)
+	assert_true(GameSettings.creator_hole.needs_width)
+	assert_eq(GameSettings.creator_lesson_at, 0)
+	HoleStore.clear_sandbox()
+
+
 func test_defaults_to_solo_medium() -> void:
 	GameSettings.reset()
 	assert_true(GameSettings.is_solo())

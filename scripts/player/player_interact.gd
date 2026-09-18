@@ -26,10 +26,6 @@ func tick(player: Player, delta: float) -> void:
 		return
 	if player.is_grappling() and player.input.just_pressed("interact"):
 		player._drop_grapple()
-	if player.is_milling():
-		if player.input.just_pressed("interact"):
-			player.mill_desk.try_toggle(player)
-		return
 	if player.is_poker_seated():
 		if player.input.just_pressed("interact"):
 			player.poker.use(player)
@@ -108,7 +104,7 @@ func cpu_shot_hold_applies(player: Player) -> bool:
 		or player.station() != null or player.npc() != null or player.can_retrieve_ball()
 	):
 		return false
-	if player.can_start_play() or player.beer.cart_for(player) != null or mill_control(player) != null:
+	if player.can_start_play() or player.beer.cart_for(player) != null:
 		return false
 	if _Escalator.nearest(player) != null:
 		return false
@@ -169,8 +165,6 @@ func use(player: Player) -> void:
 		player.beer.use_cart(player)
 	elif player.can_retrieve_ball():
 		player.flow.retrieve_ball(player)
-	elif mill_control(player) != null:
-		mill_control(player).try_toggle(player)
 	elif escalator_button(player) != null:
 		escalator_button(player).try_reverse(player)
 	elif steps_lever(player) != null:

@@ -8,6 +8,10 @@ const POST_R := 0.1
 const TARGET_R := 0.78
 const FACE_Z := 0.18
 const LAND_FORWARD := 0.95
+## Stand just under the bullseye. A short snap finds a ledge; it must not
+## fall through to the fairway sixteen metres down.
+const LAND_DROP := 1.05
+const LAND_SNAP := 1.6
 ## Same reach as the claw. Kept here so this script does not import Grappler.
 const FIND := 36.0
 
@@ -45,22 +49,22 @@ func aim_at() -> Vector3:
 	return to_global(Vector3(0.0, _face_y(), FACE_Z))
 
 
-## Feet on the deck under the bullseye, in front of the post so you stand clear.
+## Feet in front of the bullseye, at the height you grabbed.
 func land_at() -> Vector3:
-	var pad := to_global(Vector3(0.0, 0.0, LAND_FORWARD))
+	var stand := to_global(Vector3(0.0, maxf(_face_y() - LAND_DROP, 0.0), LAND_FORWARD))
 	if not is_inside_tree():
-		return pad
+		return stand
 	var world := get_world_3d()
 	if world == null:
-		return pad
-	var from := to_global(Vector3(0.0, _face_y(), LAND_FORWARD))
+		return stand
+	var from := stand + Vector3.UP * 0.45
 	var query := PhysicsRayQueryParameters3D.create(
-		from, from + Vector3.DOWN * 16.0, Layers.WORLD | Layers.PROP
+		from, from + Vector3.DOWN * LAND_SNAP, Layers.WORLD | Layers.PROP
 	)
 	query.exclude = [get_rid()]
 	var hit := world.direct_space_state.intersect_ray(query)
 	if hit.is_empty():
-		return pad
+		return stand
 	return hit["position"]
 
 

@@ -24,6 +24,15 @@ func ignore_body(body: Node) -> void:
 		_exclude.append(solid.get_rid())
 
 
+func ignore_friendly_carts(from: Player = shooter) -> void:
+	if from == null or not is_inside_tree():
+		return
+	for node in get_tree().get_nodes_in_group("golf_carts"):
+		var cart := node as GolfCart
+		if cart != null and not cart.hostile_rocket(from):
+			ignore_body(cart)
+
+
 static func spawn(
 	root: Node, origin: Vector3, fly: Vector3, stats: WeaponStats
 ) -> Rocket:
@@ -87,6 +96,13 @@ static func detonate(
 		var hull := mech.blast_point()
 		if in_blast(hull.distance_to(at), radius + MechVisuals.WIDTH * 0.35):
 			mech.take_rocket(shooter)
+	for node in tree.get_nodes_in_group("golf_carts"):
+		var cart := node as GolfCart
+		if cart == null or not is_instance_valid(cart) or cart.is_wrecked():
+			continue
+		var cabin := cart.global_position + Vector3.UP * 0.8
+		if in_blast(cabin.distance_to(at), radius + absf(CartVisuals.NOSE_Z)):
+			cart.take_rocket(shooter)
 	var from: Node = shooter
 	if from == null:
 		from = fx
@@ -128,7 +144,7 @@ func _physics_process(delta: float) -> void:
 	var step := SPEED * delta
 	var from := global_position
 	var to := from + direction * step
-	var query := PhysicsRayQueryParameters3D.create(from, to, Layers.BULLET_MASK)
+	var query := PhysicsRayQueryParameters3D.create(from, to, Layers.ROCKET_MASK)
 	query.exclude = _exclude
 	var hit := get_world_3d().direct_space_state.intersect_ray(query)
 	if not hit.is_empty():

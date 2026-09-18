@@ -144,6 +144,8 @@ func test_one_ball_offset_per_team() -> void:
 	GameSettings.mode = GameSettings.Mode.ONLINE_COOP_VS
 	assert_almost_eq(VsCourse.ball_offset(0, 16), VsCourse.ball_offset(1, 16), 0.001)
 	assert_gt(absf(VsCourse.ball_offset(0, 16) - VsCourse.ball_offset(2, 16)), 1.0)
+	assert_almost_eq(VsCourse.ball_offset(0, 16, 23.0), VsCourse.ball_offset(1, 16, 23.0), 0.001)
+	assert_gt(absf(VsCourse.ball_offset(0, 16, 23.0) - VsCourse.ball_offset(14, 16, 23.0)), 16.0)
 	assert_eq(VsCourse.cart_index_for_seat(0), VsCourse.cart_index_for_seat(1))
 	assert_eq(VsCourse.cart_index_for_seat(2), 1)
 

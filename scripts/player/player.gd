@@ -270,6 +270,7 @@ func _physics_process(delta: float) -> void:
 	else:
 		head.position.y = STAND_HEAD_HEIGHT
 	motion.tick(self, delta)
+	_sync_mill_remote(delta)
 	combat.tick(self, delta)
 	interact.tick(self, delta)
 	poker.tick(self, delta)
@@ -694,6 +695,16 @@ func exit_boost() -> void:
 	motion.exit_boost()
 
 
+func enter_fan() -> void:
+	motion.enter_fan()
+	if motion.fan_count == 1:
+		Sfx.play("fan", self)
+
+
+func exit_fan() -> void:
+	motion.exit_fan()
+
+
 func enter_escalator(lift) -> void:
 	motion.enter_escalator(lift)
 
@@ -1062,6 +1073,19 @@ func mill_control():
 	return interact.mill_control(self)
 
 
+func is_holding_mill() -> bool:
+	return weapon != null and weapon.stats() != null and weapon.stats().is_mill()
+
+
+func bind_mill(desk) -> void:
+	mill_desk = desk
+
+
+func pose_mill(stick: Vector2, mill_rad: float) -> void:
+	if raygun != null:
+		raygun.pose_mill(stick, mill_rad)
+
+
 func escalator_button():
 	return interact.escalator_button(self)
 
@@ -1233,7 +1257,7 @@ func _set_grapple_mask(on: bool) -> void:
 	if on:
 		var skip := Layers.VEHICLE | Layers.MECH
 		if grappler.is_point():
-			skip |= Layers.PROP
+			skip |= Layers.PROP | Layers.WORLD
 		collision_mask = Layers.PLAYER_MASK & ~skip
 	else:
 		collision_mask = Layers.PLAYER_MASK
@@ -1258,15 +1282,21 @@ func begin_mill(desk) -> void:
 
 
 func end_mill(desk) -> void:
-	if mill_desk == desk:
+	if mill_desk == desk and (desk == null or not desk.is_carried_by(self)):
 		mill_desk = null
 
 
-func face_mill(at: Vector3, yaw: float) -> void:
-	global_position = at
-	look.yaw = rad_to_deg(yaw)
-	rotation.y = yaw
-	velocity = Vector3.ZERO
+func _sync_mill_remote(delta: float) -> void:
+	var desk = mill_desk
+	if desk == null or not is_instance_valid(desk):
+		return
+	if is_holding_mill() and desk.operator != self:
+		if desk.can_use(self):
+			desk.try_toggle(self)
+	elif not is_holding_mill() and desk.operator == self:
+		desk.release(self)
+	if desk.operator == self:
+		desk.tick(self, delta)
 
 
 func _distance_to(other: Node3D) -> float:

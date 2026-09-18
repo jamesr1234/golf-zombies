@@ -9,6 +9,16 @@ const GAMEPLAY := "res://scenes/main.tscn"
 const _Music := preload("res://scripts/fx/music.gd")
 ## Circle plays, Square edits, Triangle starts a new hole, L1 asks to delete.
 const DELETE_PROMPT := "Are you sure you want to delete this hole?"
+const RESTART_PROMPT := "Start the lesson over?"
+const HINT_HOLE := (
+	"W/S or stick move   click / C / Square edit   E / Circle play"
+	+ "   N / Triangle new   X / L1 delete   Esc / Options back"
+)
+const HINT_START := "W/S or stick move   Enter / Circle start   Esc / Options back"
+const HINT_RESUME := (
+	"W/S or stick move   Enter / Circle resume   C / Square start over"
+	+ "   Esc / Options back"
+)
 const PAD_KEYS: PackedStringArray = [
 	"move_forward", "move_back", "interact", "jump", "reload", "revive", "melee", "pause",
 ]
@@ -18,9 +28,11 @@ var picked := 0
 
 var _list: VBoxContainer
 var _blurb: Label
+var _hint: Label
 var _confirm: CreatorConfirm
 var _leaving := false
 var _open := false
+var _restarting := false
 var _pad := PadInput.new()
 
 
@@ -32,6 +44,7 @@ func _ready() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_build()
+	picked = _default_pick()
 	reload()
 	_Music.play_lounge()
 	# The title click that opened this is still down on the first frame.
@@ -64,7 +77,7 @@ func play() -> void:
 	if confirming():
 		return
 	if picking_tutorial():
-		start_tutorial()
+		open_tutorial()
 		return
 	if picking_new():
 		create()
@@ -84,7 +97,7 @@ func edit() -> void:
 	if confirming():
 		return
 	if picking_tutorial():
-		start_tutorial()
+		ask_restart()
 		return
 	if picking_new():
 		create()
@@ -107,17 +120,30 @@ func create() -> void:
 	_go(CREATOR)
 
 
-func start_tutorial() -> void:
+func open_tutorial() -> void:
 	if confirming():
 		return
 	Sfx.play("ui_confirm", self)
-	GameSettings.start_tutorial()
+	if HoleStore.lesson_resumable():
+		GameSettings.resume_tutorial()
+	else:
+		GameSettings.start_tutorial()
 	_go(CREATOR)
+
+
+func ask_restart() -> void:
+	if confirming() or not HoleStore.lesson_resumable():
+		if picking_tutorial():
+			Sfx.play("ui_deny", self)
+		return
+	_restarting = true
+	_confirm.open(RESTART_PROMPT)
 
 
 func ask_erase() -> void:
 	if confirming() or picking_tutorial() or picking_new() or rows.is_empty():
 		return
+	_restarting = false
 	_confirm.open(DELETE_PROMPT)
 
 
@@ -131,6 +157,19 @@ func erase() -> void:
 	Sfx.play("ui_back", self)
 	HoleStore.delete_hole(String(rows[_hole_index()]["id"]))
 	reload()
+
+
+func _on_confirmed() -> void:
+	if _restarting:
+		_restarting = false
+		GameSettings.restart_tutorial()
+		_go(CREATOR)
+		return
+	erase()
+
+
+func _on_cancelled() -> void:
+	_restarting = false
 
 
 func back() -> void:
@@ -225,7 +264,7 @@ func _refresh() -> void:
 	_list.add_child(_divider())
 	_list.add_child(_new_entry(picking_new()))
 	if picking_tutorial():
-		_blurb.text = HudStyle.chrome("Learn every tool by using it.")
+		_blurb.text = HudStyle.chrome(_tutorial_blurb())
 	elif picking_new():
 		_blurb.text = HudStyle.chrome("Start a blank hole.")
 	else:
@@ -237,6 +276,7 @@ func _refresh() -> void:
 		])
 	for i in rows.size():
 		_list.add_child(_entry(rows[i], picked == i + 2, i + 2))
+	_hint.text = HudStyle.chrome(_footer())
 
 
 func _replace_note(row: Dictionary) -> String:
@@ -260,7 +300,7 @@ func _tutorial_entry(selected: bool) -> Button:
 		if not _open:
 			return
 		if picking_tutorial():
-			start_tutorial()
+			open_tutorial()
 			return
 		picked = 0
 		_refresh()
@@ -357,18 +397,35 @@ func _build() -> void:
 	_blurb.label_settings = HudStyle.readout(Palette.ICE, 16)
 	column.add_child(_blurb)
 
-	var hint := Label.new()
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hint.label_settings = HudStyle.readout(Palette.LIME, 14)
-	hint.text = HudStyle.chrome(
-		"W/S or stick move   click / C / Square edit   E / Circle play"
-		+ "   N / Triangle new   X / L1 delete   Esc / Options back"
-	)
-	root.add_child(hint)
+	_hint = Label.new()
+	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_hint.label_settings = HudStyle.readout(Palette.LIME, 14)
+	root.add_child(_hint)
 
 	_confirm = CreatorConfirm.create()
-	_confirm.confirmed.connect(erase)
+	_confirm.confirmed.connect(_on_confirmed)
+	_confirm.cancelled.connect(_on_cancelled)
 	add_child(_confirm)
+
+
+func _default_pick() -> int:
+	if HoleStore.lesson_completed() and not HoleStore.lesson_resumable():
+		return 1
+	return 0
+
+
+func _tutorial_blurb() -> String:
+	if not HoleStore.lesson_resumable():
+		return "Learn every tool by using it."
+	return "Resume at %d / %d." % [
+		HoleStore.lesson_step() + 1, CreatorLesson.ids().size() - 1,
+	]
+
+
+func _footer() -> String:
+	if not picking_tutorial():
+		return HINT_HOLE
+	return HINT_RESUME if HoleStore.lesson_resumable() else HINT_START
 
 
 func _panel_style() -> StyleBoxFlat:

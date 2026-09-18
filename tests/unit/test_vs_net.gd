@@ -30,6 +30,20 @@ func test_two_balls_sit_apart_on_the_tee() -> void:
 	assert_gt(absf(VsCourse.ball_offset(0, 2) - VsCourse.ball_offset(1, 2)), 1.0)
 
 
+func test_tee_balls_use_the_full_strip() -> void:
+	var width := 23.0
+	var left := VsCourse.ball_offset(0, 2, width)
+	var right := VsCourse.ball_offset(1, 2, width)
+	assert_eq(VsCourse.ball_offset(0, 1, width), 0.0, "a solo ball still sits on the line")
+	assert_almost_eq(absf(left), width * 0.5 - VsCourse.BALL_EDGE, 0.01)
+	assert_almost_eq(right, -left, 0.01)
+	assert_lt(absf(left), width * 0.5, "still on the hitting box")
+	var inner := VsCourse.ball_offset(1, 4, width)
+	var outer := VsCourse.ball_offset(0, 4, width)
+	assert_gt(absf(outer) - absf(inner), 3.0, "four balls are not bunched in the middle")
+	assert_lt(absf(VsCourse.ball_offset(0, 8, width)), width * 0.5 - VsCourse.BALL_EDGE + 0.01)
+
+
 func test_starting_play_tees_both_balls_apart() -> void:
 	var course := VsCourse.new()
 	course.hole = HoleGenerator.generate(0, 20260816)
@@ -45,15 +59,17 @@ func test_starting_play_tees_both_balls_apart() -> void:
 		add_child_autofree(golf)
 		sessions.append(golf)
 	course.aim_play(sessions)
-	var lateral := course.along_hole().cross(Vector3.UP).normalized()
+	var along := course.along_hole()
+	var lateral := along.cross(Vector3.UP).normalized()
 	var sides: Array[float] = []
 	for ball in balls:
 		var offset := ball.global_position - course.hole.tee
 		offset.y = 0.0
 		sides.append(offset.dot(lateral))
-		assert_lt(offset.length(), 1.5, "the ball should be on the tee, not the practice green")
+		assert_lt(absf(offset.dot(along)), 1.5, "the ball should be on the tee, not down the hole")
+		assert_lt(absf(offset.dot(lateral)), course.hole.fairway_width() * 0.5)
 		assert_true(ball.visible, "pressing Circle has to put the ball in play")
-	assert_gt(absf(sides[0] - sides[1]), 1.0, "the pair is not stacked")
+	assert_gt(absf(sides[0] - sides[1]), 8.0, "the pair has room to swing")
 	course.free()
 
 
@@ -459,6 +475,7 @@ func test_melee_hits_players_in_arc_and_does_not_down_them() -> void:
 	assert_true(Melee.in_arc(origin, forward, Vector3(0.0, 0.0, -2.0), Melee.RANGE, Melee.ARC_DEG))
 	assert_false(Melee.in_arc(origin, forward, Vector3(0.0, 0.0, -8.0), Melee.RANGE, Melee.ARC_DEG))
 	assert_false(Melee.in_arc(origin, forward, Vector3(4.0, 0.0, 0.0), Melee.RANGE, Melee.ARC_DEG))
+	assert_false(Melee.in_arc(origin, forward, Vector3(0.0, 6.0, -1.0), Melee.RANGE, Melee.ARC_DEG))
 	var victim: Player = preload("res://scenes/players/player.tscn").instantiate()
 	add_child_autofree(victim)
 	victim.global_position = Vector3(0.0, 0.0, -1.5)

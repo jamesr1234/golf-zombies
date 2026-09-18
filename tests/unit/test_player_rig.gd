@@ -295,6 +295,23 @@ func test_the_warp_door_gun_is_its_own_mesh() -> void:
 	assert_lt(gun.forward_extent(), -0.2, "the door frame should stick out")
 
 
+func test_the_mill_remote_is_its_own_mesh() -> void:
+	var gun := Raygun.new()
+	add_child_autofree(gun)
+	gun.build(Palette.PLAYER_ONE)
+	assert_false(gun.is_mill())
+	gun.show_gun("mill")
+	assert_true(gun.is_mill())
+	assert_false(gun.is_remote())
+	assert_false(gun.is_rocket())
+	assert_not_null(gun.find_child("StickPivot", true, false))
+	gun.pose_mill(Vector2(1.0, 0.0), 0.8)
+	var pivot := gun.find_child("StickPivot", true, false) as Node3D
+	assert_almost_eq(pivot.rotation.z, -WindmillControl.MAX_TILT, 0.001)
+	var knob := gun.find_child("Knob", true, false) as Node3D
+	assert_almost_eq(knob.rotation.y, 0.8, 0.001)
+
+
 func test_the_shape_remote_is_its_own_mesh() -> void:
 	var gun := Raygun.new()
 	add_child_autofree(gun)

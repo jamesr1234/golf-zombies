@@ -68,6 +68,8 @@ func _ready() -> void:
 	_ui.width_cancelled.connect(_back_to_browser)
 	_ui.spawn_picked.connect(_on_spawn_picked)
 	_ui.spawn_cancelled.connect(_on_spawn_cancelled)
+	_ui.mill_picked.connect(_on_mill_picked)
+	_ui.mill_cancelled.connect(_on_mill_cancelled)
 	_ui.undo_requested.connect(undo_change)
 	_ui.redo_requested.connect(redo_change)
 	_ui.erase_requested.connect(erase_hole)
@@ -214,6 +216,8 @@ func confirm() -> void:
 				Sfx.play("ui_move", self)
 			elif _commit(_place.place):
 				Sfx.play("ui_confirm", self)
+				if CustomHole.is_windmill(_place.picked_path()):
+					_ask_mill()
 		Tool.GROUP:
 			_group.toggle()
 		_:
@@ -519,6 +523,13 @@ func _ask_spawn() -> void:
 	_ui.ask_spawn()
 
 
+func _ask_mill() -> void:
+	var start := CartPathWindmill.SPIN_DEFAULT
+	if not hole.placements.is_empty():
+		start = CustomHole.spin_of(hole.placements[hole.placements.size() - 1])
+	_ui.ask_mill(start)
+
+
 func _on_spawn_picked(counts: Dictionary) -> void:
 	if _commit(_place.finish_spawn.bind(counts)):
 		_refresh_props()
@@ -533,6 +544,18 @@ func _on_spawn_cancelled() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	if _lesson != null:
 		_lesson.after_cancel(self)
+	_aim()
+
+
+func _on_mill_picked(deg: float) -> void:
+	if _commit(_place.finish_spin.bind(deg)):
+		_refresh_props()
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	_aim()
+
+
+func _on_mill_cancelled() -> void:
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	_aim()
 
 
@@ -580,6 +603,9 @@ func switch_tool(next: Tool) -> void:
 
 
 func _save(title: String) -> void:
+	if _lesson != null and _lesson.is_live() and title.strip_edges().is_empty():
+		_snapshot_lesson()
+		return
 	hole.title = title if not title.strip_edges().is_empty() else hole.title
 	if HoleStore.save_hole(hole):
 		var slot := HoleStore.course_slot(hole.title)
@@ -612,15 +638,17 @@ func _launch_playtest(from_lesson := false) -> bool:
 	if not hole.is_playable():
 		_ui.flash("THE HOLE NEEDS AT LEAST %d PIECES" % FairwayPiece.MIN_PIECES)
 		return false
-	if not HoleStore.save_hole(hole):
-		_ui.flash("COULD NOT SAVE THAT HOLE")
-		return false
 	if from_lesson:
+		HoleStore.save_lesson(_lesson.index() + 1, int(tool), hole)
 		GameSettings.play_tutorial_hole(
 			hole, _lesson.index() + 1, int(tool), _lesson.playtest_goal()
 		)
-	else:
-		GameSettings.play_custom(hole)
+		_go(GAMEPLAY)
+		return true
+	if not HoleStore.save_hole(hole):
+		_ui.flash("COULD NOT SAVE THAT HOLE")
+		return false
+	GameSettings.play_custom(hole)
 	_go(GAMEPLAY)
 	return true
 
@@ -637,11 +665,13 @@ func _on_width_picked(size: FairwayPiece.Width) -> void:
 
 
 func _back_to_browser() -> void:
+	_snapshot_lesson()
 	GameSettings.reset()
 	_go(BROWSER)
 
 
 func _leave() -> void:
+	_snapshot_lesson()
 	GameSettings.reset()
 	_go(MENU)
 
@@ -727,11 +757,21 @@ func _begin_lesson() -> void:
 		return
 	_lesson = CreatorLesson.new()
 	_ui.attach_lesson(_lesson)
+	_lesson.finished.connect(HoleStore.mark_lesson_done)
 	_lesson.start(self)
 	var at := GameSettings.take_creator_lesson_at()
 	if at > 0:
 		tool = GameSettings.take_creator_lesson_tool() as Tool
 		_lesson.resume_at(self, at)
+
+
+func _snapshot_lesson() -> void:
+	if _lesson == null or not _lesson.is_live():
+		return
+	var at := _lesson.index()
+	if _lesson.praising():
+		at += 1
+	HoleStore.save_lesson(at, int(tool), hole)
 
 
 func _take_next(event: InputEvent) -> bool:

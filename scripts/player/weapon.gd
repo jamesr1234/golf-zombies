@@ -299,6 +299,9 @@ func tick(delta: float, view: Transform3D, trigger_held: bool, trigger_pulled: b
 	if current == null:
 		_firing = false
 		return
+	if current.is_mill():
+		_firing = false
+		return
 	if is_reloading():
 		_firing = false
 		return
@@ -406,6 +409,7 @@ func _launch_rocket(view: Transform3D, current: WeaponStats) -> void:
 	var rocket := Rocket.spawn(_fx_root(), origin, direction, current)
 	if rocket != null:
 		rocket.shooter = get_parent() as Player
+		rocket.ignore_friendly_carts()
 		_WorldFx.announce_rocket(
 			self, origin, direction, rocket.damage, rocket.blast_radius, rocket.max_range
 		)

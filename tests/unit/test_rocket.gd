@@ -3,6 +3,7 @@ extends GutTest
 
 const WALKER: ZombieStats = preload("res://resources/zombies/walker.tres")
 const ZOMBIE_SCENE := preload("res://scenes/zombies/zombie.tscn")
+const CART_SCENE := preload("res://scenes/vehicles/golf_cart.tscn")
 const ROCKET: WeaponStats = preload("res://resources/weapons/rocket.tres")
 
 
@@ -13,6 +14,7 @@ func before_each() -> void:
 
 
 func after_each() -> void:
+	GameSettings.reset()
 	for group in ["rockets", "fireworks"]:
 		for node in get_tree().get_nodes_in_group(group):
 			node.queue_free()
@@ -74,6 +76,82 @@ func test_the_flying_rocket_has_a_yellow_nose() -> void:
 	assert_almost_eq(nose.material_override.albedo_color.r, Palette.AMBER.r, 0.01)
 	assert_almost_eq(nose.material_override.albedo_color.g, Palette.AMBER.g, 0.01)
 	rocket.free()
+
+
+func test_rockets_stop_on_carts() -> void:
+	assert_eq(Layers.ROCKET_MASK & Layers.VEHICLE, Layers.VEHICLE)
+	assert_eq(Layers.BULLET_MASK & Layers.VEHICLE, 0, "hitscan still flies through the cabin")
+
+
+func test_only_an_opposing_rocket_wrecks_a_cart() -> void:
+	GameSettings.mode = GameSettings.Mode.ONLINE_VS
+	var cart := GolfCart.new()
+	var foe := Player.new()
+	var driver := Player.new()
+	var partner := Player.new()
+	driver.partner = partner
+	partner.partner = driver
+	cart.driver = driver
+	assert_true(cart.hostile_rocket(foe))
+	assert_false(cart.hostile_rocket(driver))
+	assert_false(cart.hostile_rocket(partner))
+	assert_false(cart.hostile_rocket(null))
+	GameSettings.mode = GameSettings.Mode.SOLO
+	assert_false(cart.hostile_rocket(foe), "no opposing players on a PvE hole")
+	cart.free()
+	foe.free()
+	driver.free()
+	partner.free()
+
+
+func test_an_opposing_blast_blows_up_the_cart() -> void:
+	GameSettings.mode = GameSettings.Mode.ONLINE_VS
+	var cart: GolfCart = CART_SCENE.instantiate()
+	var foe := Player.new()
+	add_child_autofree(cart)
+	cart.set_physics_process(false)
+	cart.global_position = Vector3.ZERO
+	Rocket.detonate(get_tree(), Vector3(0.0, 1.0, 0.0), 110.0, 6.5, self, foe)
+	assert_true(cart.is_wrecked())
+	assert_false(cart.visible)
+	foe.free()
+
+
+func test_your_own_rocket_does_not_wreck_the_cart_you_are_in() -> void:
+	GameSettings.mode = GameSettings.Mode.ONLINE_VS
+	var cart: GolfCart = CART_SCENE.instantiate()
+	var driver := Player.new()
+	add_child_autofree(cart)
+	cart.set_physics_process(false)
+	cart.driver = driver
+	Rocket.detonate(get_tree(), Vector3(0.0, 1.0, 0.0), 110.0, 6.5, self, driver)
+	assert_false(cart.is_wrecked())
+	driver.free()
+
+
+func test_a_solo_rocket_leaves_the_cart_up() -> void:
+	var cart: GolfCart = CART_SCENE.instantiate()
+	var player := Player.new()
+	add_child_autofree(cart)
+	cart.set_physics_process(false)
+	Rocket.detonate(get_tree(), Vector3(0.0, 1.0, 0.0), 110.0, 6.5, self, player)
+	assert_false(cart.is_wrecked())
+	player.free()
+
+
+func test_a_rocket_aimed_at_an_enemy_cart_wrecks_it() -> void:
+	GameSettings.mode = GameSettings.Mode.ONLINE_VS
+	var cart: GolfCart = CART_SCENE.instantiate()
+	var foe := Player.new()
+	add_child_autofree(cart)
+	cart.set_physics_process(false)
+	cart.global_position = Vector3(0.0, 0.0, -4.0)
+	await wait_physics_frames(1)
+	var rocket := Rocket.spawn_flight(self, Vector3(0.0, 0.8, 0.0), Vector3.FORWARD, 110.0, 6.5, 90.0)
+	rocket.shooter = foe
+	await wait_seconds(0.2)
+	assert_true(cart.is_wrecked())
+	foe.free()
 
 
 func _zombie(root: Node, at: Vector3) -> Zombie:

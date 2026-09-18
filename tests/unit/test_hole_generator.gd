@@ -35,6 +35,15 @@ func test_hole_ten_paints_a_double_wide_fairway() -> void:
 	assert_gt(strips, 0)
 
 
+func test_the_tee_covers_the_fairway_width() -> void:
+	for index in [0, 9]:
+		var hole := HoleGenerator.generate(index, SEED)
+		var tee := _tee_patch(hole)
+		assert_false(tee.is_empty(), "hole %d needs a hitting box" % (index + 1))
+		assert_almost_eq(tee["size"].x, hole.fairway_width(), 0.01)
+		assert_almost_eq(tee["size"].y, HoleGenerator.TEE_DEPTH, 0.01)
+
+
 func test_generation_is_deterministic() -> void:
 	var first := HoleGenerator.generate(3, SEED)
 	var second := HoleGenerator.generate(3, SEED)
@@ -737,6 +746,13 @@ func _near_water(hole: HoleData, point: Vector3) -> bool:
 		if HoleGenerator.patch_covers(inflated, point):
 			return true
 	return false
+
+
+func _tee_patch(hole: HoleData) -> Dictionary:
+	for patch in hole.patches:
+		if patch["type"] == Surface.Type.TEE:
+			return patch
+	return {}
 
 
 func _inside_sign_frame(sign: Node3D, local: Vector3) -> bool:

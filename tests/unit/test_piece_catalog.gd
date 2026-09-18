@@ -52,6 +52,18 @@ func test_every_gun_can_be_dropped_on_a_hole() -> void:
 		assert_not_null(load(path) as WeaponStats, path)
 
 
+func test_a_fan_is_a_placeable_lift() -> void:
+	var path := "%s/fan.tscn" % PieceCatalog.PROP_DIR
+	assert_true(PieceCatalog.entries(PieceCatalog.PROPS).has(path))
+	var fan := CustomOverlay.instantiate(path) as Fan
+	add_child_autofree(fan)
+	assert_not_null(fan)
+	assert_true(fan.is_in_group("fans"))
+	assert_eq(fan.collision_mask, Layers.PLAYER | Layers.VEHICLE | Layers.BALL)
+	assert_not_null(fan.get_node_or_null("Model"))
+	assert_not_null(fan.find_child("Rotor", true, false))
+
+
 func test_a_speed_rectangle_is_a_placeable_boost_pad() -> void:
 	var path := "%s/speed_rectangle.tscn" % PieceCatalog.PROP_DIR
 	assert_true(PieceCatalog.entries(PieceCatalog.PROPS).has(path))

@@ -4,6 +4,8 @@ extends Node
 
 const PLAYER_SPREAD := 2.2
 const BALL_SPREAD := 1.2
+## Keep a stance inside the lip so the outer balls are not against the wall.
+const BALL_EDGE := 2.0
 const CART_BACK := 2.0
 const CART_SIDE := 8.0
 const CART_GAP := 5.5
@@ -122,13 +124,13 @@ func place_balls(balls: Array[GolfBall]) -> void:
 	_seat_balls(balls, hole.arrival_point())
 
 
-## Circle on the tee: every ball lands on the box at once, spaced so they
-## do not stack.
+## Circle on the tee: every ball lands on the box at once, spaced across the
+## strip so each player has room to swing.
 func place_tee_balls(balls: Array[GolfBall]) -> void:
-	_seat_balls(balls, hole.tee)
+	_seat_balls(balls, hole.tee, hole.fairway_width())
 
 
-func _seat_balls(balls: Array[GolfBall], origin: Vector3) -> void:
+func _seat_balls(balls: Array[GolfBall], origin: Vector3, width := 0.0) -> void:
 	if hole == null:
 		return
 	var n := maxi(1, balls.size())
@@ -141,14 +143,24 @@ func _seat_balls(balls: Array[GolfBall], origin: Vector3) -> void:
 			seat = CoopVs.tee_seat(balls[i].team)
 		if seat < 0:
 			seat = i
-		balls[i].place_at(hole.lift(origin + lateral * ball_offset(seat, n)))
+		balls[i].place_at(hole.lift(origin + lateral * ball_offset(seat, n, width)))
 		balls[i].bounds = hole.bounds
 
 
-static func ball_offset(seat: int, count: int) -> float:
+static func ball_offset(seat: int, count: int, width := 0.0) -> float:
+	var n := maxi(1, count)
+	var gap := _ball_gap(n, width)
 	if GameSettings.is_coop_vs():
-		return (float(CoopVs.team_of(seat)) - 3.5) * BALL_SPREAD
-	return (float(seat) - float(maxi(1, count) - 1) * 0.5) * BALL_SPREAD
+		return (float(CoopVs.team_of(seat)) - 3.5) * gap
+	return (float(seat) - float(n - 1) * 0.5) * gap
+
+
+static func _ball_gap(count: int, width: float) -> float:
+	var slots := 8 if GameSettings.is_coop_vs() else maxi(1, count)
+	var usable := width - BALL_EDGE * 2.0
+	if usable > 0.0 and slots > 1:
+		return maxf(BALL_SPREAD, usable / float(slots - 1))
+	return BALL_SPREAD
 
 
 func place_carts(carts: Array[GolfCart]) -> void:

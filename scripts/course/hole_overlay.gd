@@ -67,40 +67,7 @@ static func attach(host: Node3D, data: HoleData) -> void:
 	_strip_pads(overlay)
 	strip_spawns(overlay)
 	host.add_child(overlay)
-	# #region agent log
-	var _host_parent := host.get_parent()
-	var _ladder_n := 0
-	for _n in overlay.find_children("*", "Node3D", true, false):
-		if ClimbLadder.is_ladder(_n):
-			_ladder_n += 1
-	var _dbg := FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-c47b79.log", FileAccess.READ_WRITE)
-	if _dbg == null:
-		_dbg = FileAccess.open("/Users/jamesritchie/golf-zombies/.cursor/debug-c47b79.log", FileAccess.WRITE)
-	else:
-		_dbg.seek_end()
-	if _dbg != null:
-		_dbg.store_line(JSON.stringify({
-			"sessionId": "c47b79",
-			"hypothesisId": "A",
-			"location": "hole_overlay.gd:attach",
-			"message": "overlay attached, before get_tree",
-			"data": {
-				"host": host.name,
-				"host_in_tree": host.is_inside_tree(),
-				"host_has_parent": _host_parent != null,
-				"parent_name": "" if _host_parent == null else _host_parent.name,
-				"parent_in_tree": _host_parent != null and _host_parent.is_inside_tree(),
-				"overlay_in_tree": overlay.is_inside_tree(),
-				"overlay_parent": "" if overlay.get_parent() == null else overlay.get_parent().name,
-				"ladder_count": _ladder_n,
-				"hole_index": data.index,
-			},
-			"timestamp": Time.get_ticks_msec(),
-		}))
-		_dbg.close()
-	# #endregion
-	if host.is_inside_tree():
-		ClimbLadder.adopt(host.get_tree())
+	ClimbLadder.adopt(overlay)
 	_Escalator.adopt(overlay)
 	ObstacleLeds.adopt(overlay)
 

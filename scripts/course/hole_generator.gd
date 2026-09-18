@@ -19,6 +19,9 @@ const GREEN_RADIUS_MIN := 8.0
 const GREEN_RADIUS_MAX := 11.0
 ## Hole 10 is a blank double-wide landing strip. Overlay props go on later.
 const WIDE_HOLE := 9
+## Hitting box depth. Width always matches the fairway so a group can stand
+## across the tee instead of stacking on an 8 m pad.
+const TEE_DEPTH := 10.0
 
 
 static func _setpiece(data: HoleData) -> bool:
@@ -47,6 +50,10 @@ static func length_range(par: int) -> Vector2:
 			return Vector2(carry * 1.15, carry * 1.9)
 		_:
 			return Vector2(carry * 2.1, carry * 2.75)
+
+
+static func tee_size(width: float) -> Vector2:
+	return Vector2(width, TEE_DEPTH)
 
 
 static func fairway_width(par: int, index := -1) -> float:
@@ -115,7 +122,7 @@ static func generate(index: int, base_seed: int) -> HoleData:
 		data.green_radius = ArenaHole.GREEN_RADIUS
 	else:
 		data.green_radius = rng.randf_range(GREEN_RADIUS_MIN, GREEN_RADIUS_MAX)
-	data.patches.append(_patch(Surface.Type.TEE, data.tee, Vector2(8.0, 10.0), headings[0]))
+	data.patches.append(_patch(Surface.Type.TEE, data.tee, tee_size(width), headings[0]))
 	var fringe_radius := data.green_radius + FRINGE_WIDTH
 	data.patches.append(_patch(
 		Surface.Type.FRINGE, data.cup,

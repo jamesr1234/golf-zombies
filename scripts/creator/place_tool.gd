@@ -225,6 +225,8 @@ func place() -> bool:
 		gating = hole.placements.size() - 1
 	elif CustomHole.is_spawn(path):
 		_begin_roam(hole.placements.size() - 1)
+	elif CustomHole.is_windmill(path):
+		hole.placements[hole.placements.size() - 1][CustomHole.SPIN] = CartPathWindmill.SPIN_DEFAULT
 	changed.emit()
 	return true
 
@@ -308,6 +310,17 @@ func finish_spawn(counts: Dictionary) -> bool:
 	hole.placements[roaming][CustomHole.AGGRO] = aggro_radius
 	roaming = -1
 	hunting = false
+	changed.emit()
+	return true
+
+
+func finish_spin(deg: float) -> bool:
+	var index := hole.placements.size() - 1
+	if index < 0:
+		return false
+	if not CustomHole.is_windmill(String(hole.placements[index][CustomHole.PATH])):
+		return false
+	hole.placements[index][CustomHole.SPIN] = CartPathWindmill.clamp_spin(deg)
 	changed.emit()
 	return true
 

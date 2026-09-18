@@ -31,8 +31,7 @@ static func attach(host: Node3D, data: HoleData) -> void:
 		return
 	var overlay := build(data.custom, data)
 	host.add_child(overlay)
-	if host.is_inside_tree():
-		ClimbLadder.adopt(host.get_tree())
+	ClimbLadder.adopt(overlay)
 	_Escalator.adopt(overlay)
 	ObstacleLeds.adopt(overlay)
 
@@ -57,6 +56,8 @@ static func expand(entry: Dictionary, depth := 0) -> Array[Dictionary]:
 			origin + (child[CustomHole.END] as Vector3).rotated(Vector3.UP, yaw)
 			if CustomHole.has_end(child) else CustomHole.NO_END
 		)
+		if child.has(CustomHole.SPIN):
+			moved[CustomHole.SPIN] = CustomHole.spin_of(child)
 		out.append_array(expand(moved, depth + 1))
 	return out
 
@@ -96,6 +97,9 @@ static func _add(
 			node.position = GunPickup.sit_at(node, lifted, yaw)
 		else:
 			node.position = GridSnap.anchored_at(node, lifted, yaw)
+		var mill := node as CartPathWindmill
+		if mill != null:
+			mill.spin_deg = CustomHole.spin_of(flat)
 		overlay.add_child(node)
 
 

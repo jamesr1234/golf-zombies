@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="WeaponStats" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/player/weapon_stats.gd" id="1_stats"]
+
+[resource]
+script = ExtResource("1_stats")
+display_name = "Mill Remote"
+visual = "mill"
+damage = 0.0
+pellets = 1
+rounds_per_minute = 1.0
+automatic = false
+mag_size = 1
+reserve_start = 0
+reserve_max = 0
+spread_deg = 0.0
+ads_spread_deg = 0.0
+range_m = 1.0
+reload_time = 0.2
+pickup_amount = 1
+burst = 1
+kick = 0.0

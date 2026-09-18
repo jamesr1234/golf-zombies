@@ -44,8 +44,8 @@ func latch(player: Player, on: ClimbingWall) -> bool:
 	if on == null or not on.can_latch(player):
 		return false
 	wall = on
-	if on is LeanLadder:
-		return _latch_ladder(player, on as LeanLadder)
+	if on.is_rail_climb():
+		return _latch_ladder(player, on)
 	var chest := player.global_position + Vector3.UP * 1.15
 	left = on.nearest_hold(chest + player.global_transform.basis.x * -0.25)
 	right = on.nearest_hold(chest + player.global_transform.basis.x * 0.25)
@@ -70,8 +70,8 @@ func tick(player: Player, delta: float) -> bool:
 		return false
 	if is_mantling():
 		return _tick_mantle(player, delta)
-	if wall is LeanLadder:
-		if not (wall as LeanLadder).is_live():
+	if wall.is_rail_climb():
+		if wall.has_method("is_live") and not wall.is_live():
 			return false
 		return _tick_ladder(player, delta)
 	_catch = maxf(0.0, _catch - delta)
@@ -154,7 +154,9 @@ func _aim_hands(player: Player, left_stick: Vector2, right_stick: Vector2) -> vo
 	aim = left_aim
 
 
-func _latch_ladder(player: Player, on: LeanLadder) -> bool:
+func _latch_ladder(player: Player, on: ClimbingWall) -> bool:
+	if on.has_method("set_stand_side"):
+		on.set_stand_side(player)
 	_rail_t = on.rail_t_at(player.global_position)
 	_catch = 0.0
 	_angle = 0.0
@@ -167,13 +169,14 @@ func _latch_ladder(player: Player, on: LeanLadder) -> bool:
 
 
 func _tick_ladder(player: Player, delta: float) -> bool:
-	var ladder := wall as LeanLadder
 	if player.input.just_pressed("jump"):
 		if _rail_t >= 0.82:
 			_mantle(player)
 		return false
 	var climb := -player.input.move_vector().y
-	_rail_t = clampf(_rail_t + climb * LADDER_SPEED / maxf(ladder.rail_length(), 0.01) * delta, 0.0, 1.0)
+	_rail_t = clampf(
+		_rail_t + climb * LADDER_SPEED / maxf(wall.rail_length(), 0.01) * delta, 0.0, 1.0
+	)
 	_snap_to_rail(player)
 	_grab_rail_hands(player)
 	if _rail_t >= 1.0:
@@ -183,10 +186,9 @@ func _tick_ladder(player: Player, delta: float) -> bool:
 
 
 func _snap_to_rail(player: Player) -> void:
-	var ladder := wall as LeanLadder
-	if ladder == null:
+	if wall == null or not wall.has_method("point_on_rail"):
 		return
-	player.global_position = ladder.point_on_rail(_rail_t)
+	player.global_position = wall.point_on_rail(_rail_t)
 	player.velocity = Vector3.ZERO
 	_face_wall(player)
 
@@ -265,6 +267,11 @@ func _snap_to_hang(player: Player) -> void:
 
 func _face_wall(player: Player) -> void:
 	var into := -wall.face_normal()
+	if wall.is_rail_climb():
+		var to_wall := wall.global_position - player.global_position
+		to_wall.y = 0.0
+		if to_wall.length_squared() > 0.001:
+			into = to_wall.normalized()
 	player.rotation.y = atan2(-into.x, -into.z)
 	player._yaw = rad_to_deg(player.rotation.y)
 
@@ -274,7 +281,7 @@ func _can_mantle(_player: Player) -> bool:
 
 
 func _mantle(player: Player) -> void:
-	if wall is LeanLadder:
+	if wall.is_rail_climb():
 		player.global_position = wall.ledge_stand(player)
 		player.velocity = Vector3.ZERO
 		Sfx.play("jump")

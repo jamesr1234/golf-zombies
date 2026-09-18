@@ -21,7 +21,7 @@ const WEAPON_DIR := CustomHole.WEAPON_DIR
 ## Props that stand on their own. The rest are either paired with a setpiece or
 ## built from HoleData by the generator, so dropping one bare leaves it dead.
 const LOOSE_PROPS: PackedStringArray = [
-	"climbing_wall", "folding_steps", "grapple_point", "rock",
+	"climbing_wall", "fan", "folding_steps", "grapple_point", "rock",
 	"sniper_tower", "speed_rectangle", "spiral_track", "wall", "windmill",
 	"zipline",
 ]

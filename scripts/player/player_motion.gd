@@ -15,10 +15,12 @@ const FLOOR_MAX_DEG := 60.0
 const SAFE_MARGIN := 0.04
 
 const _Boost := preload("res://scripts/course/cart_path_boost.gd")
+const _Fan := preload("res://scripts/course/fan.gd")
 
 var fling_left := 0.0
 var boost_count := 0
 var boost_along := Vector3.ZERO
+var fan_count := 0
 var escalator
 var seen_jumps := 0
 
@@ -68,9 +70,6 @@ func tick(player: Player, delta: float) -> void:
 	if player.is_milling():
 		player.slide.cancel(player)
 		player.glide.cancel(player)
-		player.mill_desk.tick(player, delta)
-		player.velocity = Vector3.ZERO
-		return
 	if player.is_poker_seated():
 		player.slide.cancel(player)
 		player.glide.cancel(player)
@@ -81,8 +80,7 @@ func tick(player: Player, delta: float) -> void:
 	if fling_left > 0.0:
 		player.glide.cancel(player)
 		fling_left = maxf(0.0, fling_left - delta)
-		if not player.is_on_floor():
-			player.velocity += player.get_gravity() * GRAVITY_SCALE * delta
+		_apply_air(player, delta)
 		player.move_and_slide()
 		return
 	var wading := player.swim.water_depth(player)
@@ -96,8 +94,7 @@ func tick(player: Player, delta: float) -> void:
 	if player.glide.active:
 		_tick_glide(player, delta, true)
 		return
-	if not player.is_on_floor():
-		player.velocity += player.get_gravity() * GRAVITY_SCALE * delta
+	_apply_air(player, delta)
 	var mobile := can_walk(player)
 	var wish := Vector3.ZERO
 	if mobile:
@@ -137,8 +134,13 @@ func tick(player: Player, delta: float) -> void:
 	var on_floor := player.is_on_floor()
 	if escalator != null and on_floor:
 		carry = escalator.carry_along()
-	player.velocity.x = move_toward(player.velocity.x, target.x + carry.x, ACCELERATION * delta)
-	player.velocity.z = move_toward(player.velocity.z, target.z + carry.z, ACCELERATION * delta)
+	player.floor_snap_length = 0.0 if fan_count > 0 else FLOOR_SNAP
+	if fan_count > 0 and not on_floor:
+		if wish.length_squared() > 0.01:
+			player.velocity = _Fan.hold_horizontal(player.velocity, wish, delta)
+	else:
+		player.velocity.x = move_toward(player.velocity.x, target.x + carry.x, ACCELERATION * delta)
+		player.velocity.z = move_toward(player.velocity.z, target.z + carry.z, ACCELERATION * delta)
 	if boost_count > 0:
 		player.velocity = _Boost.player_velocity(player.velocity, boost_along, delta)
 	# The belt only drives Y downhill. Pushing Y up makes move_and_slide skip
@@ -276,6 +278,9 @@ func apply_knockback(player: Player, from: Vector3, speed := 10.0) -> void:
 
 
 func do_knockback(player: Player, from: Vector3, speed: float) -> void:
+	if player.is_ziplining():
+		player._drop_zipline()
+		Sfx.play("zipline_drop", player)
 	var away := player.global_position - from
 	away.y = 0.0
 	if away.length_squared() < 0.001:
@@ -311,7 +316,7 @@ func try_latch_climb(player: Player) -> bool:
 	if player.input.just_pressed("melee") or player.input.just_pressed("shield"):
 		return start_climb(player)
 	var wall := ClimbingWall.nearest(player)
-	if wall is LeanLadder and _pushing_into(player, wall):
+	if wall != null and wall.is_rail_climb() and _pushing_into(player, wall):
 		return start_climb(player)
 	return false
 
@@ -324,7 +329,14 @@ func _pushing_into(player: Player, wall: ClimbingWall) -> bool:
 	wish.y = 0.0
 	if wish.length_squared() < 0.0001:
 		return false
-	return wish.normalized().dot(-wall.face_normal()) > 0.35
+	var n := wall.face_normal()
+	n.y = 0.0
+	if n.length_squared() < 0.0001:
+		return false
+	var along := wish.normalized().dot(n.normalized())
+	if wall is ClimbLadder:
+		return absf(along) > 0.35
+	return along < -0.35
 
 
 func start_climb(player: Player) -> bool:
@@ -352,6 +364,22 @@ func enter_boost_pad(player: Player, along: Vector3) -> void:
 
 func exit_boost() -> void:
 	boost_count = maxi(0, boost_count - 1)
+
+
+func enter_fan() -> void:
+	fan_count += 1
+
+
+func exit_fan() -> void:
+	fan_count = maxi(0, fan_count - 1)
+
+
+func _apply_air(player: Player, delta: float) -> void:
+	if fan_count > 0:
+		player.velocity.y = _Fan.next_vertical(player.velocity.y, delta)
+		return
+	if not player.is_on_floor():
+		player.velocity += player.get_gravity() * GRAVITY_SCALE * delta
 
 
 func enter_escalator(lift) -> void:

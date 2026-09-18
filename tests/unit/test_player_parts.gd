@@ -32,3 +32,15 @@ func test_motion_boost_counts_stack() -> void:
 	assert_eq(motion.boost_count, 2)
 	motion.exit_boost()
 	assert_eq(motion.boost_count, 1)
+
+
+func test_motion_fan_counts_stack() -> void:
+	var motion := PlayerMotion.new()
+	assert_eq(motion.fan_count, 0)
+	motion.enter_fan()
+	motion.enter_fan()
+	assert_eq(motion.fan_count, 2)
+	motion.exit_fan()
+	assert_eq(motion.fan_count, 1)
+	motion.exit_fan()
+	assert_eq(motion.fan_count, 0)

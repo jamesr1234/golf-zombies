@@ -50,6 +50,7 @@
 	],
 	"props": [
 		"res://scenes/course/props/climbing_wall.tscn",
+		"res://scenes/course/props/fan.tscn",
 		"res://scenes/course/props/folding_steps.tscn",
 		"res://scenes/course/props/grapple_point.tscn",
 		"res://scenes/course/props/rock.tscn",

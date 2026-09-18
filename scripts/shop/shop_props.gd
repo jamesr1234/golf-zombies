@@ -70,6 +70,8 @@ static func preview(parent: Node3D, item: Dictionary) -> void:
 			_door(parent)
 		"remote", "shape_remote":
 			_remote(parent)
+		"mill", "mill_remote":
+			_mill(parent)
 		"ammo":
 			_ammo(parent)
 		"barrier":
@@ -220,6 +222,15 @@ static func _door(parent: Node3D) -> void:
 	_box(parent, Vector3(0.16, 0.2, 0.03), Palette.ICE, Palette.GLOW_STRONG, Vector3(0.0, 0.02, -0.7))
 	var grip := _box(parent, Vector3(0.08, 0.22, 0.1), metal, 0.0, Vector3(0.0, -0.18, 0.16))
 	grip.rotation.x = deg_to_rad(-16.0)
+
+
+static func _mill(parent: Node3D) -> void:
+	var model := WindmillControl.make_mesh(1.6)
+	if model == null:
+		return
+	parent.add_child(model)
+	parent.rotation.y = deg_to_rad(18.0)
+	parent.rotation.z = deg_to_rad(-8.0)
 
 
 static func _remote(parent: Node3D) -> void:

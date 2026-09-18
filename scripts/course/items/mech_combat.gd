@@ -59,6 +59,7 @@ func try_fire(suit: Node3D, view: Transform3D, shooter: Player) -> bool:
 	if rocket != null:
 		rocket.shooter = shooter
 		rocket.ignore_body(suit)
+		rocket.ignore_friendly_carts()
 		_WorldFx.announce_rocket(
 			suit, origin, fly, rocket.damage, rocket.blast_radius, rocket.max_range
 		)

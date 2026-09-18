@@ -21,6 +21,7 @@ func test_prop_scenes_exist_for_the_sparse_setpieces() -> void:
 		"res://scenes/course/props/sniper_tower.tscn",
 		"res://scenes/course/props/climbing_wall.tscn",
 		"res://scenes/course/props/culvert.tscn",
+		"res://scenes/course/props/fan.tscn",
 		"res://scenes/course/props/windmill.tscn",
 		"res://scenes/course/props/windmill_control.tscn",
 		"res://scenes/course/props/grapple_point.tscn",

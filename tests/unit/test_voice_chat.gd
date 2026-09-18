@@ -34,6 +34,7 @@ func test_mute_and_ptt_gate_a_send() -> void:
 	assert_true(VoiceCodec.should_transmit(false, false, true, false), "PTT sends even if quiet")
 	assert_true(VoiceCodec.should_transmit(false, true, false, true), "open mic needs speech")
 	assert_false(VoiceCodec.should_transmit(false, true, true, false), "open mic ignores PTT on hush")
+	assert_true(VoiceCodec.should_transmit(false, true, false, false, 0.2), "hold keeps a hush")
 
 
 func test_cpu_peers_are_skipped() -> void:
@@ -78,6 +79,11 @@ func test_open_mic_needs_speech() -> void:
 	VoiceChat.set_open_mic(true)
 	assert_false(VoiceChat.try_send(VoiceCodec.silence(VoiceCodec.PACKET_FRAMES), true))
 	assert_true(VoiceChat.try_send(VoiceCodec.tone(VoiceCodec.PACKET_FRAMES), false))
+	assert_true(VoiceChat.try_send(VoiceCodec.silence(VoiceCodec.PACKET_FRAMES), false), "hold keeps the end of a word")
+
+
+func test_a_quiet_headset_still_counts_as_speech() -> void:
+	assert_true(VoiceCodec.is_speech(VoiceCodec.tone(VoiceCodec.PACKET_FRAMES, 0.01)))
 
 
 func test_prefs_remember_the_headset() -> void:
@@ -85,11 +91,51 @@ func test_prefs_remember_the_headset() -> void:
 	VoiceChat.set_open_mic(true)
 	VoiceChat.set_input_device("AirPods")
 	VoiceChat.set_output_device("AirPods")
+	VoiceChat.set_mic_gain(0.75)
 	var prefs := VoiceCodec.read_prefs(VoiceChat.config_path)
 	assert_true(bool(prefs.muted))
 	assert_true(bool(prefs.open_mic))
 	assert_eq(str(prefs.mic), "AirPods")
 	assert_eq(str(prefs.speakers), "AirPods")
+	assert_almost_eq(float(prefs.gain), 0.75, 0.01)
+
+
+func test_gain_scales_the_mic() -> void:
+	var wave := VoiceCodec.tone(VoiceCodec.PACKET_FRAMES, 0.4)
+	assert_almost_eq(VoiceCodec.rms(VoiceCodec.apply_gain(wave, 0.5)), VoiceCodec.rms(wave) * 0.5, 0.01)
+	assert_eq(VoiceCodec.apply_gain(wave, 1.0), wave)
+
+
+func test_gain_clamps_and_labels() -> void:
+	assert_eq(VoiceCodec.clamp_gain(-1.0), 0.0)
+	assert_eq(VoiceCodec.clamp_gain(9.0), VoiceCodec.MAX_GAIN)
+	assert_eq(VoiceCodec.gain_label(1.0), "100%")
+	assert_eq(VoiceCodec.gain_label(1.5), "100%")
+	VoiceChat.set_mic_gain(8.0)
+	assert_eq(VoiceChat.mic_gain, VoiceCodec.MAX_GAIN)
+
+
+func test_meter_level_rises_with_talk() -> void:
+	assert_eq(VoiceCodec.meter_level(0.0), 0.0)
+	assert_gt(VoiceCodec.meter_level(0.02), 0.1)
+	assert_eq(VoiceCodec.meter_level(1.0), 1.0)
+	assert_eq(VoiceCodec.meter_level(4.0), 1.0)
+
+
+func test_preview_does_not_send() -> void:
+	VoiceChat.set_preview(true)
+	assert_true(VoiceChat.is_previewing())
+	assert_false(VoiceChat.try_send(VoiceCodec.tone(VoiceCodec.PACKET_FRAMES), true))
+	assert_eq(VoiceChat.send_count, 0)
+	VoiceChat.set_preview(false)
+	assert_false(VoiceChat.is_previewing())
+
+
+func test_voice_pad_listens_for_the_meter() -> void:
+	var pad := VoicePad.new()
+	add_child_autofree(pad)
+	assert_true(VoiceChat.is_previewing())
+	assert_gt(pad.get_child_count(), 5)
 
 
 func test_device_choices_keep_default_first() -> void:

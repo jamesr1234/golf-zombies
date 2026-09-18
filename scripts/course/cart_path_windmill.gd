@@ -13,7 +13,10 @@ const PILLAR_LEN := 13.0
 const PILLAR_W := 1.85
 const PILLAR_T := 0.5
 const PILLAR_COUNT := 4
-const SPIN_DEG := 32.0
+const SPIN_DEFAULT := 32.0
+const SPIN_MIN := 0.0
+## Two full turns a second.
+const SPIN_MAX := 720.0
 const FLING_SPEED := 34.0
 const FLING_LIFT := 64.0
 ## Twice the lane width, so you do not pop back into the sails.
@@ -63,6 +66,12 @@ func to_prop() -> Dictionary:
 	}
 
 
+## Degrees per second while the mill auto-spins.
+@export var spin_deg := SPIN_DEFAULT
+
+
+static func clamp_spin(deg: float) -> float:
+	return clampf(deg, SPIN_MIN, SPIN_MAX)
 ## Radians around the hub. Auto-spin writes this; a control unit can take over.
 @export var sync_rotor := 0.0
 @export var sync_driven := false
@@ -143,7 +152,7 @@ func _build() -> void:
 
 func _physics_process(delta: float) -> void:
 	if not sync_driven and (Engine.is_editor_hint() or NetSession.should_simulate(self)):
-		sync_rotor += deg_to_rad(SPIN_DEG) * delta
+		sync_rotor += deg_to_rad(spin_deg) * delta
 	_apply_rotor()
 	if Engine.is_editor_hint():
 		return

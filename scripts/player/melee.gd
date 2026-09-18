@@ -54,7 +54,10 @@ func shove(origin: Vector3, forward: Vector3, strength := 1.0, attacker: Player 
 		var player := node as Player
 		if player == null or player == attacker:
 			continue
-		if not in_arc(origin, flat_forward, player.global_position, RANGE, ARC_DEG):
+		if _zip_neighbors(attacker, player):
+			if attacker.global_position.distance_to(player.global_position) > RANGE:
+				continue
+		elif not in_arc(origin, flat_forward, player.global_position, RANGE, ARC_DEG):
 			continue
 		shove_player(attacker, player, origin, strength)
 	if _ShapeDrop.yeet_in_arc(get_tree(), origin, flat_forward, strength, RANGE, ARC_DEG) > 0:
@@ -62,12 +65,23 @@ func shove(origin: Vector3, forward: Vector3, strength := 1.0, attacker: Player 
 	return true
 
 
+## Flattened XZ so a slope does not shrink the swing, plus a Y gate so a
+## platform overhead is not punching range.
+static func in_reach(from: Vector3, to: Vector3, range_m: float) -> bool:
+	var flat := Vector3(to.x - from.x, 0.0, to.z - from.z)
+	if flat.length() > range_m:
+		return false
+	return absf(to.y - from.y) <= range_m
+
+
 static func in_arc(
 	origin: Vector3, flat_forward: Vector3, target: Vector3, range_m: float, arc_deg: float
 ) -> bool:
+	if not in_reach(origin, target, range_m):
+		return false
 	var to_target := target - origin
 	to_target.y = 0.0
-	if to_target.length() > range_m or to_target.length_squared() < 0.001:
+	if to_target.length_squared() < 0.001:
 		return false
 	return rad_to_deg(flat_forward.angle_to(to_target.normalized())) <= arc_deg * 0.5
 
@@ -85,6 +99,14 @@ static func shove_player(
 			ride.try_hijack(attacker)
 			return
 	victim.apply_knockback(origin, 10.0 * maxf(0.35, strength))
+
+
+static func _zip_neighbors(attacker: Player, victim: Player) -> bool:
+	if attacker == null or victim == null:
+		return false
+	if not attacker.is_ziplining() or not victim.is_ziplining():
+		return false
+	return attacker.zipliner.line == victim.zipliner.line
 
 
 ## How much of the melee pose to show. Full through the hit, then a fade so the

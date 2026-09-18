@@ -10,6 +10,7 @@ const TEST_ROOT := "user://holes_test"
 const SUFFIX := ".json"
 const VERSION := 2
 const PARTS := "parts"
+const LESSON_FILE := "_lesson.json"
 ## Live saves sit in LIVE_ROOT. Tests flip this so a GUT run can never wipe a
 ## hole someone actually made.
 static var ROOT := LIVE_ROOT
@@ -36,6 +37,60 @@ static func clear_sandbox() -> void:
 		delete_hole(String(row["id"]))
 	for path in list_structures():
 		delete_structure(path)
+	_remove(lesson_path())
+
+
+static func lesson_path() -> String:
+	return "%s/%s" % [ROOT, LESSON_FILE]
+
+
+static func save_lesson(step: int, tool: int, hole: CustomHole) -> bool:
+	if hole == null:
+		return false
+	return _write(lesson_path(), {
+		"completed": lesson_completed(),
+		"step": maxi(step, 0),
+		"tool": tool,
+		"hole": hole.to_dict(),
+	})
+
+
+static func load_lesson() -> Dictionary:
+	return _read(lesson_path())
+
+
+static func lesson_resumable() -> bool:
+	var hole = load_lesson().get("hole", {})
+	return typeof(hole) == TYPE_DICTIONARY and not String(hole.get("id", "")).is_empty()
+
+
+static func lesson_completed() -> bool:
+	return bool(load_lesson().get("completed", false))
+
+
+static func lesson_step() -> int:
+	return int(load_lesson().get("step", 0))
+
+
+static func lesson_tool() -> int:
+	return int(load_lesson().get("tool", 0))
+
+
+static func lesson_hole() -> CustomHole:
+	if not lesson_resumable():
+		return null
+	return CustomHole.from_dict(load_lesson()["hole"])
+
+
+static func mark_lesson_done() -> void:
+	_write(lesson_path(), {"completed": true})
+
+
+static func clear_lesson_progress() -> void:
+	if lesson_completed():
+		_write(lesson_path(), {"completed": true})
+		return
+	_remove(lesson_path())
 
 
 static func hole_path(id: String) -> String:
@@ -112,6 +167,8 @@ static func layout(index: int, seed: int) -> HoleData:
 static func list_holes() -> Array[Dictionary]:
 	var rows: Array[Dictionary] = []
 	for path in _list(ROOT):
+		if path.get_file() == LESSON_FILE:
+			continue
 		var body := _read(path)
 		if body.is_empty():
 			continue
@@ -159,6 +216,8 @@ static func save_structure(title: String, parts: Array[Dictionary]) -> String:
 		}
 		if CustomHole.has_end(part):
 			row[CustomHole.END] = CustomHole.to_array((part[CustomHole.END] as Vector3) - center)
+		if part.has(CustomHole.SPIN):
+			row[CustomHole.SPIN] = CustomHole.spin_of(part)
 		listed.append(row)
 	var id := _slug(title)
 	if not _write(structure_path(id), {"version": VERSION, "title": title, PARTS: listed}):
@@ -172,13 +231,16 @@ static func structure_parts(path: String) -> Array[Dictionary]:
 	for entry in body.get(PARTS, []):
 		if typeof(entry) != TYPE_DICTIONARY:
 			continue
-		out.append(CustomHole.placement(
+		var row := CustomHole.placement(
 			String(entry.get(CustomHole.PATH, "")),
 			CustomHole.to_vector(entry.get(CustomHole.POSITION, [])),
 			float(entry.get(CustomHole.YAW, 0.0)),
 			CustomHole.NO_GATE,
 			CustomHole.to_vector(entry[CustomHole.END]) if entry.has(CustomHole.END) else CustomHole.NO_END
-		))
+		)
+		if entry.has(CustomHole.SPIN) or CustomHole.is_windmill(String(row[CustomHole.PATH])):
+			row[CustomHole.SPIN] = CustomHole.spin_of(entry)
+		out.append(row)
 	if int(body.get("version", 1)) < VERSION:
 		PieceLadder.remap_centers(out)
 		var mid := centroid(out)

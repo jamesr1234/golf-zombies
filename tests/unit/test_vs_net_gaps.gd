@@ -76,6 +76,7 @@ func test_zombie_and_cart_sync_carry_the_look_flags() -> void:
 	assert_true(cart_sync.replication_config.has_property(NodePath(":ram_plate")))
 	assert_true(cart_sync.replication_config.has_property(NodePath(":armored")))
 	assert_true(cart_sync.replication_config.has_property(NodePath(":mines")))
+	assert_true(cart_sync.replication_config.has_property(NodePath(":sync_wrecked")))
 	# Without the stick a watcher can only replay the pose, and replaying a pose
 	# is what puts every uneven arrival on screen.
 	assert_true(cart_sync.replication_config.has_property(NodePath(":sync_stick")))
@@ -682,7 +683,7 @@ func test_apply_mill_poses_the_desk_and_the_blades() -> void:
 	assert_true(mill.is_driven())
 	assert_almost_eq(mill.rotor_rad(), 0.7, 0.001)
 	assert_almost_eq(desk.sync_stick.y, -1.0, 0.001)
-	var pivot := desk.get_node("StickPivot") as Node3D
+	var pivot := desk.find_child("StickPivot", true, false) as Node3D
 	assert_almost_eq(pivot.rotation.x, -WindmillControl.MAX_TILT, 0.001)
 
 

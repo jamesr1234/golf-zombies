@@ -133,14 +133,17 @@ func try_attack(zombie: Zombie) -> void:
 		return
 	if attack_timer > 0.0 or target == null:
 		return
-	var offset := target.global_position - zombie.global_position
-	offset.y = 0.0
-	if offset.length() > zombie.stats.attack_range:
-		return
-	attack_timer = zombie.stats.attack_cooldown
 	if zombie.stats.ranged:
+		var flat := target.global_position - zombie.global_position
+		flat.y = 0.0
+		if flat.length() > zombie.stats.attack_range:
+			return
+		attack_timer = zombie.stats.attack_cooldown
 		fire_at(zombie, target)
 		return
+	if not Melee.in_reach(zombie.global_position, target.global_position, zombie.stats.attack_range):
+		return
+	attack_timer = zombie.stats.attack_cooldown
 	begin_melee(zombie)
 
 
@@ -166,11 +169,15 @@ func land_melee(zombie: Zombie) -> void:
 	if target == null:
 		return
 	var offset := target.global_position - zombie.global_position
-	offset.y = 0.0
-	if offset.length() > zombie.stats.attack_range * 1.35:
+	if not Melee.in_reach(
+		zombie.global_position, target.global_position, zombie.stats.attack_range * 1.35
+	):
 		return
+	offset.y = 0.0
 	var player := target as Player
 	if player != null:
+		if CartBrute.try_swat_rider(player, zombie):
+			return
 		var at := Melee.hit_point(
 			zombie.global_position + Vector3.UP * zombie.stats.height * 0.7,
 			player.global_position, 1.8, Player.BODY_RADIUS
@@ -196,10 +203,10 @@ func try_bash_fort(zombie: Zombie) -> bool:
 func ally_shove(zombie: Zombie) -> void:
 	if zombie._melee == null or target == null:
 		return
+	if not Melee.in_reach(zombie.global_position, target.global_position, Melee.RANGE):
+		return
 	var offset := target.global_position - zombie.global_position
 	offset.y = 0.0
-	if offset.length() > Melee.RANGE:
-		return
 	var origin := zombie.global_position + Vector3.UP * zombie.stats.height * 0.72
 	var forward := offset
 	if forward.length_squared() < 0.0001:

@@ -37,7 +37,7 @@ static func build(custom: CustomHole, base_seed := 0, index := FairwayPiece.INDE
 	data.cup = line[line.size() - 1]
 	var opening: float = turned[0] if not turned.is_empty() else 0.0
 	data.patches.append(HoleGenerator.surface_patch(
-		Surface.Type.TEE, data.tee, Vector2(8.0, 10.0), opening
+		Surface.Type.TEE, data.tee, HoleGenerator.tee_size(width), opening
 	))
 	var fringe := data.green_radius + HoleGenerator.FRINGE_WIDTH
 	data.patches.append(HoleGenerator.surface_patch(

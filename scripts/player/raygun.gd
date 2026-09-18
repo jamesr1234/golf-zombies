@@ -46,6 +46,7 @@ var _flare: Node3D
 var _nailer: Node3D
 var _door: Node3D
 var _remote: Node3D
+var _mill: Node3D
 var _phase := 0.0
 var _amount := 0.0
 var _steady_left := 0.0
@@ -86,6 +87,9 @@ func build(color: Color) -> void:
 	_remote = Node3D.new()
 	add_child(_remote)
 	_build_remote(_remote, color)
+	_mill = Node3D.new()
+	add_child(_mill)
+	_build_mill(_mill)
 	_paint_view(self)
 	show_gun("rifle")
 
@@ -113,6 +117,8 @@ func show_gun(kind: String) -> void:
 		_door.visible = kind == "door"
 	if _remote != null:
 		_remote.visible = kind == "remote"
+	if _mill != null:
+		_mill.visible = kind == "mill"
 
 
 func is_shotgun() -> bool:
@@ -147,6 +153,16 @@ func is_remote() -> bool:
 	return _remote != null and _remote.visible
 
 
+func is_mill() -> bool:
+	return _mill != null and _mill.visible
+
+
+func pose_mill(stick: Vector2, mill_rad: float) -> void:
+	if _mill == null:
+		return
+	WindmillControl.pose_model(_mill, stick, mill_rad)
+
+
 ## Farthest the visible gun reaches down the barrel, used to tell the two meshes apart.
 func forward_extent() -> float:
 	var root := _rifle
@@ -164,6 +180,8 @@ func forward_extent() -> float:
 		root = _door
 	elif is_remote():
 		root = _remote
+	elif is_mill():
+		root = _mill
 	elif is_shotgun():
 		root = _shotgun
 	if root == null:
@@ -499,6 +517,15 @@ func _build_door(parent: Node3D, color: Color) -> void:
 	grip.position = Vector3(0.0, -0.085, 0.07)
 	grip.rotation.x = deg_to_rad(-16.0)
 	parent.add_child(grip)
+
+
+func _build_mill(parent: Node3D) -> void:
+	var model := WindmillControl.make_mesh(1.0)
+	if model == null:
+		return
+	model.rotation.x = deg_to_rad(8.0)
+	model.position = Vector3(0.0, -0.02, 0.02)
+	parent.add_child(model)
 
 
 func _build_remote(parent: Node3D, color: Color) -> void:

@@ -6,6 +6,10 @@ extends Object
 const GROUP := "wall_craters"
 const REACH := 1.55
 const HOLE_R := 1.2
+## Thinner than this along the shot and the blast opens a hole. Thicker faces
+## still take a scar, but the bite stays on the surface.
+const BLOW_THROUGH := 2.0
+const DENT := 0.62
 
 
 static func fresh_seed() -> int:
@@ -39,9 +43,12 @@ static func crater(at: Vector3, normal: Vector3, seed: int, thick := 0.8) -> Arr
 	rng.seed = seed if seed != 0 else 1
 	var face := normal if normal.length_squared() > 0.01 else Vector3.FORWARD
 	face = face.normalized()
-	var depth := maxf(0.42, thick * 0.5)
+	var through_hole := thick <= BLOW_THROUGH
+	var depth := maxf(0.42, thick * 0.5) if through_hole else DENT
 	var centre := at - face * depth
-	centre.y = maxf(centre.y, 1.15)
+	## Walls need the hole high enough to walk. A deck punch stays on the slab.
+	if through_hole and absf(face.y) <= 0.58:
+		centre.y = maxf(centre.y, 1.15)
 	var through := maxf(1.1, (thick * 0.7 + 0.25) / HOLE_R)
 	var bites: Array[Dictionary] = []
 	var main := Vector3(
@@ -49,10 +56,13 @@ static func crater(at: Vector3, normal: Vector3, seed: int, thick := 0.8) -> Arr
 		rng.randf_range(1.34, 1.56),
 		rng.randf_range(1.02, 1.18)
 	)
-	if absf(face.x) >= absf(face.z):
-		main.x = maxf(main.x, through)
-	else:
-		main.z = maxf(main.z, through)
+	if through_hole:
+		if absf(face.y) >= absf(face.x) and absf(face.y) >= absf(face.z):
+			main.y = maxf(main.y, through)
+		elif absf(face.x) >= absf(face.z):
+			main.x = maxf(main.x, through)
+		else:
+			main.z = maxf(main.z, through)
 	bites.append({
 		"kind": "ball",
 		"at": centre,
@@ -61,6 +71,7 @@ static func crater(at: Vector3, normal: Vector3, seed: int, thick := 0.8) -> Arr
 		"spin": _spin(rng),
 		"seg": rng.randi_range(6, 9),
 	})
+	var chew := thick * 0.45 if through_hole else DENT * 0.5
 	for _i in rng.randi_range(6, 9):
 		var dir := Vector3(
 			rng.randf_range(-1.0, 1.0),
@@ -70,7 +81,7 @@ static func crater(at: Vector3, normal: Vector3, seed: int, thick := 0.8) -> Arr
 		if dir.length_squared() < 0.001:
 			dir = Vector3.UP
 		dir = dir.normalized()
-		var along := centre - face * rng.randf_range(0.0, thick * 0.45)
+		var along := centre - face * rng.randf_range(0.0, chew)
 		if rng.randf() < 0.4:
 			bites.append({
 				"kind": "chip",
@@ -134,11 +145,7 @@ static func _carve(body: StaticBody3D, at: Vector3, normal: Vector3, seed: int) 
 		_add_hull(crater_n, body)
 		_hollow(body)
 	var face := normal if normal.length_squared() > 0.01 else _face_near(body, at)
-	var bounds := _world_aabb(body)
-	var thick := minf(bounds.size.x, bounds.size.z)
-	if thick < 0.05:
-		thick = 0.8
-	for bite in crater(at, face, seed, thick):
+	for bite in crater(at, face, seed, _thick_along(_world_aabb(body), face)):
 		var cut := _cut(bite)
 		crater_n.add_child(cut)
 		cut.global_position = bite["at"]
@@ -195,6 +202,18 @@ static func _add_hull(crater_n: CSGCombiner3D, body: StaticBody3D) -> void:
 		added += 1
 	if added > 0:
 		return
+	## A ramp's AABB is the empty box sitting on the slope. Filling that looks
+	## like a second ramp, so non-box meshes keep their own shape.
+	var mesh_node := _owned_mesh(body)
+	if mesh_node != null and mesh_node.mesh != null and not _convex_fills_aabb(body):
+		var shaped := CSGMesh3D.new()
+		shaped.mesh = mesh_node.mesh
+		var mat := _material_of(mesh_node)
+		if mat != null:
+			shaped.material = mat
+		crater_n.add_child(shaped)
+		shaped.global_transform = mesh_node.global_transform
+		return
 	var bounds := _local_aabb(body)
 	if bounds.size.length() < 0.05:
 		return
@@ -205,13 +224,51 @@ static func _add_hull(crater_n: CSGCombiner3D, body: StaticBody3D) -> void:
 	crater_n.add_child(fill)
 
 
+static func _convex_fills_aabb(body: StaticBody3D) -> bool:
+	var bounds := _local_aabb(body)
+	if bounds.size.length() < 0.05:
+		return false
+	var hits := 0
+	for e in 8:
+		var corner := bounds.get_endpoint(e)
+		if _near_convex(body, corner, 0.15):
+			hits += 1
+	return hits >= 7
+
+
+static func _near_convex(body: StaticBody3D, at: Vector3, pad: float) -> bool:
+	for owner_id in body.get_shape_owners():
+		var xf := body.shape_owner_get_transform(owner_id)
+		for i in body.shape_owner_get_shape_count(owner_id):
+			var convex := body.shape_owner_get_shape(owner_id, i) as ConvexPolygonShape3D
+			if convex == null:
+				continue
+			for point in convex.points:
+				if (xf * point).distance_to(at) <= pad:
+					return true
+	return false
+
+
 static func _hull_material(body: StaticBody3D) -> Material:
-	var mesh_node := _owned_mesh(body)
-	if mesh_node != null and mesh_node.material_override != null:
-		return mesh_node.material_override
+	var mat := _material_of(_owned_mesh(body))
+	if mat != null:
+		return mat
 	if body is BoxProp and (body as BoxProp).kind == "rock":
 		return MeshFactory.material(Palette.ROCK)
 	return MeshFactory.material(Palette.WALL)
+
+
+static func _material_of(mesh_node: MeshInstance3D) -> Material:
+	if mesh_node == null:
+		return null
+	if mesh_node.material_override != null:
+		return mesh_node.material_override
+	var over := mesh_node.get_surface_override_material(0) if mesh_node.mesh != null else null
+	if over != null:
+		return over
+	if mesh_node.mesh != null and mesh_node.mesh.get_surface_count() > 0:
+		return mesh_node.mesh.surface_get_material(0)
+	return null
 
 
 static func _hollow(body: StaticBody3D) -> void:
@@ -222,7 +279,7 @@ static func _hollow(body: StaticBody3D) -> void:
 		if shape != null:
 			shape.disabled = true
 		var mesh := child as MeshInstance3D
-		if mesh != null:
+		if mesh != null and not ObstacleLeds.is_led(mesh):
 			mesh.visible = false
 	var mesh_node := _owned_mesh(body)
 	if mesh_node == null or mesh_node.get_parent() == body:
@@ -232,7 +289,7 @@ static func _hollow(body: StaticBody3D) -> void:
 	mesh_node.mesh = null
 	for child in mesh_node.get_children():
 		var extra := child as MeshInstance3D
-		if extra != null:
+		if extra != null and not ObstacleLeds.is_led(extra):
 			extra.visible = false
 
 
@@ -253,18 +310,17 @@ static func _owned_mesh(body: StaticBody3D) -> MeshInstance3D:
 	return null
 
 
-static func _should_carve(body: StaticBody3D, at: Vector3, normal: Vector3) -> bool:
+static func _should_carve(body: StaticBody3D, at: Vector3, _normal: Vector3) -> bool:
 	if not _is_punchable(body):
 		return false
-	if not _near_volume(body, at, REACH):
-		return false
-	if body is BoxProp or body is ClimbingWall or body is Culvert:
-		return true
-	if _obstacle_path(body).contains("/wall_"):
-		return true
-	if normal.length_squared() > 0.01:
-		return absf(normal.y) <= 0.58
-	return _side_hit(body, at)
+	return _near_volume(body, at, REACH)
+
+
+static func _thick_along(bounds: AABB, face: Vector3) -> float:
+	var n := face.normalized() if face.length_squared() > 0.01 else Vector3.FORWARD
+	var size := bounds.size
+	var along := absf(n.x) * size.x + absf(n.y) * size.y + absf(n.z) * size.z
+	return 0.8 if along < 0.05 else along
 
 
 static func _is_punchable(body: StaticBody3D) -> bool:
@@ -273,6 +329,8 @@ static func _is_punchable(body: StaticBody3D) -> bool:
 	if body is GrapplePoint or body is HexBarrierFace:
 		return false
 	if body.is_in_group("fairway_field"):
+		return false
+	if _obstacle_path(body).contains("/ramp_"):
 		return false
 	if (body.collision_layer & Layers.BARRIER) != 0:
 		return false
@@ -293,23 +351,17 @@ static func _near_volume(body: StaticBody3D, at: Vector3, pad: float) -> bool:
 	return _world_aabb(body).grow(pad).has_point(at)
 
 
-static func _side_hit(body: StaticBody3D, at: Vector3) -> bool:
+static func _face_near(body: StaticBody3D, at: Vector3) -> Vector3:
 	var box := _world_aabb(body)
-	if box.size.length() < 0.05 or not box.grow(0.45).has_point(at):
-		return false
 	var local := at - box.get_center()
 	var half := box.size * 0.5
 	var dx := half.x - absf(local.x)
 	var dy := half.y - absf(local.y)
 	var dz := half.z - absf(local.z)
-	return dy >= dx or dy >= dz
-
-
-static func _face_near(body: StaticBody3D, at: Vector3) -> Vector3:
-	var box := _world_aabb(body)
-	var local := at - box.get_center()
-	if absf(local.x) > absf(local.z):
-		return Vector3(signf(local.x), 0.0, 0.0)
+	if dy <= dx and dy <= dz:
+		return Vector3(0.0, signf(local.y) if absf(local.y) > 0.001 else 1.0, 0.0)
+	if dx <= dz:
+		return Vector3(signf(local.x) if absf(local.x) > 0.001 else 1.0, 0.0, 0.0)
 	return Vector3(0.0, 0.0, signf(local.z) if absf(local.z) > 0.001 else 1.0)
 
 
@@ -410,4 +462,3 @@ static func _xform_aabb(xf: Transform3D, box: AABB) -> AABB:
 	for i in 8:
 		out = out.expand(xf * box.get_endpoint(i))
 	return out
-

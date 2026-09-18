@@ -29,6 +29,9 @@ const BALL_MASK := WORLD | PROP | FORCEFIELD
 const PLAYER_MASK := WORLD | ZOMBIE | BARRIER | PROP | VEHICLE | MECH | FORCEFIELD
 const ZOMBIE_MASK := WORLD | PLAYER | BARRIER | PROP | FORT | FORCEFIELD
 const BULLET_MASK := WORLD | ZOMBIE | PROP | MECH
+## Rockets share the bullet mask and also stop on carts, so an enemy ride
+## takes a direct hit instead of the shell flying through the cabin.
+const ROCKET_MASK := BULLET_MASK | VEHICLE
 ## Enemy bolts hit a planted shield and the players behind it. Friendly fire
 ## stays on BULLET_MASK, so a partner can still shoot through the panel.
 const ENEMY_SHOT_MASK := WORLD | PLAYER | SHIELD | PROP | BARRIER | FORT

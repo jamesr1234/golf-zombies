@@ -1,19 +1,23 @@
 @tool
 class_name WindmillControl
-extends StaticBody3D
-## Table with a world joystick. Interact, then the analog stick is the mill:
-## however many degrees you turn the stick, the blades and the stick both sit.
+extends Area3D
+## Handheld mill remote. Walk in and it goes in the bag. Select it and the
+## analog stick is the mill: however many degrees you turn the stick, the
+## blades and the knob both sit. You can still run.
 
 const _SCRIPT := preload("res://scripts/course/windmill_control.gd")
 const _WorldFx := preload("res://scripts/net/world_fx.gd")
+const STATS := preload("res://resources/course/mill_remote.tres")
+const MODEL_PATH := "res://assets/weapons/mill_remote.glb"
 
-const USE_RANGE := 2.4
 const FIND := 8.0
-const STAND_Z := 1.15
-const TABLE := Vector3(1.15, 0.92, 0.72)
 const DEADZONE := 0.35
 const MAX_TILT := deg_to_rad(28.0)
-const SHAFT_H := 0.42
+const SHAFT_H := 0.09
+const HOVER := 0.55
+const WORLD_SCALE := 2.4
+const SPIN_SPEED := 1.1
+const HAND := Vector3(0.4, 0.32, 0.48)
 
 ## Wire this to a mill in the overlay. Empty uses the nearest windmill.
 @export var mill_path: NodePath
@@ -21,6 +25,7 @@ const SHAFT_H := 0.42
 @export var sync_stick := Vector2.ZERO
 
 var operator: Node = null
+var carrier: Node = null
 var _angle := 0.0
 var _last := 0.0
 var _latched := false
@@ -32,7 +37,7 @@ var _wire_left := 0.0
 static func create(prop: Dictionary) -> WindmillControl:
 	var desk = _SCRIPT.new()
 	desk.name = "WindmillControl"
-	desk.position = prop["position"]
+	desk.position = Vector3(prop["position"].x, HOVER, prop["position"].z)
 	desk.rotation.y = deg_to_rad(float(prop.get("yaw", 0.0)))
 	var path := String(prop.get("mill_path", ""))
 	if not path.is_empty():
@@ -45,7 +50,7 @@ func to_prop() -> Dictionary:
 	return {
 		"kind": "mill_control",
 		"position": Vector3(position.x, 0.0, position.z),
-		"size": TABLE,
+		"size": HAND,
 		"yaw": rad_to_deg(rotation.y),
 		"mill_path": mill_path,
 	}
@@ -58,7 +63,7 @@ static func nearest(who: Node3D) -> WindmillControl:
 		return null
 	for node in who.get_tree().get_nodes_in_group("mill_controls"):
 		var desk := node as WindmillControl
-		if desk == null or not desk.can_use(who):
+		if desk == null or not desk.can_pick(who):
 			continue
 		var d := who.global_position.distance_to(desk.global_position)
 		if d < best_d:
@@ -87,16 +92,40 @@ static func steer_angle(angle: float, last: float, latched: bool, stick: Vector2
 	return {"angle": angle, "last": now, "latched": true}
 
 
+static func make_mesh(scale := 1.0) -> Node3D:
+	var packed := load(MODEL_PATH) as PackedScene
+	if packed != null:
+		var model := packed.instantiate() as Node3D
+		model.name = "Mesh"
+		model.scale = Vector3.ONE * scale
+		return model
+	return _fallback_mesh(scale)
+
+
+static func pose_model(root: Node3D, stick: Vector2, mill_rad: float) -> void:
+	if root == null:
+		return
+	var pivot := root.find_child("StickPivot", true, false) as Node3D
+	if pivot == null:
+		return
+	pivot.rotation.x = stick.y * MAX_TILT
+	pivot.rotation.y = 0.0
+	pivot.rotation.z = -stick.x * MAX_TILT
+	var knob := pivot.find_child("Knob", true, false) as Node3D
+	if knob != null:
+		knob.rotation.y = mill_rad
+
+
 func _ready() -> void:
 	add_to_group("mill_controls")
 	if get_child_count() == 0:
-		collision_layer = Layers.PROP
-		collision_mask = 0
 		_build()
 	_wire_mill()
+	if not Engine.is_editor_hint():
+		body_entered.connect(_on_body_entered)
 	if Engine.is_editor_hint():
-		# Pose once for the overlay; do not tick NetSession every physics frame.
 		set_physics_process(false)
+		set_process(false)
 		_pose_from_sync()
 		return
 	if NetSession.is_active():
@@ -111,23 +140,53 @@ func mill() -> CartPathWindmill:
 	return _nearest_mill()
 
 
+func can_pick(who: Node3D) -> bool:
+	if who == null or carrier != null or not is_inside_tree() or mill() == null:
+		return false
+	if who.get("health") != null and who.health.has_method("is_alive"):
+		if not who.health.is_alive():
+			return false
+	return true
+
+
 func can_use(who: Node3D) -> bool:
-	if who == null or not is_inside_tree() or mill() == null:
+	if who == null or mill() == null:
 		return false
 	if who.get("health") != null and who.health.has_method("is_alive"):
 		if not who.health.is_alive():
 			return false
 	if who.get("shopping") == true or who.get("talking") == true:
 		return false
-	if who.get("state") != null and int(who.state) != 0:
-		return false
-	var offset := who.global_position - global_position
-	offset.y = 0.0
-	return offset.length() <= USE_RANGE
+	return carrier == who and _holding_mill(who)
 
 
 func is_used_by(who: Node) -> bool:
 	return operator == who
+
+
+func is_carried_by(who: Node) -> bool:
+	return carrier == who
+
+
+func try_pick(player: Node) -> bool:
+	if player == null or carrier != null:
+		return false
+	var bag = player.get("weapon")
+	if bag == null or STATS == null:
+		return false
+	if bag.has_gun(STATS):
+		return false
+	if not bag.add_gun(STATS):
+		return false
+	carrier = player
+	if player.has_method("bind_mill"):
+		player.bind_mill(self)
+	var mesh := get_node_or_null("Mesh") as Node3D
+	if mesh != null:
+		mesh.visible = false
+	_stop_monitoring.call_deferred()
+	Sfx.play("pickup_ammo", player)
+	return true
 
 
 func try_toggle(player: Node) -> void:
@@ -153,18 +212,16 @@ func tick(player: Node, _delta: float) -> void:
 	if not Engine.is_editor_hint() and NetSession.defers_world():
 		_report_stick.rpc_id(1, stick)
 		_pose_joystick(stick, _angle)
+		_pose_held(player, stick, _angle)
 		return
 	_steer(stick)
+	_pose_held(player, stick, _angle)
 
 
 func release(player: Node) -> void:
 	if operator != player:
 		return
 	_clear()
-
-
-func stand_at() -> Vector3:
-	return global_position + global_transform.basis.z * STAND_Z
 
 
 func take_wire(stick: Vector2, rotor: float, driven: bool) -> void:
@@ -214,7 +271,6 @@ func _claim(player: Node) -> void:
 	mill.drive(true)
 	if player.has_method("begin_mill"):
 		player.begin_mill(self)
-	_park(player)
 	_pose_joystick(Vector2.ZERO, _angle)
 	_publish_pose(0.0, true)
 
@@ -230,6 +286,7 @@ func _clear() -> void:
 	if who != null and who.has_method("end_mill"):
 		who.end_mill(self)
 	_pose_joystick(Vector2.ZERO, _angle)
+	_pose_held(who, Vector2.ZERO, _angle)
 	_publish_pose(0.0, true)
 
 
@@ -245,8 +302,15 @@ func _steer(stick: Vector2) -> void:
 	_pose_joystick(stick, _angle)
 
 
+func _process(delta: float) -> void:
+	if Engine.is_editor_hint() or carrier != null:
+		return
+	var mesh := get_node_or_null("Mesh") as Node3D
+	if mesh != null:
+		mesh.rotate_y(SPIN_SPEED * delta)
+
+
 func _physics_process(delta: float) -> void:
-	# @tool runs this in the editor; NetSession is only a placeholder there.
 	if Engine.is_editor_hint():
 		_pose_from_sync()
 		return
@@ -303,28 +367,27 @@ func _wire_mill() -> void:
 
 
 func _pose_joystick(stick: Vector2, mill_rad: float) -> void:
-	if _pivot == null or _knob == null:
-		_pivot = get_node_or_null("StickPivot") as Node3D
-		_knob = get_node_or_null("StickPivot/Shaft/Knob") as Node3D
 	if _pivot == null:
-		return
-	_pivot.rotation.x = stick.y * MAX_TILT
-	_pivot.rotation.y = 0.0
-	_pivot.rotation.z = -stick.x * MAX_TILT
-	if _knob != null:
-		_knob.rotation.y = mill_rad
+		_pivot = find_child("StickPivot", true, false) as Node3D
+	if _knob == null:
+		_knob = find_child("Knob", true, false) as Node3D
+	pose_model(self, stick, mill_rad)
 
 
-func _park(player: Node) -> void:
-	if player == null or not player.has_method("face_mill"):
+func _pose_held(player: Node, stick: Vector2, mill_rad: float) -> void:
+	if player == null or not player.has_method("pose_mill"):
 		return
-	player.face_mill(stand_at(), rotation.y)
+	player.pose_mill(stick, mill_rad)
 
 
 func _stick_of(player: Node) -> Vector2:
 	if player == null or player.input == null:
 		return Vector2.ZERO
 	return player.input.move_vector()
+
+
+func _holding_mill(who: Node) -> bool:
+	return who != null and who.has_method("is_holding_mill") and who.is_holding_mill()
 
 
 func _nearest_mill() -> CartPathWindmill:
@@ -343,6 +406,21 @@ func _nearest_mill() -> CartPathWindmill:
 	return best
 
 
+func _on_body_entered(body: Node3D) -> void:
+	if Engine.is_editor_hint():
+		return
+	if NetSession.is_active() and not multiplayer.is_server():
+		return
+	try_pick(body)
+
+
+func _stop_monitoring() -> void:
+	monitoring = false
+	monitorable = false
+	if body_entered.is_connected(_on_body_entered):
+		body_entered.disconnect(_on_body_entered)
+
+
 @rpc("any_peer", "reliable")
 func _request_toggle(peer_id: int) -> void:
 	if not multiplayer.is_server():
@@ -357,6 +435,8 @@ func _report_stick(stick: Vector2) -> void:
 	if not multiplayer.is_server() or operator == null:
 		return
 	_steer(stick)
+	if operator != null:
+		_pose_held(operator, stick, _angle)
 
 
 func _player_for(peer_id: int) -> Node:
@@ -367,49 +447,45 @@ func _player_for(peer_id: int) -> Node:
 
 
 func _build() -> void:
-	collision_layer = Layers.PROP
-	collision_mask = 0
+	collision_layer = Layers.PICKUP
+	collision_mask = Layers.PLAYER
+	monitoring = true
+	monitorable = false
 	var shape := CollisionShape3D.new()
-	var box := BoxShape3D.new()
-	box.size = TABLE
-	shape.shape = box
-	shape.position.y = TABLE.y * 0.5
+	var sphere := SphereShape3D.new()
+	sphere.radius = 0.85
+	shape.shape = sphere
 	add_child(shape)
-	var desk := MeshFactory.box(TABLE, Palette.WALL, Palette.GLOW_FAINT)
-	desk.position.y = TABLE.y * 0.5
-	add_child(desk)
-	var top := MeshFactory.box(
-		Vector3(TABLE.x + 0.08, 0.05, TABLE.z + 0.08), Palette.CYAN, Palette.GLOW_SOFT
-	)
-	top.position.y = TABLE.y + 0.03
-	add_child(top)
-	var well := MeshFactory.cylinder(0.22, 0.08, Palette.CART_FRAME, Palette.GLOW_FAINT)
-	well.position.y = TABLE.y + 0.08
-	add_child(well)
-	var ring := MeshFactory.torus(0.16, 0.26, Palette.CYAN, Palette.GLOW_MEDIUM)
-	ring.position.y = TABLE.y + 0.1
-	add_child(ring)
-	_pivot = Node3D.new()
-	_pivot.name = "StickPivot"
-	_pivot.position.y = TABLE.y + 0.1
-	add_child(_pivot)
-	var shaft := MeshFactory.cylinder(0.04, SHAFT_H, Palette.CART_FRAME, Palette.GLOW_FAINT)
+	add_child(make_mesh(WORLD_SCALE))
+	_pose_joystick(Vector2.ZERO, 0.0)
+
+
+static func _fallback_mesh(scale: float) -> Node3D:
+	var root := Node3D.new()
+	root.name = "Mesh"
+	root.scale = Vector3.ONE * scale
+	var body := MeshFactory.box(Vector3(0.18, 0.07, 0.28), Palette.WALL, Palette.GLOW_FAINT)
+	body.position.y = 0.055
+	root.add_child(body)
+	var well := MeshFactory.cylinder(0.038, 0.016, Palette.CART_FRAME, Palette.GLOW_FAINT)
+	well.position = Vector3(0.0, 0.108, -0.055)
+	root.add_child(well)
+	var ring := MeshFactory.torus(0.028, 0.046, Palette.CYAN, Palette.GLOW_MEDIUM)
+	ring.position = Vector3(0.0, 0.116, -0.055)
+	root.add_child(ring)
+	var pivot := Node3D.new()
+	pivot.name = "StickPivot"
+	pivot.position = Vector3(0.0, 0.116, -0.055)
+	root.add_child(pivot)
+	var shaft := MeshFactory.cylinder(0.011, SHAFT_H, Palette.CART_FRAME, Palette.GLOW_FAINT)
 	shaft.name = "Shaft"
 	shaft.position.y = SHAFT_H * 0.5
-	_pivot.add_child(shaft)
-	_knob = MeshFactory.sphere(0.11, Palette.ORANGE, Palette.GLOW_STRONG)
-	_knob.name = "Knob"
-	_knob.position.y = SHAFT_H
-	shaft.add_child(_knob)
-	var fin := MeshFactory.box(Vector3(0.16, 0.035, 0.04), Palette.ICE, Palette.GLOW_STRONG)
-	fin.position = Vector3(0.1, 0.0, 0.0)
-	_knob.add_child(fin)
-	var sign := Label3D.new()
-	sign.text = "MILL"
-	sign.font_size = 28
-	sign.modulate = Palette.CYAN
-	sign.outline_size = 6
-	sign.outline_modulate = Palette.NIGHT
-	sign.position = Vector3(0.0, TABLE.y + 0.18, TABLE.z * 0.5 + 0.02)
-	add_child(sign)
-	_pose_joystick(Vector2.ZERO, 0.0)
+	pivot.add_child(shaft)
+	var knob := MeshFactory.sphere(0.026, Palette.ORANGE, Palette.GLOW_STRONG)
+	knob.name = "Knob"
+	knob.position.y = SHAFT_H
+	shaft.add_child(knob)
+	var fin := MeshFactory.box(Vector3(0.038, 0.008, 0.01), Palette.ICE, Palette.GLOW_STRONG)
+	fin.position = Vector3(0.024, 0.0, 0.0)
+	knob.add_child(fin)
+	return root
