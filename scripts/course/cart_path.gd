@@ -57,7 +57,11 @@ static func build(
 	path.heading = path.heading.normalized()
 	var exit_at := _exit_point(cup, path.heading, bounds)
 	var start := _start_point(cup, path.heading, bounds, height, green_radius)
-	var deck := height.height_at(start.x, start.z)
+	var green := height.height_at(cup.x, cup.z)
+	var start_h := height.height_at(start.x, start.z)
+	# A mountain clip can drop 28m just off the strip. Ordinary rough is a
+	# metre or two; only a real pit should lift the circuit to the green.
+	var deck := green if green - start_h > 4.0 else start_h
 	start.y = deck
 	path.keep_out = bounds
 	path.centerline = CartPathTrack.centerline(start, path.heading, deck, short)
@@ -382,6 +386,14 @@ static func _hide_old_pin(hole_node: Node3D) -> void:
 	var beam := hole_node.find_child("PinBeam", true, false) as Node3D
 	if beam != null:
 		beam.visible = false
+
+
+## Cup plus the circuit, so the last metres of fairway stay on the same deck.
+static func leave_line(cup: Vector3, centerline: Array[Vector3]) -> Array[Vector3]:
+	var line: Array[Vector3] = [cup]
+	for point in centerline:
+		line.append(point)
+	return line
 
 
 ## Punch OOB walls and fairway lips wherever the cart path crosses them.

@@ -101,6 +101,8 @@ static func keeps(data: HoleData, point: Vector3, half := -1.0) -> bool:
 		return true
 	if point.distance_to(data.cup) < data.green_radius + HoleGenerator.FRINGE_WIDTH + 2.0:
 		return true
+	if CourseTrees.in_exit_corridor(data, point):
+		return true
 	if HoleGenerator.distance_to_centerline(data, point) > lip:
 		return false
 	return HeightField.along_t(data, point) <= 1.04

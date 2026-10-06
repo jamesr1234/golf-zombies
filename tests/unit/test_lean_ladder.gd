@@ -77,6 +77,35 @@ func test_you_slide_up_the_rails() -> void:
 	assert_true(player.is_climbing())
 
 
+func test_jumping_off_clears_the_rails() -> void:
+	var ladder: LeanLadder = LeanLadder.spawn(self, Vector3.ZERO, 0.0, 5.0)
+	var player: Player = PLAYER.instantiate()
+	add_child_autofree(player)
+	await wait_physics_frames(1)
+	player.input = CpuInput.new(player.input_prefix, false)
+	player.global_position = ladder.point_on_rail(0.2)
+	assert_true(player._start_climb())
+	var on_rail := player.global_position
+	var pad := player.input as CpuInput
+	pad.begin_frame()
+	pad.move = Vector2(0.0, -1.0)
+	pad.tap("jump")
+	player._move(STEP)
+	assert_false(player.is_climbing(), "jump hops you off")
+	assert_gt(
+		player.global_position.distance_to(ladder.point_on_rail(0.2)),
+		1.4,
+		"the hop lands you behind the latch"
+	)
+	assert_false(ladder.can_latch(player), "you are outside the rails")
+	for _i in 8:
+		pad.begin_frame()
+		pad.move = Vector2(0.0, -1.0)
+		player._move(STEP)
+	assert_false(player.is_climbing(), "holding in does not grab the same rungs")
+	assert_gt(player.global_position.distance_to(on_rail), 1.2)
+
+
 func test_the_top_steps_you_onto_the_ledge() -> void:
 	var ladder: LeanLadder = LeanLadder.spawn(self, Vector3.ZERO, 0.0, 4.0)
 	var player: Player = PLAYER.instantiate()

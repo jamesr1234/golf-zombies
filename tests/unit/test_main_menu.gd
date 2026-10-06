@@ -64,6 +64,72 @@ func test_stick_or_wasd_cycles_the_highlighted_mode() -> void:
 	assert_eq(menu.mode_index, 0)
 
 
+func test_analog_events_do_not_skip_modes() -> void:
+	var menu: MainMenu = MENU.instantiate()
+	add_child_autofree(menu)
+	await wait_frames(1)
+	# A flick used to fire move() once per JoypadMotion on that frame.
+	for _i in 6:
+		menu._unhandled_input(_stick_event(1.0))
+	assert_eq(menu.mode_index, 0)
+
+
+func test_one_key_press_moves_one_row() -> void:
+	var menu: MainMenu = MENU.instantiate()
+	add_child_autofree(menu)
+	await wait_frames(1)
+	menu._unhandled_input(_key_event(KEY_DOWN))
+	assert_eq(menu.mode_index, 1)
+	menu._unhandled_input(_key_event(KEY_DOWN, true))
+	assert_eq(menu.mode_index, 1, "held-key echo must not skip")
+	menu._unhandled_input(_key_event(KEY_UP))
+	assert_eq(menu.mode_index, 0)
+
+
+func test_a_held_stick_steps_once_then_waits() -> void:
+	var menu: MainMenu = MENU.instantiate()
+	add_child_autofree(menu)
+	await wait_frames(1)
+	menu._apply_pad({}, Vector2i(0, 1))
+	assert_eq(menu.mode_index, 1)
+	menu._apply_pad({}, Vector2i.ZERO)
+	assert_eq(menu.mode_index, 1)
+	menu._apply_pad({"swap_weapon": true}, Vector2i.ZERO)
+	assert_eq(menu.mode_index, 2)
+
+
+func test_pad_confirm_does_not_skip_difficulty() -> void:
+	var menu: MainMenu = MENU.instantiate()
+	add_child_autofree(menu)
+	await wait_frames(1)
+	var button := InputEventJoypadButton.new()
+	button.button_index = JOY_BUTTON_B
+	button.pressed = true
+	menu._unhandled_input(button)
+	menu._unhandled_input(button)
+	assert_eq(menu.step, MainMenu.Step.MODE, "Circle events must not confirm from _unhandled_input")
+	menu._apply_pad({"interact": true}, Vector2i.ZERO)
+	assert_eq(menu.step, MainMenu.Step.DIFFICULTY)
+	menu._apply_pad({}, Vector2i.ZERO)
+	assert_eq(menu.step, MainMenu.Step.DIFFICULTY)
+	assert_false(menu.started, "one Circle must not also start the round")
+
+
+func _key_event(keycode: Key, echo := false) -> InputEventKey:
+	var key := InputEventKey.new()
+	key.pressed = true
+	key.echo = echo
+	key.physical_keycode = keycode
+	return key
+
+
+func _stick_event(value: float) -> InputEventJoypadMotion:
+	var motion := InputEventJoypadMotion.new()
+	motion.axis = JOY_AXIS_LEFT_Y
+	motion.axis_value = value
+	return motion
+
+
 func test_online_opens_from_the_title() -> void:
 	var menu: MainMenu = MENU.instantiate()
 	add_child_autofree(menu)
@@ -102,6 +168,27 @@ func test_title_shows_every_mode() -> void:
 	var last_bottom := last.global_position.y + last.size.y
 	var panel_bottom := menu._panel.global_position.y + menu._panel.size.y
 	assert_lte(last_bottom, panel_bottom + 1.0, "the last mode must sit inside the panel")
+	assert_eq(menu._blurb.get_parent().custom_minimum_size.y, MainMenu.BLURB_HEIGHT)
+	assert_eq(menu._options.custom_minimum_size.y, menu._options_height(MainMenu.MODE_COPY.size()))
+
+
+func test_the_panel_keeps_its_size_while_the_blurb_changes() -> void:
+	var menu: MainMenu = MENU.instantiate()
+	add_child_autofree(menu)
+	await wait_frames(2)
+	var size := menu._panel.size
+	assert_gt(menu._blurb.get_parent().size.y, 32.0, "two lines of copy have a reserved slot")
+	for _i in MainMenu.MODE_COPY.size():
+		menu.move(1)
+		await wait_frames(1)
+		assert_eq(menu._panel.size, size, "hovering a mode must not resize the box")
+	menu.confirm()
+	await wait_frames(1)
+	assert_eq(menu._panel.size, size, "the difficulty step uses the same box")
+	for _i in GameSettings.LABELS.size():
+		menu.move(1)
+		await wait_frames(1)
+		assert_eq(menu._panel.size, size, "hovering a difficulty must not resize the box")
 
 
 ## Building a hole is not a difficulty pick, so it skips that step the same way

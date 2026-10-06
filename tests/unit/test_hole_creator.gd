@@ -6,6 +6,7 @@ const CUBE := "res://assets/obstacles/cube_large.glb"
 const WALL := "res://assets/obstacles/wall_medium.glb"
 const RIFLE := "res://resources/weapons/rifle.tres"
 const ZIP := "res://scenes/course/props/zipline.tscn"
+const LAVA := "res://scenes/course/props/lava.tscn"
 
 
 func before_each() -> void:
@@ -315,6 +316,24 @@ func test_a_zipline_end_has_to_sit_lower() -> void:
 	tool.release()
 
 
+func test_a_spawn_can_sit_on_a_block() -> void:
+	var hole := CustomHole.create("Perch")
+	var host := Node3D.new()
+	add_child_autofree(host)
+	var block := MeshFactory.box_body(Vector3(2.7, 2.7, 2.7), Palette.WALL, Layers.PROP)
+	block.position = Vector3(0.0, 1.35, -20.0)
+	host.add_child(block)
+	await wait_physics_frames(2)
+	var tool := PlaceTool.new(hole)
+	tool.space = host.get_world_3d().direct_space_state
+	_pick_spawn(tool)
+	tool.aim(host, host, Vector3(0.0, 10.0, -20.0))
+	assert_true(tool.place())
+	var at: Vector3 = hole.placements[0][CustomHole.POSITION]
+	assert_gt(at.y, 2.0, "the pack stands on the block, not the grass under it")
+	tool.abort_spawn()
+
+
 func test_a_spawn_sits_on_the_grass_even_from_a_high_aim() -> void:
 	var hole := CustomHole.create("High Aim")
 	var tool := PlaceTool.new(hole)
@@ -388,6 +407,594 @@ func test_the_place_tool_lists_a_zombie_spawn() -> void:
 	assert_eq(tool.shelf(), PlaceTool.SPAWNS)
 	assert_eq(tool.picked_path(), CustomHole.SPAWN)
 	assert_eq(tool.picked_label(), "ZOMBIE SPAWN")
+
+
+func test_the_place_tool_lists_a_sandtrap() -> void:
+	var tool := PlaceTool.new(CustomHole.create("Sand"))
+	_pick_sand(tool)
+	assert_eq(tool.picked_path(), CustomHole.SANDTRAP)
+	assert_eq(tool.picked_label(), "SANDTRAP")
+	assert_true(tool.labels().has("SANDTRAP"))
+
+
+func test_a_sandtrap_is_a_circle_then_a_depth() -> void:
+	var hole := CustomHole.create("Bunker")
+	var tool := PlaceTool.new(hole)
+	var host := Node3D.new()
+	add_child_autofree(host)
+	_pick_sand(tool)
+	tool.aim(host, host, Vector3(0.0, 0.0, -20.0))
+	assert_true(tool.place())
+	assert_true(tool.is_sanding(), "the circle comes first")
+	assert_false(tool.is_digging())
+	assert_eq(hole.placements.size(), 1)
+	tool.aim(host, host, Vector3(6.0, 0.0, -20.0))
+	assert_true(tool.set_sand_radius())
+	assert_almost_eq(tool.sand_radius, 6.0, 0.05)
+	assert_true(tool.is_digging(), "depth comes after the circle")
+	tool.aim(host, host, Vector3(1.4, 0.0, -20.0))
+	assert_true(tool.set_sand_depth())
+	assert_false(tool.is_sanding())
+	assert_false(tool.is_digging())
+	assert_almost_eq(SandTrap.radius_of(hole.placements[0]), 6.0, 0.05)
+	assert_almost_eq(SandTrap.depth_of(hole.placements[0]), 1.4, 0.05)
+	assert_true(tool.wants_rebuild, "the ground has to bowl")
+	tool.release()
+
+
+func test_backing_out_of_a_sandtrap_drops_it() -> void:
+	var hole := CustomHole.create("No Sand")
+	var tool := PlaceTool.new(hole)
+	var host := Node3D.new()
+	add_child_autofree(host)
+	_pick_sand(tool)
+	tool.aim(host, host, Vector3(0.0, 0.0, -20.0))
+	assert_true(tool.place())
+	assert_true(tool.abort_sand())
+	assert_eq(hole.placements.size(), 0)
+	assert_false(tool.is_sanding())
+	tool.release()
+
+
+func test_erasing_a_sandtrap_hits_anywhere_in_the_circle() -> void:
+	var hole := CustomHole.create("Wipe Sand")
+	var tool := PlaceTool.new(hole)
+	hole.add_placement(CustomHole.SANDTRAP, Vector3(0.0, 0.0, -20.0))
+	hole.placements[0][CustomHole.RADIUS] = 8.0
+	hole.placements[0][CustomHole.DEPTH] = 1.0
+	assert_true(tool.erase(Vector3(5.0, 0.0, -20.0)))
+	assert_eq(hole.placements.size(), 0)
+	assert_true(tool.wants_rebuild)
+	tool.release()
+
+
+func test_water_tiles_wait_for_circle_then_a_depth() -> void:
+	var hole := CustomHole.create("Pond")
+	var tool := PlaceTool.new(hole)
+	var host := Node3D.new()
+	add_child_autofree(host)
+	_pick_water(tool)
+	tool.aim(host, host, Vector3(0.0, 0.0, -20.0))
+	assert_true(tool.place())
+	assert_true(tool.is_water_filling(), "the first R2 parks a corner")
+	tool.aim(host, host, Vector3(GridSnap.CELL, 0.0, -20.0))
+	assert_true(tool.place())
+	assert_false(tool.is_water_filling())
+	assert_eq(hole.placements.size(), 2)
+	assert_true(hole.has_open_water())
+	assert_true(tool.is_water_pending())
+	assert_true(tool.confirm_water())
+	assert_true(tool.is_water_depthing())
+	tool.aim(host, host, Vector3(0.0, -3.0, -20.0))
+	assert_true(tool.set_water_depth())
+	assert_false(tool.is_water_depthing())
+	assert_false(hole.has_open_water())
+	assert_almost_eq(WaterTile.depth_of(hole.placements[0]), 3.0, 0.001)
+	assert_almost_eq(WaterTile.depth_of(hole.placements[1]), 3.0, 0.001)
+	assert_true(CustomHole.same_water(hole.placements[0], hole.placements[1]))
+	tool.release()
+
+
+## The whole point of the dig: two ponds, a run between them, and the run
+## closing itself the moment it breaks into the far water.
+func test_a_dig_joins_two_ponds_and_finishes_itself() -> void:
+	var hole := CustomHole.create("Two Ponds")
+	var tool := PlaceTool.new(hole)
+	var host := Node3D.new()
+	add_child_autofree(host)
+	_pick_water(tool)
+	_fill_pond(tool, host, Vector3(0.0, 0.0, -20.0), Vector3(0.0, 0.0, -20.0), 3.0)
+	var far := Vector3(0.0, 0.0, -44.0)
+	_fill_pond(tool, host, far, far, 3.0)
+	assert_eq(hole.placements.size(), 2)
+	assert_false(CustomHole.same_water(hole.placements[0], hole.placements[1]))
+	var eye := Vector3(0.0, -2.0, -20.0)
+	tool.aim(host, host, Vector3(0.0, -2.0, -32.0), eye)
+	assert_true(tool.tunnel.is_submerged(), "you dig from inside a finished pond")
+	assert_true(tool.tunnel.can_dig())
+	assert_true(tool.place(), "the first R2 opens the run")
+	assert_true(tool.is_digging_tunnel())
+	assert_eq(hole.placements.size(), 3, "a whole corridor is one placement")
+	assert_true(hole.has_open_tunnel(), "a dig that stops short is a dead end")
+	tool.aim(host, host, far, Vector3(0.0, -2.0, -32.0))
+	assert_false(tool.tunnel.dig_lands_in().is_empty(), "the far pond is in reach")
+	assert_true(tool.place())
+	assert_false(tool.is_digging_tunnel(), "reaching water closes the tunnel")
+	assert_false(hole.has_open_tunnel())
+	assert_eq(hole.placements.size(), 3)
+	var dug: Dictionary = hole.placements[2]
+	assert_true(WaterTunnel.is_done(dug))
+	assert_eq(WaterTunnel.nodes_of(dug).size(), 3)
+	tool.release()
+
+
+## Digging from the middle of a pond has to break ground at the bank you are
+## facing, not open a hole in the water beside you.
+func test_a_run_starts_at_the_wall_of_the_pond_you_dig_from() -> void:
+	var hole := CustomHole.create("At The Wall")
+	var tool := PlaceTool.new(hole)
+	var host := Node3D.new()
+	add_child_autofree(host)
+	_pick_water(tool)
+	var span := GridSnap.CELL * 4.0
+	_fill_pond(tool, host, Vector3(0.0, 0.0, -20.0), Vector3(0.0, 0.0, -20.0 - span), 3.0)
+	var wall := -20.0 - span
+	# Floating at the near end of a long pond, facing down it and out the far side.
+	tool.aim(host, host, Vector3(0.0, -2.0, wall - 12.0), Vector3(0.0, -2.0, -20.0))
+	assert_true(tool.place())
+	var mouth: Vector3 = WaterTunnel.nodes_of(hole.placements[hole.placements.size() - 1])[0]
+	assert_almost_eq(mouth.z, wall, GridSnap.CELL, "the run starts at the far bank")
+	assert_lt(mouth.z, -20.0 - span * 0.5, "not back where the camera was floating")
+	tool.release()
+
+
+## A run that stops a stride short of the far bank would dead end in rock, so
+## both mouths are pushed into the water and the swim has to be unbroken.
+func test_a_finished_run_is_one_unbroken_swim_between_the_ponds() -> void:
+	var hole := CustomHole.create("Unbroken")
+	var tool := PlaceTool.new(hole)
+	var host := Node3D.new()
+	add_child_autofree(host)
+	_pick_water(tool)
+	var near := Vector3(0.0, 0.0, -20.0)
+	var far := Vector3(0.0, 0.0, -44.0)
+	_fill_pond(tool, host, near, near, 3.0)
+	_fill_pond(tool, host, far, far, 3.0)
+	# Aimed at the bank rather than into the water, the way a real dig lands.
+	tool.aim(host, host, Vector3(0.0, -2.0, -43.0), Vector3(0.0, -2.0, -20.0))
+	assert_true(tool.place())
+	assert_false(hole.has_open_tunnel(), "landing near the bank still closes it")
+	var data := CustomLayout.build(hole)
+	var steps := 60
+	for i in steps + 1:
+		var at := (
+			data.custom.placements[0][CustomHole.POSITION] as Vector3
+		).lerp(data.custom.placements[1][CustomHole.POSITION] as Vector3, float(i) / steps)
+		at.y = -2.0
+		assert_gt(
+			data.water_depth_at(at), PlayerSwim.WADE_DEPTH,
+			"no bite of rock at %.1f m along the run" % at.z
+		)
+	tool.release()
+
+
+func test_a_dig_turns_a_corner_and_l2_backs_it_up() -> void:
+	var hole := CustomHole.create("Corner")
+	var tool := PlaceTool.new(hole)
+	var host := Node3D.new()
+	add_child_autofree(host)
+	_pick_water(tool)
+	_fill_pond(tool, host, Vector3(0.0, 0.0, -20.0), Vector3(0.0, 0.0, -20.0), 3.0)
+	var eye := Vector3(0.0, -2.0, -20.0)
+	tool.aim(host, host, Vector3(0.0, -2.0, -32.0), eye)
+	assert_true(tool.place())
+	tool.aim(host, host, Vector3(9.0, -3.0, -32.0), Vector3(0.0, -2.0, -32.0))
+	assert_true(tool.place(), "a turn is just the next corner")
+	var dug: Dictionary = hole.placements[1]
+	assert_eq(WaterTunnel.nodes_of(dug).size(), 3)
+	assert_true(tool.undo_dig())
+	assert_eq(WaterTunnel.nodes_of(hole.placements[1]).size(), 2, "L2 drops one corner")
+	assert_true(tool.undo_dig())
+	assert_eq(hole.placements.size(), 1, "and off the last corner the dig is dropped")
+	tool.release()
+
+
+func test_a_dig_stays_under_the_turf_and_on_the_strip() -> void:
+	var hole := CustomHole.create("Buried Run")
+	var tool := PlaceTool.new(hole)
+	var host := Node3D.new()
+	add_child_autofree(host)
+	_pick_water(tool)
+	_fill_pond(tool, host, Vector3(0.0, 0.0, -20.0), Vector3(0.0, 0.0, -20.0), 3.0)
+	var eye := Vector3(0.0, -2.0, -20.0)
+	tool.aim(host, host, Vector3(0.0, 8.0, -32.0), eye)
+	assert_lt(tool.tunnel.dig_target().y, 0.0, "an aim above the grass still digs under it")
+	tool.aim(host, host, Vector3(600.0, -2.0, -32.0), eye)
+	assert_false(tool.place(), "and nothing digs off the fairway")
+	assert_eq(hole.placements.size(), 1)
+	tool.release()
+
+
+func test_the_bore_is_set_before_and_during_a_dig() -> void:
+	var hole := CustomHole.create("Wide Run")
+	var tool := PlaceTool.new(hole)
+	var host := Node3D.new()
+	add_child_autofree(host)
+	_pick_water(tool)
+	_fill_pond(tool, host, Vector3(0.0, 0.0, -20.0), Vector3(0.0, 0.0, -20.0), 3.0)
+	var eye := Vector3(0.0, -2.0, -20.0)
+	tool.aim(host, host, Vector3(0.0, -2.0, -32.0), eye)
+	var start := tool.tunnel.bore
+	tool.turn(1)
+	assert_gt(tool.tunnel.bore, start, "the same buttons that turn a piece size a dig")
+	assert_almost_eq(tool.yaw, 0.0, 0.001, "and they do not spin anything while digging")
+	var wider := tool.tunnel.bore
+	assert_true(tool.place())
+	tool.turn(1)
+	assert_gt(tool.tunnel.bore, wider)
+	assert_almost_eq(
+		WaterTunnel.bore_of(hole.placements[1]), tool.tunnel.bore, 0.001,
+		"the run being dug takes the new size"
+	)
+	tool.release()
+
+
+## Leaving the tool mid-dig must not strand a dead end, so a run within reach
+## of the lens is picked back up rather than started over.
+func test_a_half_dug_run_is_carried_on_after_leaving_the_tool() -> void:
+	var hole := CustomHole.create("Resume")
+	var tool := PlaceTool.new(hole)
+	var host := Node3D.new()
+	add_child_autofree(host)
+	_pick_water(tool)
+	_fill_pond(tool, host, Vector3(0.0, 0.0, -20.0), Vector3(0.0, 0.0, -20.0), 3.0)
+	tool.aim(host, host, Vector3(0.0, -2.0, -32.0), Vector3(0.0, -2.0, -20.0))
+	assert_true(tool.place())
+	tool.release()
+	assert_false(tool.is_digging_tunnel())
+	assert_true(hole.has_open_tunnel())
+	tool.aim(host, host, Vector3(0.0, -2.0, -40.0), Vector3(0.0, -2.0, -32.0))
+	assert_true(tool.tunnel.can_dig(), "the open end is still within reach")
+	assert_true(tool.place())
+	assert_eq(hole.placements.size(), 2, "it carried on rather than starting again")
+	assert_eq(WaterTunnel.nodes_of(hole.placements[1]).size(), 3)
+	tool.release()
+
+
+func test_erasing_a_pond_takes_the_run_dug_out_of_it() -> void:
+	var hole := CustomHole.create("Wipe Both")
+	var tool := PlaceTool.new(hole)
+	var host := Node3D.new()
+	add_child_autofree(host)
+	_pick_water(tool)
+	_fill_pond(tool, host, Vector3(0.0, 0.0, -20.0), Vector3(0.0, 0.0, -20.0), 3.0)
+	tool.aim(host, host, Vector3(0.0, -2.0, -32.0), Vector3(0.0, -2.0, -20.0))
+	assert_true(tool.place())
+	assert_eq(hole.placements.size(), 2)
+	assert_true(tool.erase(Vector3(0.0, 0.0, -20.0)))
+	assert_eq(hole.placements.size(), 0, "a run into water that is gone goes too")
+	tool.release()
+
+
+func test_erasing_a_tunnel_leaves_the_ponds() -> void:
+	var hole := CustomHole.create("Wipe Dig")
+	var tool := PlaceTool.new(hole)
+	var host := Node3D.new()
+	add_child_autofree(host)
+	_pick_water(tool)
+	_fill_pond(tool, host, Vector3(0.0, 0.0, -20.0), Vector3(0.0, 0.0, -20.0), 3.0)
+	var eye := Vector3(0.0, -2.0, -20.0)
+	tool.aim(host, host, Vector3(0.0, -2.0, -32.0), eye)
+	assert_true(tool.place())
+	assert_eq(hole.placements.size(), 2)
+	assert_true(tool.erase(Vector3(0.0, -2.0, -28.0)), "erase finds a run anywhere along it")
+	assert_eq(hole.placements.size(), 1)
+	assert_true(CustomHole.is_water(String(hole.placements[0][CustomHole.PATH])))
+	tool.release()
+
+
+func test_backing_out_of_water_depth_lets_you_add_tiles() -> void:
+	var hole := CustomHole.create("More Water")
+	var tool := PlaceTool.new(hole)
+	var host := Node3D.new()
+	add_child_autofree(host)
+	_pick_water(tool)
+	tool.aim(host, host, Vector3(0.0, 0.0, -20.0))
+	assert_true(tool.place())
+	assert_true(tool.place())
+	assert_true(tool.confirm_water())
+	assert_true(tool.clear_water_depth())
+	assert_false(tool.is_water_depthing())
+	assert_true(tool.is_water_pending())
+	tool.release()
+
+
+func test_erasing_water_takes_the_whole_pond() -> void:
+	var hole := CustomHole.create("Wipe Pond")
+	var tool := PlaceTool.new(hole)
+	var host := Node3D.new()
+	add_child_autofree(host)
+	_pick_water(tool)
+	_fill_pond(tool, host, Vector3(0.0, 0.0, -20.0), Vector3(GridSnap.CELL, 0.0, -20.0), 3.0)
+	assert_eq(hole.placements.size(), 2)
+	assert_true(tool.erase(Vector3(0.0, 0.0, -20.0)))
+	assert_eq(hole.placements.size(), 0)
+	tool.release()
+
+
+func test_erasing_one_pond_leaves_the_other() -> void:
+	var hole := CustomHole.create("Keep Pond")
+	var tool := PlaceTool.new(hole)
+	var host := Node3D.new()
+	add_child_autofree(host)
+	_pick_water(tool)
+	_fill_pond(tool, host, Vector3(0.0, 0.0, -20.0), Vector3(0.0, 0.0, -20.0), 3.0)
+	_fill_pond(
+		tool, host,
+		Vector3(0.0, 0.0, -20.0 - GridSnap.CELL * 3.0),
+		Vector3(0.0, 0.0, -20.0 - GridSnap.CELL * 3.0),
+		3.0
+	)
+	assert_eq(hole.placements.size(), 2)
+	assert_true(tool.erase(Vector3(0.0, 0.0, -20.0)))
+	assert_eq(hole.placements.size(), 1)
+	assert_true(CustomHole.is_water(String(hole.placements[0][CustomHole.PATH])))
+	tool.release()
+
+
+func test_lava_tiles_wait_for_circle_then_a_respawn() -> void:
+	var hole := CustomHole.create("Lava")
+	var tool := PlaceTool.new(hole)
+	var host := Node3D.new()
+	add_child_autofree(host)
+	_pick_lava(tool)
+	tool.aim(host, host, Vector3(0.0, 0.0, -20.0))
+	assert_true(tool.place())
+	assert_true(tool.is_lava_filling(), "the first R2 parks a corner")
+	assert_eq(hole.placements.size(), 0)
+	tool.aim(host, host, Vector3(GridSnap.CELL, 0.0, -20.0))
+	assert_true(tool.place())
+	assert_false(tool.is_lava_filling())
+	assert_eq(hole.placements.size(), 2)
+	assert_true(hole.has_open_lava())
+	assert_true(tool.is_lava_pending())
+	assert_false(tool.hold(), "Circle is confirm, not hold, once tiles are down")
+	assert_true(tool.confirm_lava())
+	assert_true(tool.is_lava_respawning())
+	tool.aim(host, host, Vector3(5.4, 0.0, -12.15))
+	assert_true(tool.set_lava_respawn())
+	assert_false(tool.is_lava_respawning())
+	assert_false(hole.has_open_lava())
+	assert_almost_eq(
+		CustomHole.respawn_of(hole.placements[0]).distance_to(
+			CustomHole.respawn_of(hole.placements[1])
+		),
+		0.0, 0.01
+	)
+	tool.release()
+
+
+func test_a_respawn_cannot_sit_on_lava() -> void:
+	var hole := CustomHole.create("Loop")
+	var tool := PlaceTool.new(hole)
+	var host := Node3D.new()
+	add_child_autofree(host)
+	var reasons: Array[String] = []
+	tool.refused.connect(func(reason: String) -> void: reasons.append(reason))
+	_pick_lava(tool)
+	tool.aim(host, host, Vector3(0.0, 0.0, -20.0))
+	assert_true(tool.place())
+	assert_true(tool.place())
+	assert_true(tool.confirm_lava())
+	tool.aim(host, host, Vector3(0.0, 0.0, -20.0))
+	assert_false(tool.set_lava_respawn())
+	assert_true(tool.is_lava_respawning())
+	assert_true(hole.has_open_lava())
+	assert_eq(reasons.size(), 1)
+	assert_true(reasons[0].contains("LAVA"))
+	tool.aim(host, host, Vector3(5.4, 0.0, -12.15))
+	assert_true(tool.set_lava_respawn())
+	assert_false(hole.has_open_lava())
+	tool.release()
+
+
+func test_lava_cannot_cover_an_existing_respawn() -> void:
+	var hole := CustomHole.create("Cover")
+	var tool := PlaceTool.new(hole)
+	var host := Node3D.new()
+	add_child_autofree(host)
+	var reasons: Array[String] = []
+	tool.refused.connect(func(reason: String) -> void: reasons.append(reason))
+	_pick_lava(tool)
+	tool.aim(host, host, Vector3(0.0, 0.0, -20.0))
+	assert_true(tool.place())
+	assert_true(tool.place())
+	assert_true(tool.confirm_lava())
+	tool.aim(host, host, Vector3(5.4, 0.0, -12.15))
+	assert_true(tool.set_lava_respawn())
+	tool.aim(host, host, Vector3(5.4, 0.0, -12.15))
+	assert_false(tool.place(), "a new tile on the stand-back would loop")
+	assert_eq(reasons.size(), 1)
+	tool.release()
+
+
+func test_backing_out_of_the_respawn_lets_you_add_tiles() -> void:
+	var hole := CustomHole.create("More Lava")
+	var tool := PlaceTool.new(hole)
+	var host := Node3D.new()
+	add_child_autofree(host)
+	_pick_lava(tool)
+	tool.aim(host, host, Vector3(0.0, 0.0, -20.0))
+	assert_true(tool.place())
+	assert_true(tool.place())
+	assert_true(tool.confirm_lava())
+	assert_true(tool.clear_lava_aim())
+	assert_false(tool.is_lava_respawning())
+	assert_true(tool.is_lava_pending())
+	tool.aim(host, host, Vector3(GridSnap.CELL, 0.0, -20.0))
+	assert_true(tool.place())
+	assert_true(tool.place())
+	assert_eq(hole.placements.size(), 2)
+	tool.release()
+
+
+func test_dragging_lava_fills_the_rectangle() -> void:
+	var hole := CustomHole.create("Pool")
+	var tool := PlaceTool.new(hole)
+	var host := Node3D.new()
+	add_child_autofree(host)
+	_pick_lava(tool)
+	tool.aim(host, host, Vector3(0.0, 0.0, -20.0))
+	assert_true(tool.place())
+	tool.aim(host, host, Vector3(GridSnap.CELL, 0.0, -20.0 - GridSnap.CELL))
+	assert_eq(tool.lava_cells().size(), 4)
+	assert_true(tool.lava_fill_ok())
+	assert_true(tool.place())
+	assert_eq(hole.placements.size(), 4)
+	tool.release()
+
+
+func test_lava_can_sit_on_a_block() -> void:
+	var hole := CustomHole.create("Perch Pool")
+	var host := Node3D.new()
+	add_child_autofree(host)
+	var block := MeshFactory.box_body(Vector3(2.7, 2.7, 2.7), Palette.WALL, Layers.PROP)
+	block.position = Vector3(0.0, 1.35, -20.0)
+	host.add_child(block)
+	await wait_physics_frames(2)
+	var tool := PlaceTool.new(hole)
+	tool.space = host.get_world_3d().direct_space_state
+	_pick_lava(tool)
+	tool.aim(host, host, Vector3(0.0, 10.0, -20.0))
+	assert_gt(tool.aim_at().y, 2.0, "the ghost sits on the block")
+	assert_true(tool.place())
+	assert_gt(tool.lava_from.y, 2.0)
+	assert_true(tool.place())
+	assert_eq(hole.placements.size(), 1)
+	assert_gt(hole.placements[0][CustomHole.POSITION].y, 2.0)
+	tool.release()
+
+
+func test_a_lava_respawn_can_sit_on_a_block() -> void:
+	var hole := CustomHole.create("Safe Perch")
+	var host := Node3D.new()
+	add_child_autofree(host)
+	var block := MeshFactory.box_body(Vector3(2.7, 2.7, 2.7), Palette.WALL, Layers.PROP)
+	block.position = Vector3(0.0, 1.35, -12.15)
+	host.add_child(block)
+	await wait_physics_frames(2)
+	var tool := PlaceTool.new(hole)
+	tool.space = host.get_world_3d().direct_space_state
+	_pick_lava(tool)
+	tool.aim(host, host, Vector3(0.0, 0.0, -20.0))
+	assert_true(tool.place())
+	assert_true(tool.place())
+	assert_true(tool.confirm_lava())
+	tool.aim(host, host, Vector3(0.0, 10.0, -12.15))
+	assert_gt(tool.aim_at().y, 2.0)
+	assert_true(tool.set_lava_respawn())
+	assert_gt(CustomHole.respawn_of(hole.placements[0]).y, 2.0)
+	tool.release()
+
+
+func test_erasing_lava_takes_the_whole_pool() -> void:
+	var hole := CustomHole.create("Wipe Pool")
+	var tool := PlaceTool.new(hole)
+	var host := Node3D.new()
+	add_child_autofree(host)
+	_pick_lava(tool)
+	tool.aim(host, host, Vector3(0.0, 0.0, -20.0))
+	assert_true(tool.place())
+	tool.aim(host, host, Vector3(GridSnap.CELL, 0.0, -20.0 - GridSnap.CELL))
+	assert_true(tool.place())
+	assert_eq(hole.placements.size(), 4)
+	assert_true(tool.confirm_lava())
+	tool.aim(host, host, Vector3(5.4, 0.0, -12.15))
+	assert_true(tool.set_lava_respawn())
+	assert_true(tool.erase(Vector3(0.0, 0.0, -20.0)))
+	assert_eq(hole.placements.size(), 0)
+	tool.release()
+
+
+func test_erasing_one_lava_pool_leaves_the_other() -> void:
+	var hole := CustomHole.create("Two Pools")
+	var tool := PlaceTool.new(hole)
+	var host := Node3D.new()
+	add_child_autofree(host)
+	_pick_lava(tool)
+	tool.aim(host, host, Vector3(0.0, 0.0, -20.0))
+	assert_true(tool.place())
+	assert_true(tool.place())
+	assert_true(tool.confirm_lava())
+	tool.aim(host, host, Vector3(5.4, 0.0, -12.15))
+	assert_true(tool.set_lava_respawn())
+	tool.aim(host, host, Vector3(0.0, 0.0, -20.0 - GridSnap.CELL * 3.0))
+	assert_true(tool.place())
+	assert_true(tool.place())
+	assert_true(tool.confirm_lava())
+	tool.aim(host, host, Vector3(-5.4, 0.0, -12.15))
+	assert_true(tool.set_lava_respawn())
+	assert_eq(hole.placements.size(), 2)
+	var kept: Vector3 = hole.placements[1][CustomHole.POSITION]
+	assert_true(tool.erase(Vector3(0.0, 0.0, -20.0)))
+	assert_eq(hole.placements.size(), 1)
+	assert_almost_eq(
+		(hole.placements[0][CustomHole.POSITION] as Vector3).distance_to(kept),
+		0.0, 0.01
+	)
+	tool.release()
+
+
+func test_erasing_pending_lava_takes_every_open_tile() -> void:
+	var hole := CustomHole.create("Open Wipe")
+	var tool := PlaceTool.new(hole)
+	var host := Node3D.new()
+	add_child_autofree(host)
+	_pick_lava(tool)
+	tool.aim(host, host, Vector3(0.0, 0.0, -20.0))
+	assert_true(tool.place())
+	tool.aim(host, host, Vector3(GridSnap.CELL, 0.0, -20.0))
+	assert_true(tool.place())
+	assert_eq(hole.placements.size(), 2)
+	assert_true(hole.has_open_lava())
+	assert_true(tool.erase(Vector3(GridSnap.CELL, 0.0, -20.0)))
+	assert_eq(hole.placements.size(), 0)
+	assert_false(hole.has_open_lava())
+	tool.release()
+
+
+func test_erasing_a_block_leaves_the_lava_pool() -> void:
+	var hole := CustomHole.create("Beside")
+	var tool := PlaceTool.new(hole)
+	var host := Node3D.new()
+	add_child_autofree(host)
+	hole.add_placement(CUBE, Vector3(0.0, 0.0, -12.15))
+	_pick_lava(tool)
+	tool.aim(host, host, Vector3(0.0, 0.0, -20.0))
+	assert_true(tool.place())
+	assert_true(tool.place())
+	assert_true(tool.confirm_lava())
+	tool.aim(host, host, Vector3(5.4, 0.0, -16.2))
+	assert_true(tool.set_lava_respawn())
+	assert_eq(hole.placements.size(), 2)
+	assert_true(tool.erase(Vector3(0.0, 0.0, -12.15)))
+	assert_eq(hole.placements.size(), 1)
+	assert_true(CustomHole.is_lava(String(hole.placements[0][CustomHole.PATH])))
+	tool.release()
+
+
+func test_backing_out_of_a_lava_drag_drops_the_start() -> void:
+	var hole := CustomHole.create("Lava Cancel")
+	var tool := PlaceTool.new(hole)
+	var host := Node3D.new()
+	add_child_autofree(host)
+	_pick_lava(tool)
+	tool.aim(host, host, Vector3(0.0, 0.0, -20.0))
+	assert_true(tool.place())
+	assert_true(tool.clear_lava_fill())
+	assert_false(tool.is_lava_filling())
+	assert_eq(hole.placements.size(), 0)
+	tool.release()
 
 
 func test_backing_out_of_a_zipline_drops_the_start() -> void:
@@ -1346,5 +1953,48 @@ func _pick_zip(tool: PlaceTool) -> void:
 	while tool.picked_path() != ZIP:
 		var path := tool.picked_path()
 		assert_false(seen.has(path), "the props shelf has to list the zipline")
+		seen.append(path)
+		tool.step_piece(1)
+
+
+func _pick_sand(tool: PlaceTool) -> void:
+	while tool.shelf() != PieceCatalog.PROPS:
+		tool.step_shelf(1)
+	var seen: PackedStringArray = []
+	while tool.picked_path() != CustomHole.SANDTRAP:
+		var path := tool.picked_path()
+		assert_false(seen.has(path), "the props shelf has to list a sandtrap")
+		seen.append(path)
+		tool.step_piece(1)
+
+
+func _fill_pond(tool: PlaceTool, host: Node3D, from: Vector3, to: Vector3, depth: float) -> void:
+	tool.aim(host, host, from)
+	assert_true(tool.place())
+	tool.aim(host, host, to)
+	assert_true(tool.place())
+	assert_true(tool.confirm_water())
+	tool.aim(host, host, Vector3(from.x, -depth, from.z))
+	assert_true(tool.set_water_depth())
+
+
+func _pick_water(tool: PlaceTool) -> void:
+	while tool.shelf() != PieceCatalog.PROPS:
+		tool.step_shelf(1)
+	var seen: PackedStringArray = []
+	while tool.picked_path() != CustomHole.WATER:
+		var path := tool.picked_path()
+		assert_false(seen.has(path), "the props shelf has to list water")
+		seen.append(path)
+		tool.step_piece(1)
+
+
+func _pick_lava(tool: PlaceTool) -> void:
+	while tool.shelf() != PieceCatalog.PROPS:
+		tool.step_shelf(1)
+	var seen: PackedStringArray = []
+	while tool.picked_path() != LAVA:
+		var path := tool.picked_path()
+		assert_false(seen.has(path), "the props shelf has to list lava")
 		seen.append(path)
 		tool.step_piece(1)

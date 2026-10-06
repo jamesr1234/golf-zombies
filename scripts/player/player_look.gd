@@ -21,6 +21,12 @@ const CHEER_CAM_SIDE := 1.15
 const CHEER_CAM_HEIGHT := 1.9
 const CHEER_CAM_LOOK := 1.15
 const CHEER_FOV := 70.0
+const LAVA_BURN_TIME := 1.8
+const LAVA_CAM_BACK := 4.4
+const LAVA_CAM_SIDE := 1.5
+const LAVA_CAM_HEIGHT := 2.6
+const LAVA_CAM_LOOK := 0.7
+const LAVA_FOV := 68.0
 
 var yaw := 0.0
 var pitch := 0.0
@@ -29,6 +35,8 @@ var view_kick := 0.0
 ## Driver only: L1 pulls the camera out behind the cart.
 var cart_chase := false
 var cheer_left := 0.0
+var lava_burn_left := 0.0
+var lava_respawn := Vector3.INF
 
 
 func add_mouse(player: Player, relative: Vector2) -> void:
@@ -47,7 +55,7 @@ func tick(player: Player, delta: float) -> void:
 			cart_chase = not cart_chase
 		mouse_delta = Vector2.ZERO
 		return
-	if player.is_celebrating():
+	if player.is_celebrating() or player.is_burning():
 		mouse_delta = Vector2.ZERO
 		return
 	if player.is_climbing():
@@ -91,6 +99,8 @@ func tick(player: Player, delta: float) -> void:
 func view_transform(player: Player) -> Transform3D:
 	if player.is_previewing():
 		return player.flow.preview_view()
+	if player.is_burning():
+		return lava_view(player)
 	if player.is_climbing():
 		return player.climber.view_transform(player)
 	if player.is_ziplining():
@@ -128,6 +138,8 @@ func drunk_view(player: Player, xform: Transform3D) -> Transform3D:
 
 func view_fov(player: Player) -> float:
 	var bump := player.buzz.fov_bump() if player.wants_drunk_fx() else 0.0
+	if player.is_burning():
+		return LAVA_FOV
 	if player.is_climbing():
 		return Climber.CAM_FOV
 	if player.is_ziplining():
@@ -183,6 +195,37 @@ func tick_cheer(delta: float) -> void:
 	cheer_left = maxf(0.0, cheer_left - delta)
 
 
+func begin_lava_burn(player: Player, at: Vector3) -> bool:
+	if lava_burn_left > 0.0 or not at.is_finite():
+		return false
+	cheer_left = 0.0
+	player.hit_fx.on_downed(player)
+	lava_respawn = at
+	lava_burn_left = LAVA_BURN_TIME
+	Sfx.play("hazard", player)
+	return true
+
+
+func tick_lava_burn(player: Player, delta: float) -> void:
+	if lava_burn_left <= 0.0:
+		return
+	lava_burn_left = maxf(0.0, lava_burn_left - delta)
+	if lava_burn_left > 0.0:
+		return
+	player.hit_fx.on_revived(player)
+	player.stand_at(lava_respawn, player.look_yaw())
+	lava_respawn = Vector3.INF
+
+
+func lava_view(player: Player) -> Transform3D:
+	var eye := (
+		player.global_position + player.transform.basis.z * LAVA_CAM_BACK
+		+ player.transform.basis.x * LAVA_CAM_SIDE + Vector3.UP * LAVA_CAM_HEIGHT
+	)
+	var target := player.global_position + Vector3.UP * LAVA_CAM_LOOK
+	return Transform3D(Basis(), eye).looking_at(target, Vector3.UP)
+
+
 func cheer_view(player: Player) -> Transform3D:
 	var eye := (
 		player.global_position + player.transform.basis.z * CHEER_CAM_BACK
@@ -202,6 +245,8 @@ func sit_driver(player: Player, sit_at: Vector3, facing_yaw: float) -> void:
 
 
 func hides_own_cabin(player: Player) -> bool:
+	if player.is_burning():
+		return false
 	if player.is_underwater() or player.is_in_mech() or player.shopping:
 		return true
 	return player.is_driving() and not cart_chase

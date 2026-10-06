@@ -34,6 +34,8 @@ func can_start(player: Player) -> bool:
 		return false
 	if player.shopping or player.is_celebrating():
 		return false
+	if player.is_dropping_ball():
+		return false
 	return (
 		not player.is_golfing()
 		and not player.is_riding()

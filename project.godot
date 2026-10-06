@@ -51,6 +51,9 @@ enabled=PackedStringArray("res://addons/fs_pin/plugin.cfg", "res://addons/godot_
 3d_physics/layer_10="shield"
 3d_physics/layer_11="fort"
 3d_physics/layer_12="cup"
+3d_physics/layer_13="mech"
+3d_physics/layer_14="forcefield"
+3d_physics/layer_15="lava"
 
 [physics]
 

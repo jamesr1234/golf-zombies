@@ -48,6 +48,9 @@ func draw(data: HoleData) -> void:
 			_draw_gates(data, hole)
 			_draw_zip()
 			_draw_spawns(hole)
+			_draw_lava(hole)
+			_draw_water(hole)
+			_draw_sand(hole)
 	_marks.finish()
 
 
@@ -58,7 +61,12 @@ func refresh() -> void:
 		CreatorMode.Tool.FAIRWAY:
 			_ui.show_palette(fairway_labels(), _fairway.picked, _fairway.allowed())
 		CreatorMode.Tool.PLACE:
-			if _place.is_gating() or _place.is_zipping() or _place.is_roaming():
+			if (
+				_place.is_gating() or _place.is_zipping() or _place.is_roaming()
+				or _place.is_lava_respawning() or _place.is_lava_filling()
+				or _place.is_sanding() or _place.is_water_filling()
+				or _place.is_water_depthing() or _place.is_digging_tunnel()
+			):
 				_ui.show_palette(PackedStringArray(), -1, [])
 			else:
 				_ui.show_palette(
@@ -89,6 +97,26 @@ func picked_label() -> String:
 				return "CHASE RANGE"
 			if _place.is_roaming():
 				return "SPAWN YARD"
+			if _place.is_lava_respawning():
+				return "LAVA RESPAWN"
+			if _place.is_lava_filling():
+				return "LAVA FILL"
+			if _place.is_lava_pending():
+				return "CONFIRM LAVA"
+			if _place.is_water_depthing():
+				return "WATER DEPTH"
+			if _place.is_water_filling():
+				return "WATER FILL"
+			if _place.is_water_pending():
+				return "CONFIRM WATER"
+			if _place.is_digging_tunnel():
+				return "DIGGING"
+			if _place.tunnel.can_dig():
+				return "DIG TUNNEL"
+			if _place.is_digging():
+				return "SAND DEPTH"
+			if _place.is_sanding():
+				return "SAND CIRCLE"
 			if _place.is_holding():
 				return "HOLDING"
 			return _place.picked_label()
@@ -152,6 +180,127 @@ func _draw_spawns(hole: CustomHole) -> void:
 		_marks.ring(at, yard, yard_color)
 		_marks.ring(at, chase, chase_color)
 	if CustomHole.is_spawn(_place.picked_path()) and not _place.is_roaming():
+		_marks.marker(_place.aim_at(), Palette.CYAN)
+
+
+func _draw_lava(hole: CustomHole) -> void:
+	var hover := _place.lava_pool_at(_place.aim_at())
+	var hovering := {}
+	for i in hover:
+		hovering[i] = true
+	var drawn := {}
+	var seen: Array[Vector3] = []
+	for i in hole.placements.size():
+		var entry: Dictionary = hole.placements[i]
+		if not CustomHole.is_lava(String(entry[CustomHole.PATH])):
+			continue
+		var tile: Vector3 = entry[CustomHole.POSITION]
+		_marks.marker(tile, Palette.ORANGE if not CustomHole.has_respawn(entry) else Palette.LAVA)
+		if CustomHole.has_respawn(entry):
+			var point := CustomHole.respawn_of(entry)
+			var already := false
+			for other in seen:
+				if other.distance_to(point) < 0.05:
+					already = true
+					break
+			if not already:
+				seen.append(point)
+				_marks.marker(point, Palette.SUN)
+		if drawn.has(i):
+			continue
+		var pool := CustomHole.lava_pool(hole.placements, i)
+		var cells: Array[Vector3] = []
+		var pending := false
+		for j in pool:
+			drawn[j] = true
+			cells.append(hole.placements[j][CustomHole.POSITION])
+			if not CustomHole.has_respawn(hole.placements[j]):
+				pending = true
+		var color := Palette.LIME if hovering.has(i) else (Palette.ORANGE if pending else Palette.LAVA)
+		_marks.footprint(cells, color)
+	if _place.is_lava_filling():
+		var color := Palette.LIME if _place.lava_fill_ok() else Palette.SUN
+		_marks.area(_place.lava_from, _place.aim_at(), color)
+		return
+	if not _place.is_lava_respawning():
+		return
+	var at := _place.aim_at()
+	_marks.marker(at, Palette.SUN if not _place.lava_stand_ok() else Palette.LIME)
+
+
+func _draw_water(hole: CustomHole) -> void:
+	var hover := _place.water_pool_at(_place.aim_at())
+	var hovering := {}
+	for i in hover:
+		hovering[i] = true
+	var drawn := {}
+	for i in hole.placements.size():
+		var entry: Dictionary = hole.placements[i]
+		if not CustomHole.is_water(String(entry[CustomHole.PATH])):
+			continue
+		var tile: Vector3 = entry[CustomHole.POSITION]
+		var pending := not WaterTile.has_depth(entry)
+		var color := Palette.ORANGE if pending else Palette.AZURE
+		_marks.marker(tile, color)
+		if drawn.has(i):
+			continue
+		var pool := CustomHole.water_pool(hole.placements, i)
+		var cells: Array[Vector3] = []
+		for j in pool:
+			drawn[j] = true
+			cells.append(hole.placements[j][CustomHole.POSITION])
+		var rim := Palette.LIME if hovering.has(i) else color
+		_marks.footprint(cells, rim)
+	if _place.is_water_filling():
+		var color := Palette.LIME if _place.water_fill_ok() else Palette.SUN
+		_marks.area(_place.pond.from, _place.aim_at(), color)
+		return
+	_draw_tunnels(hole)
+	if not _place.is_water_depthing():
+		return
+	var listed := _place.pond.open()
+	if listed.is_empty():
+		return
+	var origin: Vector3 = hole.placements[listed[0]][CustomHole.POSITION]
+	_marks.column(origin, _place.pond.preview_depth(), Palette.CYAN)
+
+
+## Dug runs stay outlined while the creator is open, since the finished tunnel
+## itself is buried and there is nothing on the surface to point at it.
+func _draw_tunnels(hole: CustomHole) -> void:
+	for entry in hole.placements:
+		if not CustomHole.is_tunnel(String(entry[CustomHole.PATH])):
+			continue
+		var color := Palette.CYAN if WaterTunnel.is_done(entry) else Palette.ORANGE
+		_marks.tube(WaterTunnel.nodes_of(entry), WaterTunnel.bore_of(entry), color)
+	if not _place.tunnel.can_dig():
+		return
+	var next := _place.tunnel.dig_preview()
+	if next.size() < 2:
+		return
+	var lands := not _place.tunnel.dig_lands_in().is_empty()
+	_marks.tube(next, _place.tunnel.bore, Palette.LIME if lands else Palette.SUN)
+
+
+func _draw_sand(hole: CustomHole) -> void:
+	for i in hole.placements.size():
+		if not CustomHole.is_sandtrap(String(hole.placements[i][CustomHole.PATH])):
+			continue
+		var at: Vector3 = hole.placements[i][CustomHole.POSITION]
+		var editing := i == _place.sanding
+		var radius := _place.sand_radius if editing else SandTrap.radius_of(hole.placements[i])
+		var depth := _place.sand_depth if editing and _place.is_digging() else SandTrap.depth_of(
+			hole.placements[i]
+		)
+		var color := Palette.LIME if editing else Palette.AMBER
+		_marks.marker(at, color)
+		if editing and _place.is_digging():
+			_marks.bowl(at, radius, depth, color)
+		elif editing:
+			_marks.disk(at, radius, color)
+		else:
+			_marks.ring(at, radius, color)
+	if CustomHole.is_sandtrap(_place.picked_path()) and not _place.is_sanding():
 		_marks.marker(_place.aim_at(), Palette.CYAN)
 
 

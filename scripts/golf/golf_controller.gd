@@ -129,6 +129,15 @@ func release() -> void:
 	golfer_changed.emit(null)
 
 
+## Relief drop: the ball goes back on the ground and the card takes a stroke.
+func take_drop(at: Vector3) -> void:
+	if ball == null:
+		return
+	release()
+	ball.place_at(at)
+	stroke_taken.emit()
+
+
 ## Interrupted mid-swing: the stroke does not count.
 func cancel_swing() -> void:
 	if meter.is_swinging():

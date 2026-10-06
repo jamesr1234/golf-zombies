@@ -9,9 +9,10 @@ extends RefCounted
 ## these on the very keys the creator uses.
 ##
 ## D-pad walks the list you can see. Shoulders change the tool. Circle parks a
-## piece so you can walk around it. Group Circle is merge. R2 places, and also
-## sets a weapon line, spawn yard and chase. L1 held with Circle or Triangle
-## walks history.
+## piece so you can walk around it. Group Circle is merge. After lava tiles are
+## down, Circle locks them so R2 can set the stand-back. R2 places, and also
+## sets a weapon line, spawn yard, chase, sandtrap circle and sandtrap depth.
+## L1 held with Circle or Triangle walks history.
 ## Options is the rest. L1+R1 opens the pad command list.
 
 const BUTTONS: PackedStringArray = [

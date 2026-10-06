@@ -220,6 +220,7 @@ static func can_walk(player: Player) -> bool:
 		player.health.is_alive() and not player.is_floored()
 		and (player.state == Player.State.NORMAL or player.state == Player.State.PLACING)
 		and not player.is_celebrating()
+		and not player.is_burning()
 		and not player.shopping
 	)
 

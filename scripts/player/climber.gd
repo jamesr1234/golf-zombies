@@ -19,6 +19,8 @@ const MOUSE_STICK := 0.07
 
 const LADDER_SPEED := 5.6
 const MANTLE_TIME := 0.72
+const HOP_BACK := 2.0
+const HOP_SPEED := 5.5
 
 var wall: ClimbingWall
 var left := Vector3.INF
@@ -172,6 +174,8 @@ func _tick_ladder(player: Player, delta: float) -> bool:
 	if player.input.just_pressed("jump"):
 		if _rail_t >= 0.82:
 			_mantle(player)
+		else:
+			_hop_off(player)
 		return false
 	var climb := -player.input.move_vector().y
 	_rail_t = clampf(
@@ -183,6 +187,18 @@ func _tick_ladder(player: Player, delta: float) -> bool:
 		_mantle(player)
 		return false
 	return true
+
+
+func _hop_off(player: Player) -> void:
+	var away := player.global_position - wall.global_position
+	away.y = 0.0
+	if away.length_squared() < 0.001:
+		away = player.transform.basis.z
+	else:
+		away = away.normalized()
+	player.global_position += away * HOP_BACK
+	player.velocity = away * HOP_SPEED
+	Sfx.play("jump")
 
 
 func _snap_to_rail(player: Player) -> void:

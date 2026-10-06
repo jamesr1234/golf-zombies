@@ -64,6 +64,26 @@ func test_a_fan_is_a_placeable_lift() -> void:
 	assert_not_null(fan.find_child("Rotor", true, false))
 
 
+func test_lava_is_a_placeable_pool() -> void:
+	var path := "%s/lava.tscn" % PieceCatalog.PROP_DIR
+	assert_true(PieceCatalog.entries(PieceCatalog.PROPS).has(path))
+	var tile := CustomOverlay.instantiate(path) as Lava
+	add_child_autofree(tile)
+	assert_not_null(tile)
+	assert_true(tile.is_in_group("lava"))
+	assert_not_null(tile.get_node_or_null("Surface"))
+
+
+func test_water_is_a_placeable_pond() -> void:
+	var path := "%s/water.tscn" % PieceCatalog.PROP_DIR
+	assert_true(PieceCatalog.entries(PieceCatalog.PROPS).has(path))
+	var tile := CustomOverlay.instantiate(path) as WaterTile
+	add_child_autofree(tile)
+	assert_not_null(tile)
+	assert_true(tile.is_in_group("water"))
+	assert_not_null(tile.get_node_or_null("Surface"))
+
+
 func test_a_speed_rectangle_is_a_placeable_boost_pad() -> void:
 	var path := "%s/speed_rectangle.tscn" % PieceCatalog.PROP_DIR
 	assert_true(PieceCatalog.entries(PieceCatalog.PROPS).has(path))

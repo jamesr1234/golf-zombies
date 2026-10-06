@@ -816,6 +816,15 @@ func _along_hole() -> Vector3:
 	return forward.normalized()
 
 
+## Off the green along the last fairway, so the cart path does not walk into a pit.
+func _leave_hole() -> Vector3:
+	if hole == null:
+		return Vector3.FORWARD
+	if ArenaHole.applies(hole):
+		return ArenaHole.leave_along(hole)
+	return hole.leave_along()
+
+
 func _on_stroke_taken() -> void:
 	if is_practice():
 		return
@@ -823,6 +832,8 @@ func _on_stroke_taken() -> void:
 	scorecard_changed.emit()
 	if score.strokes == 1:
 		_summon_cart_girl()
+	if score.at_stroke_limit() and (ball == null or not ball.is_in_play()):
+		_complete_hole(false)
 
 
 func _on_ball_rest(_position: Vector3) -> void:

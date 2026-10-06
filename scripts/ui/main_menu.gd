@@ -24,6 +24,15 @@ const DIFF_BLURB := [
 	"Faster swarms, tougher zombies, 90 seconds a hole.",
 	"No mercy. 60 seconds. Gunners from the first tee.",
 ]
+## D-pad and face buttons only. The stick is gated through PadInput.repeat_dir
+## so analog jitter cannot skip rows the way is_action_just_pressed did.
+const PAD_KEYS: PackedStringArray = [
+	"interact", "jump", "pause", "swap_weapon_prev", "swap_weapon",
+]
+const PANEL_WIDTH := 560.0
+const OPTION_HEIGHT := 42.0
+const OPTION_GAP := 6.0
+const BLURB_HEIGHT := 48.0
 
 enum Step { MODE, DIFFICULTY }
 
@@ -31,6 +40,7 @@ var step: Step = Step.MODE
 var mode_index := 0
 var difficulty_index := 1
 var started := false
+var _pad := PadInput.new()
 
 var _title: Label
 var _panel: PanelContainer
@@ -137,43 +147,45 @@ func start_browser() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if started:
+	var key := event as InputEventKey
+	if started or key == null or not key.pressed or key.echo:
 		return
+	match key.physical_keycode:
+		KEY_W, KEY_UP:
+			move(-1)
+		KEY_S, KEY_DOWN:
+			move(1)
+		KEY_E, KEY_ENTER, KEY_SPACE:
+			confirm()
+		KEY_ESCAPE:
+			back()
+		_:
+			return
 	var viewport := get_viewport()
-	if _pressed(event, [KEY_W, KEY_UP]) or _action_just("move_forward"):
-		_mark_handled(viewport)
-		move(-1)
-	elif _pressed(event, [KEY_S, KEY_DOWN]) or _action_just("move_back"):
-		_mark_handled(viewport)
-		move(1)
-	elif (
-		_pressed(event, [KEY_E, KEY_ENTER, KEY_SPACE])
-		or _action_just("interact")
-		or _action_just("jump")
-	):
-		_mark_handled(viewport)
-		confirm()
-	elif _pressed(event, [KEY_ESCAPE]) or _action_just("pause"):
-		_mark_handled(viewport)
-		back()
-
-
-func _mark_handled(viewport: Viewport) -> void:
 	if viewport != null:
 		viewport.set_input_as_handled()
 
 
-func _action_just(suffix: String) -> bool:
-	return (
-		Input.is_action_just_pressed("p1_" + suffix)
-		or Input.is_action_just_pressed("p2_" + suffix)
-	)
+## The pad is polled once a frame. Reading is_action_just_pressed from
+## _unhandled_input let every analog event on that frame step the list again.
+func _process(delta: float) -> void:
+	if started:
+		return
+	var fired: Dictionary = {}
+	for suffix in PAD_KEYS:
+		fired[suffix] = _pad.just(suffix)
+	_apply_pad(fired, _pad.repeat_dir(delta))
 
 
-func _pressed(event: InputEvent, keys: Array) -> bool:
-	if not (event is InputEventKey and event.pressed and not event.echo):
-		return false
-	return (event as InputEventKey).physical_keycode in keys
+func _apply_pad(fired: Dictionary, stick: Vector2i) -> void:
+	if bool(fired.get("swap_weapon_prev", false)) or stick.y < 0:
+		move(-1)
+	elif bool(fired.get("swap_weapon", false)) or stick.y > 0:
+		move(1)
+	elif bool(fired.get("interact", false)) or bool(fired.get("jump", false)):
+		confirm()
+	elif bool(fired.get("pause", false)):
+		back()
 
 
 func _build() -> void:
@@ -211,7 +223,7 @@ func _build() -> void:
 
 	_panel = PanelContainer.new()
 	_panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	_panel.custom_minimum_size = Vector2(560.0, 0.0)
+	_panel.custom_minimum_size = Vector2(PANEL_WIDTH, 0.0)
 	_panel.clip_contents = false
 	_panel.add_theme_stylebox_override("panel", _panel_style())
 	root.add_child(_panel)
@@ -226,14 +238,22 @@ func _build() -> void:
 	column.add_child(_heading)
 
 	_options = VBoxContainer.new()
-	_options.add_theme_constant_override("separation", 6)
+	_options.add_theme_constant_override("separation", int(OPTION_GAP))
+	_options.custom_minimum_size.y = _options_height(MODE_COPY.size())
 	column.add_child(_options)
 
+	var blurb_slot := Control.new()
+	blurb_slot.custom_minimum_size.y = BLURB_HEIGHT
+	blurb_slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	column.add_child(blurb_slot)
+
 	_blurb = Label.new()
+	_blurb.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_blurb.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_blurb.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_blurb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_blurb.label_settings = HudStyle.readout(Palette.ICE, 16)
-	column.add_child(_blurb)
+	blurb_slot.add_child(_blurb)
 
 	_hint = Label.new()
 	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -249,22 +269,23 @@ func _refresh() -> void:
 	var selected := mode_index if step == Step.MODE else difficulty_index
 	_heading.text = HudStyle.chrome("Select mode" if step == Step.MODE else "Select difficulty")
 	_blurb.text = MODE_BLURB[mode_index] if step == Step.MODE else DIFF_BLURB[difficulty_index]
-	for child in _options.get_children():
-		child.queue_free()
-	_buttons.clear()
-	for i in labels.size():
+	if _buttons.is_empty():
+		_rebuild_options(MODE_COPY.size())
+	for i in _buttons.size():
+		var used := i < labels.size()
+		_buttons[i].visible = used
+		if used:
+			_paint_option(_buttons[i], str(labels[i]), i == selected)
+
+
+func _rebuild_options(rows: int) -> void:
+	for i in rows:
 		var button := Button.new()
-		button.text = HudStyle.chrome(str(labels[i]))
 		button.focus_mode = Control.FOCUS_NONE
+		button.custom_minimum_size.y = OPTION_HEIGHT
 		button.alignment = HORIZONTAL_ALIGNMENT_CENTER
 		button.add_theme_font_override("font", HudStyle.banner(Palette.CYAN).font)
 		button.add_theme_font_size_override("font_size", 24)
-		button.add_theme_stylebox_override("normal", _option_style(i == selected))
-		button.add_theme_stylebox_override("hover", _option_style(true))
-		button.add_theme_stylebox_override("pressed", _option_style(true))
-		button.add_theme_color_override(
-			"font_color", Palette.ORANGE if i == selected else Palette.ICE
-		)
 		button.add_theme_color_override("font_hover_color", Palette.ORANGE)
 		var index := i
 		button.pressed.connect(func() -> void:
@@ -277,6 +298,20 @@ func _refresh() -> void:
 		)
 		_options.add_child(button)
 		_buttons.append(button)
+
+
+func _paint_option(button: Button, label: String, selected: bool) -> void:
+	button.text = HudStyle.chrome(label)
+	button.add_theme_stylebox_override("normal", _option_style(selected))
+	button.add_theme_stylebox_override("hover", _option_style(true))
+	button.add_theme_stylebox_override("pressed", _option_style(true))
+	button.add_theme_color_override(
+		"font_color", Palette.ORANGE if selected else Palette.ICE
+	)
+
+
+func _options_height(rows: int) -> float:
+	return float(rows) * OPTION_HEIGHT + float(maxi(rows - 1, 0)) * OPTION_GAP
 
 
 func _panel_style() -> StyleBoxFlat:
@@ -296,7 +331,7 @@ func _option_style(selected: bool) -> StyleBoxFlat:
 	var box := StyleBoxFlat.new()
 	box.bg_color = Color(Palette.ORANGE, 0.18) if selected else Color(0.04, 0.06, 0.08, 0.7)
 	box.border_color = Palette.ORANGE if selected else Color(Palette.CYAN, 0.35)
-	box.set_border_width_all(2 if selected else 1)
+	box.set_border_width_all(2)
 	box.set_corner_radius_all(3)
 	box.content_margin_left = 14.0
 	box.content_margin_right = 14.0

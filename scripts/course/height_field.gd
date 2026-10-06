@@ -39,9 +39,27 @@ var max_height := 0.0
 ## World XZ the visual mesh should leave alone, so a later heightmap (the
 ## clubhouse woods) never redraws the hole the player is standing on.
 var hide := Rect2()
+## Pond-bank openings for dug tunnels. World XZ plus a radius. Only the sloped
+## lake wall is skipped, so the fairway over the run stays whole.
+var cuts: Array = []
 ## Parent-node yaw. Samples stay local; queries come in world XZ.
 var yaw := 0.0
 var world_offset := Vector2.ZERO
+
+
+func slope_at(x: float, z: float) -> float:
+	if width < 2 or depth < 2:
+		return 0.0
+	var local := _to_local(x, z)
+	var fx := clampf((local.x - origin.x) / cell, 0.0, float(width - 1) - 0.0001)
+	var fz := clampf((local.y - origin.y) / cell, 0.0, float(depth - 1) - 0.0001)
+	var x0 := int(fx)
+	var z0 := int(fz)
+	var a: float = _sample(x0, z0)
+	var b: float = _sample(x0 + 1, z0)
+	var c: float = _sample(x0, z0 + 1)
+	var d: float = _sample(x0 + 1, z0 + 1)
+	return maxf(maxf(a, b), maxf(c, d)) - minf(minf(a, b), minf(c, d))
 
 
 func height_at(x: float, z: float) -> float:
@@ -71,12 +89,21 @@ func shift(offset: Vector3) -> void:
 		origin += delta
 	if hide.size != Vector2.ZERO:
 		hide.position += delta
+	var flat := Vector3(offset.x, 0.0, offset.z)
+	for i in cuts.size():
+		var cut: Dictionary = cuts[i]
+		var at: Vector3 = cut.get("position", Vector3.ZERO)
+		cuts[i]["position"] = at + flat
 
 
 func rotate_y(radians: float) -> void:
 	if absf(radians) < 0.0001:
 		return
 	yaw += radians
+	for i in cuts.size():
+		var cut: Dictionary = cuts[i]
+		var at: Vector3 = cut.get("position", Vector3.ZERO)
+		cuts[i]["position"] = at.rotated(Vector3.UP, radians)
 
 
 func make_body() -> StaticBody3D:
@@ -205,6 +232,7 @@ static func generate(data: HoleData, rng: RandomNumberGenerator) -> HeightField:
 	CulvertHole.raise(field, data)
 	CulvertHole.cut(field, data)
 	field._sink_ponds(data)
+	SandTrap.sink(field, data)
 	field._raise_jumps(data)
 	if not MountainHole.applies(data) and not CulvertHole.applies(data):
 		field._pave_exit(data)
@@ -500,6 +528,45 @@ func _hidden(x: int, z: int) -> bool:
 	return hide.has_point(origin + Vector2(float(x) * cell, float(z) * cell))
 
 
+## True when this quad is the sloped pond wall sitting on a tunnel mouth.
+func _mouth_bank(x: int, z: int) -> bool:
+	if cuts.is_empty():
+		return false
+	var lo: float = minf(
+		minf(_sample(x, z), _sample(x + 1, z)),
+		minf(_sample(x, z + 1), _sample(x + 1, z + 1))
+	)
+	var hi: float = maxf(
+		maxf(_sample(x, z), _sample(x + 1, z)),
+		maxf(_sample(x, z + 1), _sample(x + 1, z + 1))
+	)
+	if hi - lo < 1.0:
+		return false
+	var a := _from_local(origin.x + float(x) * cell, origin.y + float(z) * cell)
+	var b := _from_local(origin.x + float(x + 1) * cell, origin.y + float(z + 1) * cell)
+	var min_x: float = minf(a.x, b.x)
+	var max_x: float = maxf(a.x, b.x)
+	var min_z: float = minf(a.y, b.y)
+	var max_z: float = maxf(a.y, b.y)
+	for cut in cuts:
+		if typeof(cut) != TYPE_DICTIONARY:
+			continue
+		var at: Vector3 = cut.get("position", Vector3.ZERO)
+		var pad: float = 0.2
+		if at.x >= min_x - pad and at.x <= max_x + pad and at.z >= min_z - pad and at.z <= max_z + pad:
+			return true
+	return false
+
+
+func mouth_banks() -> int:
+	var n := 0
+	for z in range(maxi(0, depth - 1)):
+		for x in range(maxi(0, width - 1)):
+			if _mouth_bank(x, z):
+				n += 1
+	return n
+
+
 func _visual_mesh() -> ArrayMesh:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
@@ -508,6 +575,8 @@ func _visual_mesh() -> ArrayMesh:
 	for z in range(depth - 1):
 		for x in range(width - 1):
 			if _hidden(x, z) or _hidden(x + 1, z) or _hidden(x, z + 1) or _hidden(x + 1, z + 1):
+				continue
+			if _mouth_bank(x, z):
 				continue
 			var a := _vert(x, z, hx, hz)
 			var b := _vert(x + 1, z, hx, hz)

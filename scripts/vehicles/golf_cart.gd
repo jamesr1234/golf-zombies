@@ -393,8 +393,10 @@ func unseat_at(player: Player, at: Vector3) -> void:
 		driver = null
 	else:
 		passenger = null
+	var carry := velocity
 	player.exit_ride()
 	player.stand_at(at, rad_to_deg(rotation.y))
+	player.velocity = carry
 
 
 func windshield_drop(along: Vector3) -> Vector3:
@@ -447,7 +449,10 @@ func exit_point(side: float) -> Vector3:
 		right = Vector3.RIGHT
 	else:
 		right = right.normalized()
-	return _ground_at(_clamp_exit_to_fairway(global_position + right * side * exit_side))
+	var beside := _clamp_exit_to_fairway(global_position + right * side * exit_side)
+	if on_fan():
+		return beside + Vector3.UP * EXIT_LIFT
+	return _ground_at(beside)
 
 
 func wreck() -> void:
@@ -1459,9 +1464,11 @@ func _replicate_seats(driver_id: int, passenger_id: int) -> void:
 
 
 func _drop_rider(player: Player, side: float) -> void:
+	var carry := velocity
 	if player.is_riding():
 		player.exit_ride()
 	player.stand_at(exit_point(side), rad_to_deg(player.rotation.y))
+	player.velocity = carry
 
 
 func _occupy(player: Player) -> void:

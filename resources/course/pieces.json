@@ -53,11 +53,13 @@
 		"res://scenes/course/props/fan.tscn",
 		"res://scenes/course/props/folding_steps.tscn",
 		"res://scenes/course/props/grapple_point.tscn",
+		"res://scenes/course/props/lava.tscn",
 		"res://scenes/course/props/rock.tscn",
 		"res://scenes/course/props/sniper_tower.tscn",
 		"res://scenes/course/props/speed_rectangle.tscn",
 		"res://scenes/course/props/spiral_track.tscn",
 		"res://scenes/course/props/wall.tscn",
+		"res://scenes/course/props/water.tscn",
 		"res://scenes/course/props/windmill.tscn",
 		"res://scenes/course/props/zipline.tscn"
 	],

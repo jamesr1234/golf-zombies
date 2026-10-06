@@ -223,6 +223,11 @@ func test_the_clubhouse_waits_until_every_third_hole() -> void:
 		if next_index < 12:
 			assert_eq(card.visits_clubhouse(), next_index % 3 == 0, "next hole %d" % next_index)
 	assert_eq(house, [3, 6, 9, 12])
+	assert_true(GameState.leaves_for_clubhouse(2), "hole 3 drives to the shop")
+	assert_true(GameState.leaves_for_clubhouse(5))
+	assert_true(GameState.leaves_for_clubhouse(8))
+	assert_false(GameState.leaves_for_clubhouse(0))
+	assert_false(GameState.leaves_for_clubhouse(3), "hole 4 is after the shop")
 	card.hole_index = 11
 	assert_false(card.visits_clubhouse(), "the last hole ends the run")
 

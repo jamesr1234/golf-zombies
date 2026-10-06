@@ -67,14 +67,17 @@ func begin_transit(flow: MatchFlow) -> void:
 		flow.cart_path = null
 		flow.scorecard_changed.emit()
 		return
-	var forward := flow._along_hole()
+	var forward := flow._leave_hole()
 	var short := not flow.visits_clubhouse()
 	flow.cart_path = CartPath.build(
 		flow.hole.cup, forward, flow.hole.bounds, flow.hole.height, flow._hole_node,
 		flow.hole.green_radius, false, false, short
 	)
 	flow._hole_node.add_child(flow.cart_path)
-	CartPath.open_across(flow._hole_node, flow.cart_path.centerline, flow.hole.height)
+	CartPath.open_across(
+		flow._hole_node, CartPath.leave_line(flow.hole.cup, flow.cart_path.centerline),
+		flow.hole.height
+	)
 	if not short:
 		open_clubhouse(flow)
 		_hold_clubhouse(flow)
@@ -88,7 +91,7 @@ func park_cart_for_transit(flow: MatchFlow) -> void:
 	var cup := flow.hole.lift(flow.hole.cup)
 	if flow.cart.global_position.distance_to(cup) <= MatchFlow.CART_RECALL_RANGE:
 		return
-	var forward := flow._along_hole()
+	var forward := flow._leave_hole()
 	var lateral := forward.cross(Vector3.UP).normalized()
 	var yaw := rad_to_deg(atan2(-forward.x, -forward.z))
 	var spot := flow.hole.cup - forward * 6.0 + lateral * 5.5

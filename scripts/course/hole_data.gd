@@ -51,6 +51,9 @@ var custom: CustomHole
 var height: HeightField
 ## Cart arrival skips the clubhouse-door cap so the path can enter the strip.
 var open_tee_end := false
+## World pose from planting this hole on a cart path. Custom placements stay in
+## hole space; water and tunnel lookups convert through this.
+var _planted := Transform3D.IDENTITY
 
 
 ## Custom holes keep the hole-1 strip even when they sit in another slot, so a
@@ -146,6 +149,7 @@ func shift(offset: Vector3) -> void:
 	for pack in spawn_packs:
 		pack["position"] = _shifted(pack.get("position", Vector3.ZERO), flat)
 	bounds.position += Vector2(flat.x, flat.z)
+	_planted.origin += flat
 	if height != null:
 		height.shift(flat)
 
@@ -184,6 +188,7 @@ func rotate_y(radians: float) -> void:
 	for pack in spawn_packs:
 		pack["position"] = _spun(pack.get("position", Vector3.ZERO), radians)
 	bounds = HoleGenerator.bounds_of(self)
+	_planted = Transform3D(Basis(Vector3.UP, radians), Vector3.ZERO) * _planted
 	if height != null:
 		height.rotate_y(radians)
 
@@ -361,6 +366,12 @@ func along_cup() -> Vector3:
 	return _along_segment(centerline.size() - 2, cup - tee)
 
 
+## The cart path has to leave on this heading. Tee-to-cup is the wrong door on
+## a dogleg or the mountain: that line walks off the strip into a pit.
+func leave_along() -> Vector3:
+	return along_cup()
+
+
 func _along_segment(i: int, fallback: Vector3) -> Vector3:
 	if i >= 0 and i + 1 < centerline.size():
 		var d: Vector3 = centerline[i + 1] - centerline[i]
@@ -371,6 +382,44 @@ func _along_segment(i: int, fallback: Vector3) -> Vector3:
 	if fallback.length_squared() < 0.0001:
 		return Vector3.FORWARD
 	return fallback.normalized()
+
+
+func to_custom(point: Vector3) -> Vector3:
+	return _planted.affine_inverse() * point
+
+
+func from_custom(point: Vector3) -> Vector3:
+	return _planted * point
+
+
+func _custom_water(point: Vector3) -> Dictionary:
+	if custom == null:
+		return {}
+	var at := to_custom(point)
+	var tile := WaterTile.sample(custom.placements, at)
+	return tile if not tile.is_empty() else WaterTunnel.sample(custom.placements, at)
+
+
+## Standing in a pond, not in the rock a tunnel was dug through.
+func in_open_water(point: Vector3) -> bool:
+	if custom != null:
+		return not WaterTile.sample(custom.placements, to_custom(point)).is_empty()
+	return not water_patch_at(point).is_empty()
+
+
+## The dug bore around a point, or nothing out in open water. Swimming reads
+## this to stay inside a tunnel, since a tunnel carries no collider of its own.
+## Slack lets a swimmer reaching for a mouth be counted as already in it.
+func tunnel_at(point: Vector3, slack := 0.0) -> Dictionary:
+	if custom == null:
+		return {}
+	return WaterTunnel.sample(custom.placements, to_custom(point), slack)
+
+
+func tunnel_hold(point: Vector3, margin: float) -> Vector3:
+	if custom == null:
+		return point
+	return from_custom(WaterTunnel.hold(custom.placements, to_custom(point), margin))
 
 
 ## The pond covering this spot, or an empty dictionary on dry ground.
@@ -384,6 +433,9 @@ func water_patch_at(point: Vector3) -> Dictionary:
 ## One flat level for the whole pond, which is also the height of the land around
 ## its bank. The floor bowls away below it.
 func water_surface_y(point: Vector3) -> float:
+	var tile := _custom_water(point)
+	if not tile.is_empty():
+		return float(tile["water_y"])
 	var patch := water_patch_at(point)
 	if patch.is_empty():
 		return point.y
@@ -391,6 +443,9 @@ func water_surface_y(point: Vector3) -> float:
 
 
 func water_floor_y(point: Vector3) -> float:
+	var tile := _custom_water(point)
+	if not tile.is_empty():
+		return float(tile["floor_y"])
 	if height == null:
 		return point.y
 	return height.height_at(point.x, point.z)
@@ -399,6 +454,12 @@ func water_floor_y(point: Vector3) -> float:
 ## How much water is over the ground here: zero on dry land, and only past a
 ## wading depth is it deep enough to swim in.
 func water_depth_at(point: Vector3) -> float:
+	var at := to_custom(point) if custom != null else point
+	var custom_depth := WaterTile.depth_at(custom.placements, at) if custom != null else -1.0
+	if custom_depth < 0.0 and custom != null:
+		custom_depth = WaterTunnel.depth_at(custom.placements, at)
+	if custom_depth >= 0.0:
+		return custom_depth
 	var patch := water_patch_at(point)
 	if patch.is_empty() or height == null:
 		return 0.0

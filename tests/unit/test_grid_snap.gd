@@ -132,6 +132,17 @@ func test_rest_on_sits_a_piece_on_top_of_another() -> void:
 	assert_false(_cell(at).grow(-0.01).intersects(other), str(at))
 
 
+## Surface snap used to leave the hull at the camera point. Aiming at the
+## adjacent cell while the look still clipped the neighbour then picked an
+## off-grid face, which is why a piece had to be wiggled until it sat flush.
+func test_rest_on_seats_the_hull_before_it_meets_a_neighbour() -> void:
+	var other := _cell(Vector3.ZERO)
+	var aim := Vector3(0.8, 0.3, -0.2)
+	var at := GridSnap.rest_on(aim, 0.0, _cell(aim), [other])
+	assert_eq(at, Vector3(GridSnap.CELL, 0.0, 0.0))
+	assert_false(_cell(at).grow(-0.01).intersects(other), str(at))
+
+
 func test_the_editor_plugin_reads_the_same_answers() -> void:
 	assert_almost_eq(_Snap.CELL, GridSnap.CELL, 0.0001)
 	assert_eq(_Snap.ASSET_DIR, GridSnap.ASSET_DIR)

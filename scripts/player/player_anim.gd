@@ -48,7 +48,10 @@ func tick(player: Player, delta: float) -> void:
 		player.slide.apply_replicated(player, player.sync_slide)
 		player.glide.apply_replicated(player, player.sync_glide, player.sync_glide_worn)
 		apply_replicated_pose(player, delta)
-	if player.health.is_alive() and player.body != null and player.body.is_locked_limp():
+	if (
+		player.health.is_alive() and player.body != null and player.body.is_locked_limp()
+		and not player.is_burning()
+	):
 		player.body.stop_limp()
 	var travel := player.pace()
 	if player.body != null and player.body.is_limp():
@@ -105,6 +108,7 @@ func tick(player: Player, delta: float) -> void:
 		and not player.shopping
 		and not player.is_poker_seated()
 		and not player.is_gliding()
+		and not player.is_burning()
 		and player.weapon.has_weapon()
 	)
 	player.raygun.visible = show_gun

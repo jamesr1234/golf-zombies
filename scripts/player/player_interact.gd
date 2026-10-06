@@ -144,6 +144,8 @@ func use(player: Player) -> void:
 		player.stop_talk()
 	elif player.state == Player.State.RIDING:
 		player.cart.eject(player)
+	elif player.is_dropping_ball():
+		return
 	elif player.is_in_mech():
 		if player.golf != null and (player.golf.golfer == player or player.golf.can_claim(player)):
 			player.golf.try_toggle(player)

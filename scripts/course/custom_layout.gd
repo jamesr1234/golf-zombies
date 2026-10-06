@@ -49,12 +49,17 @@ static func build(custom: CustomHole, base_seed := 0, index := FairwayPiece.INDE
 	))
 	if GameState.has_practice_tee(index):
 		HoleGenerator.add_practice_green(data, opening)
+	for entry in custom.placements:
+		if CustomHole.is_sandtrap(String(entry.get(CustomHole.PATH, ""))):
+			data.patches.append(SandTrap.patch_from(entry))
 
 	data.bounds = HoleGenerator.bounds_of(data)
 	HoleGenerator.add_exit_fairway(data)
 	HoleGenerator.add_spawn_points(data, rng, width)
 	data.height = HeightField.generate(data, rng)
 	HoleGenerator.lift_to_ground(data)
+	WaterTile.sink(data.height, custom.placements)
+	WaterTunnel.cut_banks(data.height, custom.placements)
 	data.spawn_packs = SpawnPack.from_hole(custom, data.height)
 	data.index = index
 	return data

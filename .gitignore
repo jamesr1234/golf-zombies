@@ -4,3 +4,11 @@
 
 # Exported builds
 /build/
+/*.exe
+/*.pck
+/*.dll
+
+# OS / editor clutter
+.DS_Store
+*.blend1
+.cursor/debug-*.log

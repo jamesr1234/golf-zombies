@@ -122,6 +122,11 @@ func _rebuild() -> void:
 
 
 func _refresh_props() -> void:
+	if _place.wants_rebuild:
+		_place.wants_rebuild = false
+		_world.rebuild(hole)
+		_refresh_ui()
+		return
 	_world.refresh_props(hole)
 	_refresh_ui()
 
@@ -137,7 +142,7 @@ func _aim() -> void:
 			_place.height = data.height
 		var world := get_world_3d()
 		_place.space = world.direct_space_state if world != null else null
-		_place.aim(_held, _world.nav(), at)
+		_place.aim(_held, _world.nav(), at, _camera.global_position)
 	else:
 		_place.release()
 	if tool == Tool.GROUP:
@@ -212,12 +217,40 @@ func confirm() -> void:
 			elif _place.is_roaming():
 				if _commit(_place.set_roam):
 					Sfx.play("ui_confirm", self)
+			elif _place.is_lava_respawning():
+				if _commit(_place.set_lava_respawn):
+					Sfx.play("ui_confirm", self)
+			elif _place.is_water_depthing():
+				if _commit(_place.set_water_depth):
+					Sfx.play("ui_confirm", self)
+					_ui.flash("R2 ON LAND STARTS ANOTHER POND   SWIM UNDER ONE TO DIG")
+			elif _place.is_digging():
+				if _commit(_place.set_sand_depth):
+					Sfx.play("ui_confirm", self)
+			elif _place.is_sanding():
+				if _commit(_place.set_sand_radius):
+					Sfx.play("ui_confirm", self)
+					_ui.flash("SET THE DEPTH")
 			elif _begin_weapon_line():
 				Sfx.play("ui_move", self)
 			elif _commit(_place.place):
 				Sfx.play("ui_confirm", self)
 				if CustomHole.is_windmill(_place.picked_path()):
 					_ask_mill()
+				elif _place.is_lava_filling():
+					_ui.flash("DRAG THE AREA   R2 TO FILL")
+				elif _place.is_lava_pending():
+					_ui.flash("CIRCLE WHEN THE LAVA IS DONE")
+				elif _place.is_water_filling():
+					_ui.flash("DRAG THE AREA   R2 TO FILL")
+				elif _place.is_water_pending():
+					_ui.flash("CIRCLE TO SET THE DEPTH")
+				elif _place.is_digging_tunnel():
+					_ui.flash("KEEP GOING   REACH THE NEXT POND TO FINISH")
+				elif CustomHole.is_tunnel(_place.last_path()):
+					_ui.flash("TUNNEL OPEN. BOTH PONDS ARE ONE SWIM NOW.")
+				elif _place.is_sanding():
+					_ui.flash("DRAG THE CIRCLE   R2 TO SET")
 		Tool.GROUP:
 			_group.toggle()
 		_:
@@ -238,6 +271,23 @@ func cancel() -> void:
 					Sfx.play("ui_back", self)
 			elif _place.is_roaming():
 				if _commit(_place.abort_spawn):
+					Sfx.play("ui_back", self)
+			elif _place.is_lava_respawning():
+				if _place.clear_lava_aim():
+					Sfx.play("ui_back", self)
+			elif _place.is_lava_filling():
+				if _place.clear_lava_fill():
+					Sfx.play("ui_back", self)
+			elif _place.is_water_depthing():
+				if _place.clear_water_depth():
+					Sfx.play("ui_back", self)
+			elif _place.is_water_filling():
+				if _place.clear_water_fill():
+					Sfx.play("ui_back", self)
+			elif _commit(_place.undo_dig):
+				Sfx.play("ui_back", self)
+			elif _place.is_sanding():
+				if _commit(_place.abort_sand):
 					Sfx.play("ui_back", self)
 			elif _place.release_hold():
 				Sfx.play("ui_back", self)
@@ -315,6 +365,12 @@ func _drop_place_flow() -> void:
 	_place.hunting = false
 	_place.gating = -1
 	_place.zip_from = Vector3.INF
+	_place.lava_from = Vector3.INF
+	_place.lava_respawning = false
+	_place.sanding = -1
+	_place.digging = false
+	_place.pond.drop()
+	_place.tunnel.drop()
 
 
 func _take_back(action: Callable) -> void:
@@ -447,8 +503,9 @@ func toggle_yaw_snap() -> void:
 	_refresh_ui()
 
 
-## Circle / F: merge a group, or park the ghost so the camera can walk around
-## it before R2 places. Weapon lines, yards and chase rings are all R2.
+## Circle / F: merge a group, park the ghost so the camera can walk around it
+## before R2 places, or lock lava tiles so R2 can set the stand-back. Weapon
+## lines, yards and chase rings are all R2.
 func context() -> void:
 	if not _guided(CreatorLesson.Act.CONTEXT):
 		return
@@ -462,6 +519,16 @@ func context() -> void:
 
 
 func _place_context() -> void:
+	if _place.confirm_lava():
+		Sfx.play("ui_confirm", self)
+		_ui.flash("SET THE RESPAWN. NOT ON THE LAVA.")
+		_refresh_ui()
+		return
+	if _place.confirm_water():
+		Sfx.play("ui_confirm", self)
+		_ui.flash("FLY DOWN   R2 TO LOCK THE FLOOR")
+		_refresh_ui()
+		return
 	if _place.is_holding():
 		_place.release_hold()
 		Sfx.play("ui_back", self)
@@ -637,6 +704,15 @@ func lesson_playtest() -> bool:
 func _launch_playtest(from_lesson := false) -> bool:
 	if not hole.is_playable():
 		_ui.flash("THE HOLE NEEDS AT LEAST %d PIECES" % FairwayPiece.MIN_PIECES)
+		return false
+	if not from_lesson and hole.has_open_lava():
+		_ui.flash("FINISH THE LAVA. CIRCLE WHEN THE TILES ARE DOWN, THEN SET THE RESPAWN.")
+		return false
+	if not from_lesson and hole.has_open_water():
+		_ui.flash("FINISH THE WATER. CIRCLE WHEN THE TILES ARE DOWN, THEN SET THE DEPTH.")
+		return false
+	if not from_lesson and hole.has_open_tunnel():
+		_ui.flash("THAT TUNNEL IS A DEAD END. DIG ON UNTIL IT REACHES THE NEXT POND.")
 		return false
 	if from_lesson:
 		HoleStore.save_lesson(_lesson.index() + 1, int(tool), hole)

@@ -17,6 +17,7 @@ const POST := 3.2
 var _lines := ImmediateMesh.new()
 var _drawn := 0
 var _ghost := MeshInstance3D.new()
+var _fill := MeshInstance3D.new()
 # #region agent log
 var _dbg_i := 0
 var _dbg_yaw := 999.0
@@ -41,6 +42,16 @@ static func create() -> CreatorMarks:
 	marks._ghost.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	marks._ghost.material_override = ObstacleLeds.overlay_material(Palette.GLOW_SOFT)
 	marks.add_child(marks._ghost)
+	marks._fill.name = "AreaFill"
+	marks._fill.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var fill := StandardMaterial3D.new()
+	fill.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	fill.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	fill.cull_mode = BaseMaterial3D.CULL_DISABLED
+	fill.no_depth_test = true
+	fill.emission_enabled = true
+	marks._fill.material_override = fill
+	marks.add_child(marks._fill)
 	# #region agent log
 	marks._dbg_create()
 	# #endregion
@@ -56,6 +67,8 @@ func begin() -> void:
 	_drawn = 0
 	_ghost.mesh = null
 	_ghost.visible = false
+	_fill.mesh = null
+	_fill.visible = false
 
 
 func finish() -> void:
@@ -152,6 +165,163 @@ static func ring_point(
 
 func line(from: Vector3, to: Vector3, color: Color) -> void:
 	_segment(from, to, color)
+
+
+## A free circle, the sandtrap size before it is a tile fill.
+func disk(center: Vector3, radius: float, color: Color) -> void:
+	ring(center, radius, color)
+	var mesh := CylinderMesh.new()
+	mesh.top_radius = maxf(radius, 0.08)
+	mesh.bottom_radius = maxf(radius, 0.08)
+	mesh.height = 0.06
+	mesh.radial_segments = 28
+	_fill.mesh = mesh
+	_fill.position = center + Vector3.UP * 0.05
+	_fill.visible = true
+	var mat := _fill.material_override as StandardMaterial3D
+	if mat != null:
+		mat.albedo_color = Color(color, 0.32)
+		mat.emission = color
+		mat.emission_energy_multiplier = Palette.GLOW_SOFT
+
+
+## Circle plus a sunken floor so the depth pass reads as a bowl.
+func bowl(center: Vector3, radius: float, depth: float, color: Color) -> void:
+	disk(center, radius, color)
+	var floor := center - Vector3.UP * maxf(depth, 0.05)
+	var inner := maxf(radius * 0.28, 0.4)
+	ring(floor, inner, color)
+	for i in 8:
+		var angle := TAU * float(i) / 8.0
+		var rim := center + Vector3(cos(angle), 0.0, sin(angle)) * radius
+		var bottom := floor + Vector3(cos(angle), 0.0, sin(angle)) * inner
+		_segment(rim, bottom, color)
+
+
+## Depth lock: a column from the water line down to the floor.
+func column(center: Vector3, depth: float, color: Color) -> void:
+	var floor := center - Vector3.UP * maxf(depth, 0.05)
+	_segment(center, floor, color)
+	var half := GridSnap.CELL * 0.5
+	for corner in [
+		Vector3(-half, 0.0, -half), Vector3(half, 0.0, -half),
+		Vector3(half, 0.0, half), Vector3(-half, 0.0, half),
+	]:
+		_segment(center + corner, floor + corner, color)
+	var slab := BoxMesh.new()
+	slab.size = Vector3(GridSnap.CELL, maxf(depth, 0.08), GridSnap.CELL)
+	_fill.mesh = slab
+	_fill.position = center - Vector3.UP * (maxf(depth, 0.08) * 0.5)
+	_fill.visible = true
+	var mat := _fill.material_override as StandardMaterial3D
+	if mat != null:
+		mat.albedo_color = Color(color, 0.28)
+		mat.emission = color
+		mat.emission_energy_multiplier = Palette.GLOW_SOFT
+
+
+## The line a dig follows, drawn as a square tube at its real bore so the size
+## being set is the size that gets swum through.
+func tube(line: Array, bore: float, color: Color) -> void:
+	if line.size() < 2:
+		return
+	var half := maxf(bore, 0.2) * 0.5
+	var last: Array = []
+	for i in line.size():
+		var ring := _ring_at(line, i, half)
+		for c in 4:
+			_segment(ring[c], ring[(c + 1) % 4], color)
+			if not last.is_empty():
+				_segment(last[c], ring[c], color)
+		last = ring
+
+
+## Four corners square to the way the dig is heading, matching how the built
+## tunnel is swept so the guide and the real thing line up.
+func _ring_at(line: Array, index: int, half: float) -> Array:
+	var dir := Vector3.ZERO
+	if index > 0:
+		dir += (line[index] - line[index - 1]).normalized()
+	if index < line.size() - 1:
+		dir += (line[index + 1] - line[index]).normalized()
+	if dir.length_squared() < 0.0001:
+		dir = Vector3.FORWARD
+	dir = dir.normalized()
+	var right := dir.cross(Vector3.UP)
+	if right.length_squared() < 0.0001:
+		right = Vector3.RIGHT
+	right = right.normalized() * half
+	var up := right.normalized().cross(dir).normalized() * half
+	var at: Vector3 = line[index]
+	return [at + right + up, at - right + up, at - right - up, at + right - up]
+
+
+## The lava fill before it lands: a tinted slab plus a grid so each tile reads.
+func area(from: Vector3, to: Vector3, color: Color) -> void:
+	var half := GridSnap.CELL * 0.5
+	var x0 := minf(from.x, to.x) - half
+	var x1 := maxf(from.x, to.x) + half
+	var z0 := minf(from.z, to.z) - half
+	var z1 := maxf(from.z, to.z) + half
+	var y := (from.y + to.y) * 0.5
+	var a := Vector3(x0, y, z0)
+	var b := Vector3(x1, y, z0)
+	var c := Vector3(x1, y, z1)
+	var d := Vector3(x0, y, z1)
+	_segment(a, b, color)
+	_segment(b, c, color)
+	_segment(c, d, color)
+	_segment(d, a, color)
+	var x := snappedf(minf(from.x, to.x), GridSnap.CELL)
+	var x_end := snappedf(maxf(from.x, to.x), GridSnap.CELL)
+	while x <= x_end + 0.001:
+		_segment(Vector3(x, y, z0), Vector3(x, y, z1), color)
+		x += GridSnap.CELL
+	var z := snappedf(minf(from.z, to.z), GridSnap.CELL)
+	var z_end := snappedf(maxf(from.z, to.z), GridSnap.CELL)
+	while z <= z_end + 0.001:
+		_segment(Vector3(x0, y, z), Vector3(x1, y, z), color)
+		z += GridSnap.CELL
+	var slab := PlaneMesh.new()
+	slab.size = Vector2(maxf(x1 - x0, 0.08), maxf(z1 - z0, 0.08))
+	_fill.mesh = slab
+	_fill.position = Vector3((x0 + x1) * 0.5, y + 0.04, (z0 + z1) * 0.5)
+	_fill.visible = true
+	var mat := _fill.material_override as StandardMaterial3D
+	if mat != null:
+		mat.albedo_color = Color(color, 0.32)
+		mat.emission = color
+		mat.emission_energy_multiplier = Palette.GLOW_SOFT
+
+
+## Outer edge of a lava pool, so a take-back shows the whole section.
+func footprint(cells: Array, color: Color) -> void:
+	if cells.is_empty():
+		return
+	var half := GridSnap.CELL * 0.5
+	var occupied := {}
+	var y := 0.0
+	for cell in cells:
+		var at: Vector3 = cell
+		occupied[_cell_key(at)] = true
+		y += at.y
+	y /= float(cells.size())
+	var steps: Array[Vector3] = [
+		Vector3(GridSnap.CELL, 0.0, 0.0), Vector3(-GridSnap.CELL, 0.0, 0.0),
+		Vector3(0.0, 0.0, GridSnap.CELL), Vector3(0.0, 0.0, -GridSnap.CELL),
+	]
+	for cell in cells:
+		var at := Vector3((cell as Vector3).x, y, (cell as Vector3).z)
+		for step in steps:
+			if occupied.has(_cell_key(at + step)):
+				continue
+			var along := Vector3(-step.z, 0.0, step.x).normalized() * half
+			var mid := at + step.normalized() * half
+			_segment(mid - along, mid + along, color)
+
+
+func _cell_key(at: Vector3) -> String:
+	return "%d,%d" % [roundi(at.x / GridSnap.CELL), roundi(at.z / GridSnap.CELL)]
 
 
 func marker(at: Vector3, color: Color) -> void:

@@ -71,6 +71,11 @@ func test_boarding_puts_you_on_the_line() -> void:
 	assert_almost_eq(player.global_position.distance_to(line.ride_at(0.0)), 0.0, 0.02)
 
 
+func test_the_ride_is_three_times_a_sprint() -> void:
+	var line := _spawn()
+	assert_gt(line.ride_speed(), PlayerMotion.SPRINT_SPEED * 3.0)
+
+
 func test_the_ride_slides_toward_the_low_deck() -> void:
 	var line := _spawn()
 	var player := _player_at(line.board_at())

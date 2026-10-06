@@ -616,6 +616,35 @@ func test_a_fan_holds_the_cart_up_without_killing_speed() -> void:
 	cart.free()
 
 
+func test_hopping_out_of_a_fan_ride_keeps_the_speed() -> void:
+	var cart: GolfCart = preload("res://scenes/vehicles/golf_cart.tscn").instantiate()
+	var player: Player = preload("res://scenes/players/player.tscn").instantiate()
+	add_child_autofree(cart)
+	add_child_autofree(player)
+	var floor := StaticBody3D.new()
+	floor.collision_layer = Layers.WORLD
+	var col := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(40.0, 0.4, 40.0)
+	col.shape = box
+	floor.add_child(col)
+	add_child_autofree(floor)
+	floor.global_position = Vector3(0.0, -0.2, 0.0)
+	cart.set_physics_process(false)
+	player.set_physics_process(false)
+	player.set_process(false)
+	await wait_physics_frames(1)
+	cart.global_position = Vector3(0.0, 8.0, 0.0)
+	cart.board(player)
+	cart.enter_fan()
+	cart.velocity = Vector3(0.0, 1.8, -22.0)
+	cart.eject(player)
+	assert_false(player.is_riding())
+	assert_almost_eq(player.velocity.z, -22.0, 0.01)
+	assert_almost_eq(player.velocity.y, 1.8, 0.01)
+	assert_gt(player.global_position.y, 7.0, "stay in the column, do not snap to the turf")
+
+
 func test_a_boost_stripe_hurls_a_player_down_the_lane() -> void:
 	var next := _Boost.player_velocity(Vector3.ZERO, Vector3.FORWARD, 0.5)
 	assert_lt(next.z, 0.0, "Godot forward is -Z")

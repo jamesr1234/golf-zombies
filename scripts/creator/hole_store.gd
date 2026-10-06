@@ -218,6 +218,10 @@ static func save_structure(title: String, parts: Array[Dictionary]) -> String:
 			row[CustomHole.END] = CustomHole.to_array((part[CustomHole.END] as Vector3) - center)
 		if part.has(CustomHole.SPIN):
 			row[CustomHole.SPIN] = CustomHole.spin_of(part)
+		if CustomHole.has_respawn(part):
+			row[CustomHole.RESPAWN] = CustomHole.to_array(
+				(part[CustomHole.RESPAWN] as Vector3) - center
+			)
 		listed.append(row)
 	var id := _slug(title)
 	if not _write(structure_path(id), {"version": VERSION, "title": title, PARTS: listed}):
@@ -240,6 +244,8 @@ static func structure_parts(path: String) -> Array[Dictionary]:
 		)
 		if entry.has(CustomHole.SPIN) or CustomHole.is_windmill(String(row[CustomHole.PATH])):
 			row[CustomHole.SPIN] = CustomHole.spin_of(entry)
+		if entry.has(CustomHole.RESPAWN):
+			row[CustomHole.RESPAWN] = CustomHole.to_vector(entry[CustomHole.RESPAWN])
 		out.append(row)
 	if int(body.get("version", 1)) < VERSION:
 		PieceLadder.remap_centers(out)
@@ -248,6 +254,8 @@ static func structure_parts(path: String) -> Array[Dictionary]:
 			part[CustomHole.POSITION] = part[CustomHole.POSITION] - mid
 			if CustomHole.has_end(part):
 				part[CustomHole.END] = part[CustomHole.END] - mid
+			if CustomHole.has_respawn(part):
+				part[CustomHole.RESPAWN] = part[CustomHole.RESPAWN] - mid
 	return out
 
 

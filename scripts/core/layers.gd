@@ -20,12 +20,14 @@ const CUP := 1 << 11
 const MECH := 1 << 12
 ## Fairway lip. Ball, players, carts, and zombies bounce; shots pass through.
 const FORCEFIELD := 1 << 13
+## Lava skin. Only the ball hits it, so a shot skips and a player still falls in.
+const LAVA := 1 << 14
 
 ## Ground and props stop the ball, barriers deliberately do not (leaving the
 ## course is an out-of-bounds penalty, not a bounce). The well is added only
 ## while the ball is dropping in, so a fast putt can still rattle over the lip.
 ## The lip field is the exception: it kicks a shot back onto the landing strip.
-const BALL_MASK := WORLD | PROP | FORCEFIELD
+const BALL_MASK := WORLD | PROP | FORCEFIELD | LAVA
 const PLAYER_MASK := WORLD | ZOMBIE | BARRIER | PROP | VEHICLE | MECH | FORCEFIELD
 const ZOMBIE_MASK := WORLD | PLAYER | BARRIER | PROP | FORT | FORCEFIELD
 const BULLET_MASK := WORLD | ZOMBIE | PROP | MECH

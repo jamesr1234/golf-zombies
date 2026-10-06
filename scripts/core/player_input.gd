@@ -16,6 +16,7 @@ const HINTS := {
 		"map": "M", "ascend": "E", "descend": "Q", "grab": "Space", "shield": "C",
 		"zoom": "Z / Right Click", "aim": "Right Click", "look": "Mouse",
 		"grapple": "V", "jump": "Space", "sprint": "Shift", "slide": "Shift + Z",
+		"drop": "Shift",
 	},
 	"p2": {
 		"interact": "Circle", "revive": "Triangle", "swing": "R2", "shoot": "R2",
@@ -27,6 +28,7 @@ const HINTS := {
 		"zoom": "R3", "aim": "L2", "look": "Right Stick",
 		"grapple": "D-Pad Left", "jump": "Cross", "sprint": "L3",
 		"slide": "Sprint + R3",
+		"drop": "L3",
 	},
 }
 

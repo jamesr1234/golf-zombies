@@ -9,6 +9,8 @@ const STIFF := 16.0
 const REEL := 9.0
 const POINT_REEL := 42.0
 const POINT_ARRIVE := 0.4
+## Leftover after you reach the pad, about a sprint so the yank does not die.
+const POINT_KEEP := 9.0
 const SWING := 7.5
 const YANK := 6.0
 const FOV := 98.0
@@ -191,12 +193,12 @@ func _reel_to_point(player: Player, delta: float) -> bool:
 	var to_land := land - player.global_position
 	var dist := to_land.length()
 	var step := POINT_REEL * delta
+	var dir := to_land / dist if dist > 0.001 else Vector3.ZERO
 	if dist <= POINT_ARRIVE or dist <= step:
 		player.global_position = land
-		player.velocity = Vector3.ZERO
+		player.velocity = dir * POINT_KEEP
 		slack = hook.distance_to(land)
 		return false
-	var dir := to_land / dist
 	player.velocity = dir * POINT_REEL
 	player.global_position += dir * step
 	slack = player.global_position.distance_to(hook)

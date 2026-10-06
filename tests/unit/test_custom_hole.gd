@@ -7,6 +7,7 @@ const ARCH := "res://assets/obstacles/arch_large.glb"
 const RIFLE := "res://resources/weapons/rifle.tres"
 const ZIP := "res://scenes/course/props/zipline.tscn"
 const MILL := "res://scenes/course/props/windmill.tscn"
+const LAVA := "res://scenes/course/props/lava.tscn"
 
 
 func before_each() -> void:
@@ -81,6 +82,18 @@ func test_a_spawn_pack_survives_a_trip_through_json() -> void:
 	assert_eq(int(counts["brute"]), 0)
 
 
+func test_a_sandtrap_survives_a_trip_through_json() -> void:
+	var hole := CustomHole.create("Bunker")
+	hole.add_placement(CustomHole.SANDTRAP, Vector3(0.0, 0.0, -24.0))
+	hole.placements[0][CustomHole.RADIUS] = 7.2
+	hole.placements[0][CustomHole.DEPTH] = 1.5
+	var back := CustomHole.from_dict(JSON.parse_string(JSON.stringify(hole.to_dict())))
+	assert_true(CustomHole.is_sandtrap(String(back.placements[0][CustomHole.PATH])))
+	assert_almost_eq(SandTrap.radius_of(back.placements[0]), 7.2, 0.001)
+	assert_almost_eq(SandTrap.depth_of(back.placements[0]), 1.5, 0.001)
+	assert_false(back.placements[0].has(CustomHole.COUNTS), "sand is not a spawn pack")
+
+
 func test_a_windmill_keeps_the_speed_it_was_given() -> void:
 	var hole := CustomHole.create("Mill")
 	hole.add_placement(MILL, Vector3(0.0, 0.0, -24.0))
@@ -94,6 +107,52 @@ func test_a_windmill_keeps_the_speed_it_was_given() -> void:
 	var mill := overlay.get_child(0) as CartPathWindmill
 	assert_not_null(mill)
 	assert_almost_eq(mill.spin_deg, 480.0, 0.001)
+
+
+func test_lava_tiles_with_the_same_stand_back_are_one_pool() -> void:
+	var hole := CustomHole.create("Pool")
+	hole.add_placement(LAVA, Vector3(0.0, 0.0, -20.0))
+	hole.add_placement(LAVA, Vector3(GridSnap.CELL, 0.0, -20.0))
+	hole.add_placement(LAVA, Vector3(0.0, 0.0, -24.0))
+	hole.placements[0][CustomHole.RESPAWN] = Vector3(5.4, 0.0, -12.15)
+	hole.placements[1][CustomHole.RESPAWN] = Vector3(5.4, 0.0, -12.15)
+	hole.placements[2][CustomHole.RESPAWN] = Vector3(-5.4, 0.0, -12.15)
+	assert_true(CustomHole.same_lava(hole.placements[0], hole.placements[1]))
+	assert_false(CustomHole.same_lava(hole.placements[0], hole.placements[2]))
+	assert_eq(CustomHole.lava_pool(hole.placements, 0), [0, 1])
+	assert_eq(CustomHole.lava_pool(hole.placements, 2), [2])
+	hole.add_placement(LAVA, Vector3(GridSnap.CELL, 0.0, -24.0))
+	assert_eq(CustomHole.lava_pool(hole.placements, 3), [3], "unfinished tiles are their own pool")
+	assert_eq(CustomHole.lava_groups(hole.placements).size(), 3)
+
+
+func test_a_lava_respawn_survives_a_trip_through_json() -> void:
+	var hole := CustomHole.create("Pit")
+	hole.add_placement(LAVA, Vector3(0.0, 0.0, -24.0))
+	hole.placements[0][CustomHole.RESPAWN] = Vector3(5.4, 0.0, -16.2)
+	var back := CustomHole.from_dict(JSON.parse_string(JSON.stringify(hole.to_dict())))
+	assert_true(CustomHole.is_lava(String(back.placements[0][CustomHole.PATH])))
+	assert_true(CustomHole.has_respawn(back.placements[0]))
+	assert_almost_eq(
+		CustomHole.respawn_of(back.placements[0]).distance_to(Vector3(5.4, 0.0, -16.2)),
+		0.0, 0.01
+	)
+	assert_false(back.has_open_lava())
+
+
+func test_a_water_pond_survives_a_trip_through_json() -> void:
+	var hole := CustomHole.create("Pond")
+	hole.add_placement(CustomHole.WATER, Vector3(0.0, 0.0, -24.0))
+	hole.placements[0][CustomHole.DEPTH] = 4.0
+	hole.placements[0][CustomHole.POOL] = Vector3(0.0, 0.0, -24.0)
+	hole.placements[0][CustomHole.SURFACE] = 0.0
+	var back := CustomHole.from_dict(JSON.parse_string(JSON.stringify(hole.to_dict())))
+	assert_true(CustomHole.is_water(String(back.placements[0][CustomHole.PATH])))
+	assert_true(WaterTile.has_depth(back.placements[0]))
+	assert_almost_eq(WaterTile.depth_of(back.placements[0]), 4.0, 0.001)
+	assert_true(CustomHole.has_pool(back.placements[0]))
+	assert_false(back.placements[0].has(CustomHole.RADIUS), "water is not a sandtrap")
+	assert_false(back.has_open_water())
 
 
 func test_a_saved_windmill_without_a_speed_gets_the_default() -> void:
@@ -155,6 +214,16 @@ func test_a_spawn_saved_without_a_chase_range_gets_the_default() -> void:
 	assert_almost_eq(float(hole.placements[0][CustomHole.AGGRO]), CustomHole.DEFAULT_AGGRO, 0.001)
 	var packs := SpawnPack.from_hole(hole)
 	assert_almost_eq(float(packs[0]["aggro"]), SpawnPack.DEFAULT_AGGRO, 0.001)
+
+
+func test_a_sandtrap_does_not_stand_on_the_played_hole() -> void:
+	var hole := CustomHole.create("Painted")
+	hole.add_placement(CustomHole.SANDTRAP, Vector3(0.0, 0.0, -20.0))
+	hole.placements[0][CustomHole.RADIUS] = 6.0
+	hole.placements[0][CustomHole.DEPTH] = 1.2
+	var overlay := CustomOverlay.build(hole)
+	autofree(overlay)
+	assert_eq(overlay.get_child_count(), 0)
 
 
 func test_a_spawn_does_not_stand_on_the_played_hole() -> void:
@@ -332,6 +401,49 @@ func test_a_custom_hole_keeps_the_width_it_was_built_with() -> void:
 	assert_gt(wide.fairway_width(), HoleGenerator.fairway_width(hole.par(), FairwayPiece.INDEX))
 
 
+func test_a_clubhouse_custom_hole_gets_a_connected_leave_track() -> void:
+	var custom := CustomHole.create("Hole 3")
+	custom.pieces = PackedInt32Array([
+		FairwayPiece.index_of("long_straight"),
+		FairwayPiece.index_of("dogleg_left"),
+		FairwayPiece.index_of("dogleg_left"),
+		FairwayPiece.index_of("long_straight"),
+	])
+	assert_true(FairwayPiece.is_playable(custom.pieces, custom.fairway_size))
+	var data := CustomLayout.build(custom, 0, 2)
+	assert_eq(data.index, 2)
+	assert_true(GameState.leaves_for_clubhouse(data.index))
+	assert_false(data.has_practice())
+	var crow := data.cup - data.tee
+	crow.y = 0.0
+	crow = crow.normalized()
+	assert_lt(
+		data.leave_along().dot(crow), 0.75,
+		"a double dogleg must leave on the last bend, not tee-to-cup"
+	)
+	var hole := HoleBuilder.build(data)
+	add_child_autofree(hole)
+	var path := CartPath.build(
+		data.cup, data.leave_along(), data.bounds, data.height, hole, data.green_radius
+	)
+	hole.add_child(path)
+	CartPath.open_across(hole, CartPath.leave_line(data.cup, path.centerline), data.height)
+	await wait_physics_frames(2)
+	var start: Vector3 = path.centerline[0]
+	var leave := start - data.cup
+	leave.y = 0.0
+	assert_gt(leave.normalized().dot(data.leave_along()), 0.9)
+	assert_almost_eq(start.y, HeightField.DECK, 1.0)
+	assert_false(path.short)
+	var space := hole.get_world_3d().direct_space_state
+	for i in 8:
+		var at := data.cup.lerp(start, float(i) / 7.0) + Vector3.UP * 1.2
+		var query := PhysicsRayQueryParameters3D.create(at, at + Vector3.DOWN * 6.0)
+		query.collision_mask = Layers.WORLD
+		var hit := space.intersect_ray(query)
+		assert_false(hit.is_empty(), "the shop track stays connected to the green")
+
+
 func test_a_custom_hole_only_gets_a_practice_tee_after_a_clubhouse() -> void:
 	var hole := CustomHole.create("Warm Up")
 	var opening := CustomLayout.build(hole)
@@ -479,6 +591,25 @@ func test_a_grouped_windmill_keeps_its_speed() -> void:
 		if CustomHole.is_windmill(String(part[CustomHole.PATH])):
 			moved = part
 	assert_almost_eq(CustomHole.spin_of(moved), 720.0, 0.001)
+
+
+func test_a_grouped_lava_keeps_its_respawn() -> void:
+	var tile := CustomHole.placement(LAVA, Vector3(0.0, 0.0, 0.0))
+	tile[CustomHole.RESPAWN] = Vector3(2.7, 0.0, 1.35)
+	var path := HoleStore.save_structure("Lava Pair", [
+		CustomHole.placement(CUBE, Vector3(1.35, 0.0, 0.0)),
+		tile,
+	])
+	var origin := Vector3(10.0, 0.0, -20.0)
+	var flat := CustomOverlay.expand(CustomHole.placement(path, origin, 90.0))
+	var row: Dictionary = {}
+	for part in flat:
+		if CustomHole.is_lava(String(part[CustomHole.PATH])):
+			row = part
+			break
+	assert_false(row.is_empty())
+	assert_true(CustomHole.has_respawn(row))
+	assert_gt(CustomHole.respawn_of(row).distance_to(row[CustomHole.POSITION]), 1.0)
 
 
 func test_a_grouped_zipline_keeps_its_end() -> void:

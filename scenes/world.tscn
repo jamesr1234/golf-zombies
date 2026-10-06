@@ -87,4 +87,3 @@ script = ExtResource("4_spawn")
 script = ExtResource("5_flow")
 start_in_clubhouse = false
 starting_money = 2000
-mute_audio = true

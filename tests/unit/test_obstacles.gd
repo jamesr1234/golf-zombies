@@ -205,6 +205,34 @@ func test_you_slide_up_a_placed_ladder() -> void:
 	assert_true(player.is_climbing())
 
 
+func test_jumping_off_a_ladder_clears_the_rails() -> void:
+	var node: Node3D = _spawn("res://assets/obstacles/ladder_medium.glb")
+	var climb := ClimbLadder.attach(node)
+	var player: Player = (load("res://scenes/players/player.tscn") as PackedScene).instantiate()
+	add_child_autofree(player)
+	await wait_physics_frames(1)
+	player.input = CpuInput.new(player.input_prefix, false)
+	player.global_position = climb.to_global(Vector3(0.0, -climb._h * 0.35, -0.7))
+	assert_true(player._start_climb())
+	var pad := player.input as CpuInput
+	pad.begin_frame()
+	pad.move = Vector2(0.0, -1.0)
+	pad.tap("jump")
+	player._move(1.0 / 60.0)
+	assert_false(player.is_climbing(), "jump hops you off")
+	var local := climb.to_local(player.global_position)
+	assert_gt(
+		absf(local.z), ClimbingWall.LATCH_DEPTH + climb._t,
+		"the hop lands you behind the latch"
+	)
+	assert_false(climb.can_latch(player), "you are outside the rails")
+	for _i in 8:
+		pad.begin_frame()
+		pad.move = Vector2(0.0, -1.0)
+		player._move(1.0 / 60.0)
+	assert_false(player.is_climbing(), "holding in does not grab the same rungs")
+
+
 func test_a_platform_covers_the_same_size_cube() -> void:
 	for i in _SIZES.size():
 		var size: String = _SIZES[i]

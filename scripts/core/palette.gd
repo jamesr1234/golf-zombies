@@ -59,6 +59,7 @@ const TOWER_TRIM := ICE
 const SNIPER := Color(0.72, 0.92, 1.0)
 const LED_RED := Color(1.0, 0.08, 0.05)
 const LED_WHITE := Color(0.96, 0.98, 1.0)
+const LAVA := Color(1.0, 0.16, 0.04)
 
 const TREE_TRUNK := Color(0.14, 0.08, 0.05)
 const TREE_CANOPY := Color(0.28, 0.82, 0.32)

@@ -57,8 +57,22 @@ static func build(data: HoleData) -> Node3D:
 	else:
 		region.add_child(_FairwayField.create(data))
 		GunPickup.place_starters(region, data)
+	var lava_cuts: Array[Vector3] = []
+	var mouth_cuts: Array = []
+	if data.custom != null:
+		lava_cuts = CustomHole.lava_spots(data.custom.placements)
+		lava_cuts.append_array(WaterTile.spots(data.custom.placements))
+		if data.height != null:
+			mouth_cuts = data.height.cuts
+	var sand_cuts := SandTrap.cuts_from(data)
 	for patch in data.patches:
-		root.add_child(SurfacePatch.create(patch, data.height))
+		var cuts: Array = []
+		for cell in lava_cuts:
+			cuts.append(cell)
+		cuts.append_array(mouth_cuts)
+		if patch["type"] != Surface.Type.BUNKER:
+			cuts.append_array(sand_cuts)
+		root.add_child(SurfacePatch.create(patch, data.height, cuts))
 	if data.has_soccer_goal():
 		root.add_child(SoccerGoal.create(data))
 	elif not ArenaHole.applies(data):

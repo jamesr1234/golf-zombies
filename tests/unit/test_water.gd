@@ -313,6 +313,113 @@ func test_the_solo_human_lists_keyboard_and_pad_prompts() -> void:
 	assert_string_contains(player.input.hint("ascend"), "R1")
 
 
+## A dug tunnel is the one place the ground is not solid to you, so the swim
+## itself has to keep you inside the bore and hand the ground back on the way
+## out. Nothing about the run is a collider, which is what makes it cheap.
+func test_a_tunnel_is_a_swim_that_holds_you_inside_the_bore() -> void:
+	var player := _tunnel_swimmer()
+	var axis := Vector3(0.0, -2.0, -32.0)
+	player._physics_process(STEP)
+	assert_true(player.is_swimming(), "the bore is deep enough to swim")
+	assert_true(player.in_tunnel)
+	assert_eq(player.collision_mask & Layers.WORLD, 0, "the rock it runs through lets you by")
+	player.global_position += Vector3(1.0, 0.0, 0.0)
+	player._physics_process(STEP)
+	var ride := _ride_point(player)
+	assert_lt(absf(ride.x - axis.x), 1.5 - PlayerSwim.TUNNEL_MARGIN + 0.01,
+		"pushing at the wall holds you off it")
+	assert_almost_eq(ride.z, axis.z, 0.5, "along the run you are free to go")
+	var lens := player.global_position + Vector3.UP * player.head.position.y
+	assert_lt(absf(lens.y - axis.y), 1.5, "and the lens stays under the roof")
+
+
+## Reaching a mouth from open water has to take you in. The ground is still
+## solid until it does, so a bore you can only enter dead centre is one you
+## bump your nose on.
+func test_swimming_at_a_mouth_from_the_pond_takes_you_into_the_run() -> void:
+	var player := _tunnel_swimmer()
+	var hole: HoleData = player.flow.hole
+	var mouth: Vector3 = WaterTunnel.nodes_of(hole.custom.placements[2])[0]
+	assert_true(hole.tunnel_at(mouth).is_empty() == false)
+	# Floating in the pond just short of the opening, off to one side of it.
+	player.global_position = (
+		mouth + Vector3(0.7, 0.4, 1.2) - Vector3.UP * (Player.STAND_HEAD_HEIGHT * 0.5)
+	)
+	player._physics_process(STEP)
+	assert_true(player.in_tunnel, "the mouth reaches out for you")
+	assert_eq(player.collision_mask & Layers.WORLD, 0)
+
+
+## A tunnel mouth sits in the pond. That cannot steal the surface swim, or
+## walking in is an instant dive through the floor.
+func test_a_pond_with_a_tunnel_is_still_treading_water() -> void:
+	var player := _tunnel_swimmer()
+	var hole: HoleData = player.flow.hole
+	var pond: Vector3 = hole.custom.placements[0][CustomHole.POSITION]
+	player.global_position = Vector3(pond.x, hole.water_surface_y(pond), pond.z)
+	player._physics_process(STEP)
+	assert_true(player.is_swimming())
+	assert_false(player.is_underwater(), "open water is a tread, not a dive")
+	assert_false(player.in_tunnel, "the pond is not the bore")
+	assert_eq(player.collision_mask & Layers.WORLD, Layers.WORLD, "the floor has to stay")
+
+
+func test_a_planted_custom_pond_still_starts_a_swim() -> void:
+	var player := _tunnel_swimmer()
+	var hole: HoleData = player.flow.hole
+	var node := Node3D.new()
+	add_child_autofree(node)
+	hole.face_arrival(node, Vector3.RIGHT, Vector3(40.0, 0.0, 80.0))
+	var pond: Vector3 = hole.from_custom(hole.custom.placements[0][CustomHole.POSITION])
+	player.global_position = Vector3(pond.x, hole.water_surface_y(pond), pond.z)
+	player._physics_process(STEP)
+	assert_true(player.is_swimming(), "planting the hole cannot lose the pond")
+	assert_false(player.is_underwater())
+
+
+func test_walking_over_a_tunnel_is_dry_ground() -> void:
+	var player := _tunnel_swimmer()
+	var hole: HoleData = player.flow.hole
+	var over := Vector3(0.0, hole.height.height_at(0.0, -32.0), -32.0)
+	assert_almost_eq(hole.water_depth_at(over), 0.0, 0.001)
+	player.global_position = over
+	player._physics_process(STEP)
+	assert_false(player.is_swimming())
+	assert_false(player.in_tunnel)
+	assert_eq(player.collision_mask & Layers.WORLD, Layers.WORLD, "the ground is solid again")
+
+
+## Two ponds joined by one dug run, which is the shape a swim race is set on.
+func _tunnel_swimmer() -> Player:
+	var custom := CustomHole.create("Race")
+	for at in [Vector3(0.0, 0.0, -20.0), Vector3(0.0, 0.0, -44.0)]:
+		custom.add_placement(CustomHole.WATER, at)
+		var tile: Dictionary = custom.placements[custom.placements.size() - 1]
+		tile[CustomHole.DEPTH] = 3.0
+		tile[CustomHole.POOL] = at
+		tile[CustomHole.SURFACE] = 0.0
+	custom.add_placement(CustomHole.TUNNEL, Vector3(0.0, -2.0, -20.0))
+	var dug: Dictionary = custom.placements[custom.placements.size() - 1]
+	dug[CustomHole.NODES] = [Vector3(0.0, -2.0, -20.0), Vector3(0.0, -2.0, -44.0)]
+	dug[CustomHole.BORE] = 3.0
+	dug[CustomHole.DONE] = true
+	var player: Player = PLAYER_SCENE.instantiate()
+	add_child_autofree(player)
+	var flow := FakeFlow.new()
+	flow.hole = CustomLayout.build(custom)
+	player.flow = flow
+	player.input = CpuInput.new(player.input_prefix, false)
+	player.global_position = (
+		Vector3(0.0, -2.0, -32.0) - Vector3.UP * (Player.STAND_HEAD_HEIGHT * 0.5)
+	)
+	return player
+
+
+## The part of you that rides down the middle of a bore.
+func _ride_point(player: Player) -> Vector3:
+	return player.global_position + Vector3.UP * (player.head.position.y * PlayerSwim.TUNNEL_RIDE)
+
+
 func _swimmer() -> Player:
 	var hole := _hole_with_water()
 	var patch := _water_patch(hole)

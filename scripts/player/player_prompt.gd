@@ -63,9 +63,11 @@ func text(player: Player) -> String:
 		return "Hold %s to revive" % player.input.hint("revive")
 	if player.state == Player.State.SWIMMING:
 		return player.swim.prompt(player)
+	if player.is_dropping_ball():
+		return "%s to drop the ball" % player.input.hint("drop")
 	if player.state == Player.State.GOLFING:
-		return "%s to swing   stick up/down for height   %s to leave the ball" % [
-			player.input.hint("swing"), player.input.hint("interact")
+		return "%s to swing   stick up/down for height   %s to leave the ball   %s to pick up" % [
+			player.input.hint("swing"), player.input.hint("interact"), player.input.hint("drop")
 		]
 	if player.state == Player.State.SHIELDING:
 		return "Shield up   look to cover   release %s to drop" % player.input.hint("shield")
@@ -136,7 +138,12 @@ func text(player: Player) -> String:
 	if player.can_retrieve_ball():
 		return "%s to pick up your ball" % player.input.hint("interact")
 	if player.golf != null and player.golf.can_claim(player):
-		return "%s to play the ball" % player.input.hint("interact")
+		var play := "%s to play the ball" % player.input.hint("interact")
+		if player.ball_drop.can_pick_up(player):
+			return "%s   %s to pick up" % [play, player.input.hint("drop")]
+		return play
+	if player.ball_drop.can_pick_up(player):
+		return "%s to pick up the ball" % player.input.hint("drop")
 	if player.active_cart() != null and player.active_cart().can_right(player):
 		return "%s to flip the cart" % player.input.hint("interact")
 	if player.active_cart() != null and player.active_cart().can_board(player):

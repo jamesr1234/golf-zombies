@@ -101,6 +101,10 @@ var _grapple_line: GrappleLine
 var mill_desk
 
 var swim := PlayerSwim.new()
+var ball_drop := BallDrop.new()
+## True while swimming through a dug tunnel, which is the one time the ground
+## is not solid to you.
+var in_tunnel := false
 var slide := PlayerSlide.new()
 var glide := PlayerGlide.new()
 var place := PlayerPlace.new()
@@ -278,6 +282,7 @@ func _physics_process(delta: float) -> void:
 	weapon.power_mult = buzz.weapon_mult()
 	hit_fx.tick_flash(self, delta)
 	look.tick_cheer(delta)
+	look.tick_lava_burn(self, delta)
 	sync_pace = pace()
 	sync_gun = weapon.index
 	sync_state = int(state)
@@ -363,8 +368,27 @@ func is_underwater() -> bool:
 	return state == State.SWIMMING and swim.underwater
 
 
+## A swim tunnel runs through solid ground, so the ground has to stop stopping
+## you while you are in one. PlayerSwim holds you inside the bore instead.
+func set_in_tunnel(on: bool) -> void:
+	if in_tunnel == on:
+		return
+	in_tunnel = on
+	_apply_player_mask()
+
+
+func _apply_player_mask() -> void:
+	if collision_layer != Layers.PLAYER:
+		return
+	collision_mask = Layers.PLAYER_MASK & ~(Layers.WORLD if in_tunnel else 0)
+
+
 func is_carrying_ball() -> bool:
 	return golf != null and golf.ball != null and golf.ball.carrier() == self
+
+
+func is_dropping_ball() -> bool:
+	return ball_drop.active
 
 
 func is_shielding() -> bool:
@@ -397,6 +421,14 @@ func is_poker_seated() -> bool:
 
 func is_celebrating() -> bool:
 	return look.cheer_left > 0.0
+
+
+func is_burning() -> bool:
+	return look.lava_burn_left > 0.0
+
+
+func fall_in_lava(at: Vector3) -> bool:
+	return look.begin_lava_burn(self, at)
 
 
 func celebrate() -> void:
@@ -673,6 +705,8 @@ func _set_hidden_in_mech(on: bool) -> void:
 func _set_solid(on: bool) -> void:
 	collision_layer = Layers.PLAYER if on else 0
 	collision_mask = Layers.PLAYER_MASK if on else 0
+	if on:
+		_apply_player_mask()
 
 
 func _drop_from_lost_ride() -> void:
@@ -1258,9 +1292,11 @@ func _set_grapple_mask(on: bool) -> void:
 		var skip := Layers.VEHICLE | Layers.MECH
 		if grappler.is_point():
 			skip |= Layers.PROP | Layers.WORLD
+		if in_tunnel:
+			skip |= Layers.WORLD
 		collision_mask = Layers.PLAYER_MASK & ~skip
 	else:
-		collision_mask = Layers.PLAYER_MASK
+		_apply_player_mask()
 
 
 @rpc("any_peer", "reliable")

@@ -64,7 +64,9 @@ func register_hit() -> void:
 
 
 func on_downed(player: Player) -> void:
-	if player.is_carrying_ball():
+	if player.is_dropping_ball():
+		player.ball_drop.place(player)
+	elif player.is_carrying_ball():
 		player.golf.ball.release_carried()
 	if player.state == Player.State.GOLFING and player.golf != null:
 		player.golf.release()

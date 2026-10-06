@@ -113,6 +113,11 @@ static func visits_clubhouse_after(next_index: int) -> bool:
 	return next_index > 0 and next_index % CLUBHOUSE_EVERY == 0
 
 
+## Holes 3, 6, and 9: finishing one opens the long drive to the shop.
+static func leaves_for_clubhouse(index: int) -> bool:
+	return visits_clubhouse_after(index + 1)
+
+
 ## Warm-up green only after a clubhouse: the opening hole, then 4, 7, and 10.
 static func has_practice_tee(index: int) -> bool:
 	return index >= 0 and index % CLUBHOUSE_EVERY == 0

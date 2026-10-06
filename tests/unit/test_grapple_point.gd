@@ -119,6 +119,8 @@ func test_the_rope_reels_you_up_to_the_target() -> void:
 	assert_lt(player.global_position.distance_to(pad), 0.2, "you finish at the target")
 	assert_almost_eq(player.global_position.y, pad.y, 0.15)
 	assert_gt(player.global_position.y, start.y + 0.8, "the yank has to lift you")
+	assert_gt(player.velocity.length(), 4.0, "arrival has to leave a leftover")
+	assert_lt(player.velocity.length(), Grappler.POINT_REEL * 0.5, "a leftover, not the full yank")
 
 
 func test_the_prompt_names_the_target() -> void:

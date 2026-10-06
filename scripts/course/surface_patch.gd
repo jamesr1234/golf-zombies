@@ -17,13 +17,15 @@ const RIM_LIFT := 0.12
 var type: Surface.Type = Surface.Type.FAIRWAY
 
 
-static func create(patch: Dictionary, height: HeightField = null) -> SurfacePatch:
+static func create(
+	patch: Dictionary, height: HeightField = null, cuts: Array = []
+) -> SurfacePatch:
 	var node := SurfacePatch.new()
 	node.type = patch["type"]
 	var look: Dictionary = Surface.look_for(patch)
 	var shape := CollisionShape3D.new()
 	_fit_detector(shape, patch, height)
-	node.add_child(_draped_mesh(patch, look, height))
+	node.add_child(_draped_mesh(patch, look, height, cuts))
 	if node.type == Surface.Type.GREEN:
 		node.add_child(_putting_marker(patch))
 	node.add_child(shape)
@@ -118,7 +120,7 @@ static func water_level(patch: Dictionary) -> float:
 ## above the ground or clip through a rise. Water is the exception: a pond surface
 ## is flat, and the ground was levelled to its edge to meet it.
 static func _draped_mesh(
-	patch: Dictionary, look: Dictionary, height: HeightField
+	patch: Dictionary, look: Dictionary, height: HeightField, cuts: Array = []
 ) -> MeshInstance3D:
 	var size: Vector2 = patch["size"]
 	var draw: float = Surface.DRAW_HEIGHT[patch["type"]]
@@ -142,22 +144,49 @@ static func _draped_mesh(
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	if patch["round"]:
-		_drape_disk(st, size.x * 0.5, patch, height, draw)
+		_drape_disk(st, size.x * 0.5, patch, height, draw, cuts)
 	else:
-		_drape_quad(st, size, patch, height, draw)
+		_drape_quad(st, size, patch, height, draw, cuts)
 	st.generate_normals()
 	mesh_node.mesh = st.commit()
 	MeshFactory.apply_grid(mesh_node, look)
 	return mesh_node
 
 
+static func cut_covers(at: Vector3, cuts: Array) -> bool:
+	var half := GridSnap.CELL * 0.5 + 0.04
+	for cut in cuts:
+		if typeof(cut) == TYPE_DICTIONARY:
+			var center: Vector3 = cut.get(CustomHole.POSITION, Vector3.ZERO)
+			var radius := float(cut.get(SandTrap.RADIUS, 0.0))
+			if Vector2(at.x - center.x, at.z - center.z).length() <= radius + 0.04:
+				return true
+			continue
+		var cell: Vector3 = cut
+		if maxf(absf(at.x - cell.x), absf(at.z - cell.z)) <= half:
+			return true
+	return false
+
+
 static func _drape_quad(
-	st: SurfaceTool, size: Vector2, patch: Dictionary, height: HeightField, draw: float
+	st: SurfaceTool, size: Vector2, patch: Dictionary, height: HeightField, draw: float,
+	cuts: Array = []
 ) -> void:
-	var steps_x := maxi(1, int(size.x / HeightField.CELL))
-	var steps_z := maxi(1, int(size.y / HeightField.CELL))
+	var step := GridSnap.CELL * 0.5 if not cuts.is_empty() else HeightField.CELL
+	var steps_x := maxi(1, int(round(size.x / step)))
+	var steps_z := maxi(1, int(round(size.y / step)))
 	for z in steps_z:
 		for x in steps_x:
+			var mid := _world_of(
+				Vector3(
+					((float(x) + 0.5) / float(steps_x) - 0.5) * size.x,
+					0.0,
+					((float(z) + 0.5) / float(steps_z) - 0.5) * size.y
+				),
+				patch
+			)
+			if cut_covers(mid, cuts):
+				continue
 			var a := _local_on_ground(size, x, z, steps_x, steps_z, patch, height, draw)
 			var b := _local_on_ground(size, x + 1, z, steps_x, steps_z, patch, height, draw)
 			var c := _local_on_ground(size, x, z + 1, steps_x, steps_z, patch, height, draw)
@@ -183,7 +212,8 @@ static func _local_on_ground(
 
 
 static func _drape_disk(
-	st: SurfaceTool, radius: float, patch: Dictionary, height: HeightField, draw: float
+	st: SurfaceTool, radius: float, patch: Dictionary, height: HeightField, draw: float,
+	cuts: Array = []
 ) -> void:
 	var rings := 8
 	var segs := 24
@@ -195,22 +225,33 @@ static func _drape_disk(
 		for i in segs:
 			var a := TAU * float(i) / float(segs)
 			var b := TAU * float(i + 1) / float(segs)
+			var i0_local := Vector3(cos(a), 0.0, sin(a)) * inner
+			var o0_local := Vector3(cos(a), 0.0, sin(a)) * outer
+			var o1_local := Vector3(cos(b), 0.0, sin(b)) * outer
+			if cut_covers(_world_of((i0_local + o0_local + o1_local) / 3.0, patch), cuts):
+				continue
 			var i0 := (
-				_lift_local(Vector3(cos(a), 0.0, sin(a)) * inner, patch, height, draw)
-				if inner > 0.0001 else center
+				_lift_local(i0_local, patch, height, draw) if inner > 0.0001 else center
 			)
 			var i1 := (
 				_lift_local(Vector3(cos(b), 0.0, sin(b)) * inner, patch, height, draw)
 				if inner > 0.0001 else center
 			)
-			var o0 := _lift_local(Vector3(cos(a), 0.0, sin(a)) * outer, patch, height, draw)
-			var o1 := _lift_local(Vector3(cos(b), 0.0, sin(b)) * outer, patch, height, draw)
+			var o0 := _lift_local(o0_local, patch, height, draw)
+			var o1 := _lift_local(o1_local, patch, height, draw)
 			st.add_vertex(i0)
 			st.add_vertex(o1)
 			st.add_vertex(o0)
 			st.add_vertex(i0)
 			st.add_vertex(i1)
 			st.add_vertex(o1)
+
+
+static func _world_of(local: Vector3, patch: Dictionary) -> Vector3:
+	var position: Vector3 = patch["position"]
+	return local.rotated(Vector3.UP, deg_to_rad(patch["yaw"])) + Vector3(
+		position.x, 0.0, position.z
+	)
 
 
 static func _lift_local(

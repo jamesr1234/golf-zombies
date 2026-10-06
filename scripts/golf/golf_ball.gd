@@ -524,7 +524,7 @@ func _ground_hit() -> Dictionary:
 		return {}
 	var query := PhysicsRayQueryParameters3D.create(
 		global_position, global_position + Vector3.DOWN * (RADIUS + 0.2),
-		Layers.WORLD | Layers.PROP, [get_rid()]
+		Layers.WORLD | Layers.PROP | Layers.LAVA, [get_rid()]
 	)
 	return world.direct_space_state.intersect_ray(query)
 

@@ -72,6 +72,7 @@ func tick_scope(player: Player) -> void:
 
 
 func tick(player: Player, delta: float) -> void:
+	player.ball_drop.tick(player)
 	player.melee.tick(delta)
 	if player.shopping:
 		player.aiming = false
@@ -120,6 +121,7 @@ func tick(player: Player, delta: float) -> void:
 		and not player.is_milling()
 		and not player.is_in_mech()
 		and not player._in_clubhouse() and not player.is_celebrating()
+		and not player.is_burning()
 	)
 	if player.is_in_mech() and not player.is_golfing():
 		player.aiming = player.input.pressed("aim")
@@ -141,7 +143,10 @@ func tick(player: Player, delta: float) -> void:
 				player.beer.cycle_held(player, 1)
 			elif player.input.just_pressed("swap_weapon_prev"):
 				player.beer.cycle_held(player, -1)
-		if player.is_carrying_ball() and not player.is_underwater() and player.input.just_pressed("shoot"):
+		if (
+			player.is_carrying_ball() and not player.is_dropping_ball()
+			and not player.is_underwater() and player.input.just_pressed("shoot")
+		):
 			player.swim.throw_ball(player)
 		if player.is_ziplining() and player.input.just_pressed("melee"):
 			try_melee(player)

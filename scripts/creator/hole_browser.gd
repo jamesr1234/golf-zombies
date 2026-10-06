@@ -85,7 +85,10 @@ func play() -> void:
 	var hole := _selected()
 	if hole == null:
 		return
-	if not hole.is_playable():
+	if (
+		not hole.is_playable() or hole.has_open_lava() or hole.has_open_water()
+		or hole.has_open_tunnel()
+	):
 		Sfx.play("ui_deny", self)
 		return
 	Sfx.play("ui_confirm", self)

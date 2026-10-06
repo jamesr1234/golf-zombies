@@ -58,6 +58,14 @@ func along_hole() -> Vector3:
 	return forward.normalized()
 
 
+func leave_along() -> Vector3:
+	if hole == null:
+		return Vector3.FORWARD
+	if ArenaHole.applies(hole):
+		return ArenaHole.leave_along(hole)
+	return hole.leave_along()
+
+
 func place_players(players: Array[Player]) -> void:
 	var n := maxi(1, players.size())
 	for player in players:
@@ -282,13 +290,13 @@ func begin_transit(
 		_park_carts_for_transit(carts)
 		place_players_at_carts(players, carts)
 		return null
-	var forward := along_hole()
+	var forward := leave_along()
 	cart_path = CartPath.build(
 		hole.cup, forward, hole.bounds, hole.height, hole_node, hole.green_radius,
 		spread, cheap, short
 	)
 	hole_node.add_child(cart_path)
-	CartPath.open_across(hole_node, cart_path.centerline, hole.height)
+	CartPath.open_across(hole_node, CartPath.leave_line(hole.cup, cart_path.centerline), hole.height)
 	_clubhouse_wait = -1.0
 	if not short:
 		if spread:
@@ -333,7 +341,7 @@ func _park_carts_for_transit(carts: Array[GolfCart]) -> void:
 ## Start of the cart path, facing the next tee. The lot sits just onto the
 ## road so all eight carts point down the arrows.
 func _transit_lot() -> Dictionary:
-	var along := along_hole()
+	var along := leave_along()
 	var at := hole.lift(hole.cup - along * 6.0)
 	if cart_path != null and cart_path.centerline.size() >= 2:
 		var a: Vector3 = cart_path.centerline[0]

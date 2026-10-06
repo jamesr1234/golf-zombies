@@ -24,6 +24,18 @@ const SWIM_GRAB_RANGE := 2.4
 ## How far from the bank you can haul yourself out while treading. Long enough
 ## to clear the slope you jam into, short enough that open water is still a swim.
 const SWIM_CLIMB_REACH := 3.6
+## A tunnel is ridden by the chest, not the feet or the lens. The chest is what
+## fits down the middle of a bore, which keeps the head off the roof and the
+## feet off the floor at every size a tunnel can be dug at.
+const TUNNEL_RIDE := 0.5
+## Gap held between the chest and a tunnel wall. The rock a tunnel runs through
+## is never cut, so the bore has no collider and staying inside it is this
+## clamp's job.
+const TUNNEL_MARGIN := 0.35
+## Reach past a mouth that still counts as being in it, so swimming up to the
+## bank from open water carries you inside instead of bumping the wall. Only
+## ever asked while already swimming, so it cannot catch someone walking over.
+const TUNNEL_APPROACH := 0.9
 const SWIM_THROW_SPEED := 15.0
 const SWIM_THROW_LIFT := 0.38
 const SWIM_CARRY_FORWARD := 0.55
@@ -48,10 +60,17 @@ func should_swim(player: Player, water_depth: float) -> bool:
 	return water_depth >= WADE_DEPTH
 
 
+## A pond is judged at your feet, since wading in is what the depth there means.
+## A tunnel is judged at the chest, because that is the part ridden down the
+## bore, and in a tight one your feet hang below its floor.
 func water_depth(player: Player) -> float:
 	if player.flow == null or player.flow.hole == null:
 		return 0.0
-	return player.flow.hole.water_depth_at(player.global_position)
+	var at := player.global_position
+	return maxf(
+		player.flow.hole.water_depth_at(at),
+		player.flow.hole.water_depth_at(at + Vector3.UP * _ride_lift(player))
+	)
 
 
 func enter(player: Player) -> void:
@@ -67,6 +86,7 @@ func enter(player: Player) -> void:
 
 func leave(player: Player) -> void:
 	underwater = false
+	player.set_in_tunnel(false)
 	if player.state == Player.State.SWIMMING:
 		player.state = Player.State.NORMAL
 
@@ -77,6 +97,8 @@ func leave(player: Player) -> void:
 func tick(player: Player, delta: float) -> void:
 	if player.state != Player.State.SWIMMING:
 		enter(player)
+	if _tick_tunnel(player, delta):
+		return
 	var bed_y := water_floor_y(player) + SWIM_FLOOR_CLEARANCE
 	var float_y := maxf(water_surface_y(player) - SWIM_FLOAT_DEPTH, bed_y)
 	if not underwater and not player.is_carrying_ball() and player.input.just_pressed("shoot"):
@@ -115,6 +137,50 @@ func tick(player: Player, delta: float) -> void:
 	player.global_position.y = move_toward(
 		player.global_position.y, float_y, SWIM_SETTLE_SPEED * delta
 	)
+
+
+## Inside a dug tunnel the swim is free in all three axes and steers off the
+## lens, so a corridor can dip and turn and still be raced through. The rock
+## around the bore was never cut, so instead of a wall to bump into there is
+## this pull back toward the middle. False out in open water, where the pond
+## rules take over.
+func _tick_tunnel(player: Player, delta: float) -> bool:
+	if player.flow == null or player.flow.hole == null:
+		return false
+	var hole: HoleData = player.flow.hole
+	var lift := Vector3.UP * _ride_lift(player)
+	var at := player.global_position + lift
+	# A mouth sits in the pond. Treat that as treading water, not as the bore,
+	# or walking in is an instant dive that also drops the floor out.
+	if hole.in_open_water(player.global_position) and hole.tunnel_at(at).is_empty():
+		player.set_in_tunnel(false)
+		return false
+	# Generous at the mouth: reaching for it from the pond is what pulls you in,
+	# since the ground is still solid to you until it does.
+	if hole.tunnel_at(at, TUNNEL_APPROACH).is_empty():
+		player.set_in_tunnel(false)
+		return false
+	player.set_in_tunnel(true)
+	underwater = true
+	var stick := player.input.move_vector() if player.health.is_alive() else Vector2.ZERO
+	var wish := (player.head.global_transform.basis * Vector3(stick.x, 0.0, stick.y))
+	wish = wish.limit_length(1.0) * SWIM_SPEED
+	if player.input.pressed("melee"):
+		wish.y -= SWIM_VERTICAL
+	if player.input.pressed("ascend"):
+		wish.y += SWIM_VERTICAL
+	player.velocity = player.velocity.move_toward(wish, PlayerMotion.ACCELERATION * delta)
+	player.move_and_slide()
+	var held: Vector3 = player.flow.hole.tunnel_hold(
+		player.global_position + lift, TUNNEL_MARGIN
+	)
+	player.global_position = held - lift
+	return true
+
+
+func _ride_lift(player: Player) -> float:
+	var head: float = player.head.position.y if player.head != null else Player.STAND_HEAD_HEIGHT
+	return head * TUNNEL_RIDE
 
 
 func water_surface_y(player: Player) -> float:

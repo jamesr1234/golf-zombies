@@ -474,6 +474,43 @@ func test_the_cart_can_drive_from_the_green_onto_the_path() -> void:
 	)
 
 
+func test_the_mountain_opens_a_clubhouse_track_on_the_green() -> void:
+	var data := HoleGenerator.generate(2, SEED)
+	assert_true(data.has_mountain())
+	assert_true(GameState.leaves_for_clubhouse(data.index))
+	var hole := HoleBuilder.build(data)
+	add_child_autofree(hole)
+	var path := CartPath.build(
+		data.cup, data.leave_along(), data.bounds, data.height, hole, data.green_radius
+	)
+	hole.add_child(path)
+	CartPath.open_across(hole, CartPath.leave_line(data.cup, path.centerline), data.height)
+	await wait_physics_frames(2)
+	var start: Vector3 = path.centerline[0]
+	var green_h := data.height.height_at(data.cup.x, data.cup.z)
+	var pit := data.height.height_at(data.tee.x, data.tee.z) - MountainHole.DROP
+	assert_gt(start.y, pit + 16.0, "the shop drive cannot start in the mountain pit")
+	assert_almost_eq(start.y, green_h, 1.5)
+	var leave := start - data.cup
+	leave.y = 0.0
+	assert_gt(
+		leave.normalized().dot(data.leave_along()), 0.9,
+		"the track has to leave on the last fairway, not as the crow flies"
+	)
+	var space := hole.get_world_3d().direct_space_state
+	for i in 8:
+		var at := data.cup.lerp(start, float(i) / 7.0) + Vector3.UP * 1.2
+		var query := PhysicsRayQueryParameters3D.create(at, at + Vector3.DOWN * 8.0)
+		query.collision_mask = Layers.WORLD
+		var hit := space.intersect_ray(query)
+		assert_false(hit.is_empty(), "ground from the green onto the clubhouse track")
+		assert_gt(
+			hit["position"].y, pit + 16.0,
+			"that ground has to be the deck, not the 28m drop"
+		)
+	assert_false(path.short, "hole 3 always drives to the shop")
+
+
 func test_setpiece_exits_stay_cart_grade() -> void:
 	for index in [1, 2]:
 		var data := HoleGenerator.generate(index, SEED)
