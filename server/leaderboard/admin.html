@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Golf Is? leaderboard admin</title>
+<style>
+  body { font: 15px system-ui, sans-serif; background: #0b1620; color: #e6f2f5; margin: 0; padding: 20px; }
+  h1 { color: #ff8a3d; margin-top: 0; }
+  input, button { font: inherit; padding: 6px 10px; }
+  table { border-collapse: collapse; width: 100%; margin-top: 16px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #23394a; }
+  tr.hidden td { opacity: 0.4; text-decoration: line-through; }
+  tr.hidden td:last-child { opacity: 1; text-decoration: none; }
+  .flag { color: #ffcf4d; }
+  #note { color: #9fb8c4; }
+</style>
+</head>
+<body>
+<h1>Leaderboard review</h1>
+<p id="note">Every ranked round, newest first. Hide a round to take it off the public board.
+Rows marked <span class="flag">CHECK</span> were unusually fast.</p>
+<form id="login">
+  <input id="key" type="password" placeholder="Admin key" autocomplete="current-password">
+  <button>Load rounds</button>
+</form>
+<table>
+  <thead><tr><th>Started</th><th>Nickname</th><th>Code</th><th>Result</th><th>Time</th><th></th></tr></thead>
+  <tbody id="rows"></tbody>
+</table>
+<script>
+const FAST = 40;
+const keyBox = document.getElementById("key");
+keyBox.value = sessionStorage.getItem("adminKey") || "";
+
+async function call(path, body) {
+  const res = await fetch(path, {
+    method: body ? "POST" : "GET",
+    headers: { "Content-Type": "application/json", "X-Admin-Key": keyBox.value },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) throw new Error((await res.json()).error || res.status);
+  return res.json();
+}
+
+function cell(row, text, cls) {
+  const td = document.createElement("td");
+  td.textContent = text;
+  if (cls) td.className = cls;
+  row.appendChild(td);
+  return td;
+}
+
+async function load() {
+  sessionStorage.setItem("adminKey", keyBox.value);
+  const rows = document.getElementById("rows");
+  rows.textContent = "";
+  let data;
+  try { data = await call("/api/admin/runs"); } catch (e) { alert("Could not load: " + e.message); return; }
+  for (const run of data.runs) {
+    const tr = document.createElement("tr");
+    if (run.hidden) tr.className = "hidden";
+    cell(tr, new Date(run.started * 1000).toLocaleString());
+    cell(tr, run.nickname || "");
+    cell(tr, run.code);
+    const result = run.finished == null ? "not finished" : run.holed ? run.strokes + " strokes" : "did not hole out";
+    cell(tr, result);
+    const quick = run.holed && run.seconds < FAST;
+    cell(tr, run.seconds == null ? "" : run.seconds.toFixed(1) + "s" + (quick ? "  CHECK" : ""), quick ? "flag" : "");
+    const btn = document.createElement("button");
+    btn.textContent = run.hidden ? "Show" : "Hide";
+    btn.onclick = async () => { await call("/api/admin/runs/" + run.ticket + "/hide", { hidden: !run.hidden }); load(); };
+    cell(tr, "").appendChild(btn);
+    rows.appendChild(tr);
+  }
+}
+
+document.getElementById("login").onsubmit = (e) => { e.preventDefault(); load(); };
+if (keyBox.value) load();
+</script>
+</body>
+</html>

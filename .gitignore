@@ -12,3 +12,8 @@
 .DS_Store
 *.blend1
 .cursor/debug-*.log
+
+# Leaderboard data: the live database and printed bottle codes are secrets
+server/leaderboard/*.db*
+server/leaderboard/*.csv
+__pycache__/

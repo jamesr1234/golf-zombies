@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Golf Is? leaderboard</title>
+<style>
+  body { font: 17px system-ui, sans-serif; background: #0b1620; color: #e6f2f5; margin: 0; padding: 24px 16px; }
+  main { max-width: 560px; margin: 0 auto; }
+  h1 { color: #ff8a3d; text-align: center; letter-spacing: 2px; margin: 0 0 4px; }
+  p { text-align: center; color: #9fb8c4; margin: 0 0 20px; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { padding: 10px 8px; border-bottom: 1px solid #23394a; }
+  th { color: #4fd8e0; text-align: left; font-weight: 600; }
+  td.num, th.num { text-align: right; }
+  tr:first-child td { color: #ffcf4d; font-weight: 700; }
+  a.play { display: block; text-align: center; margin: 28px auto 0; padding: 14px; max-width: 280px;
+           background: #ff8a3d; color: #0b1620; font-weight: 700; text-decoration: none; border-radius: 10px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>GOLF IS? LEADERBOARD</h1>
+  <p>Fewest strokes wins. Ties go to the faster round.</p>
+  <table>
+    <thead><tr><th>#</th><th>Player</th><th class="num">Strokes</th><th class="num">Time</th></tr></thead>
+    <tbody id="rows"><tr><td colspan="4">Loading...</td></tr></tbody>
+  </table>
+  <a class="play" href="/">PLAY</a>
+</main>
+<script>
+fetch("/api/leaderboard?limit=100").then((r) => r.json()).then((data) => {
+  const rows = document.getElementById("rows");
+  rows.textContent = "";
+  if (!data.scores.length) {
+    rows.innerHTML = "<tr><td colspan='4'>No scores yet. Be the first.</td></tr>";
+    return;
+  }
+  for (const s of data.scores) {
+    const tr = document.createElement("tr");
+    for (const [text, cls] of [[s.rank, ""], [s.nickname, ""], [s.strokes, "num"], [s.seconds.toFixed(1) + "s", "num"]]) {
+      const td = document.createElement("td");
+      td.textContent = text;
+      td.className = cls;
+      tr.appendChild(td);
+    }
+    rows.appendChild(tr);
+  }
+});
+</script>
+</body>
+</html>
