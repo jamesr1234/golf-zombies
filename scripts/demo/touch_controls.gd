@@ -32,6 +32,9 @@ var _buttons: Array[TouchButton] = [
 ## Browsers hand out any integer as a finger id, negative ones included.
 var _look_finger := 0
 var _looking := false
+## Where each finger was last seen. With two fingers down a browser's drag
+## relative is measured from whichever finger moved last, not from this one.
+var _last_at := {}
 ## Only actions this layer pressed get released, so a keyboard stays usable.
 var _holding := {}
 var _shell: Splitscreen
@@ -97,7 +100,7 @@ func _input(event: InputEvent) -> void:
 			_on_up(touch.index)
 	elif event is InputEventScreenDrag:
 		var drag := event as InputEventScreenDrag
-		_on_drag(drag.index, drag.position, drag.relative)
+		_on_drag(drag.index, drag.position)
 
 
 func _button_at(at: Vector2) -> TouchButton:
@@ -109,6 +112,7 @@ func _button_at(at: Vector2) -> TouchButton:
 
 func _on_down(index: int, at: Vector2) -> void:
 	_layout()
+	_last_at[index] = at
 	var on_stick := at.distance_to(_stick_center()) <= _stick_radius() * 1.3
 	# The stick wins over a button that happens to sit on top of it.
 	if on_stick or (_in_move_zone(at) and _button_at(at) == null):
@@ -132,6 +136,7 @@ func _on_down(index: int, at: Vector2) -> void:
 
 
 func _on_up(index: int) -> void:
+	_last_at.erase(index)
 	for button in _buttons:
 		if button.is_held() and button.finger == index:
 			button.release()
@@ -141,7 +146,9 @@ func _on_up(index: int) -> void:
 		_looking = false
 
 
-func _on_drag(index: int, at: Vector2, relative: Vector2) -> void:
+func _on_drag(index: int, at: Vector2) -> void:
+	var slide: Vector2 = at - _last_at.get(index, at)
+	_last_at[index] = at
 	if stick.is_held() and stick.finger == index:
 		stick.drag(at)
 		_apply_move()
@@ -151,7 +158,7 @@ func _on_drag(index: int, at: Vector2, relative: Vector2) -> void:
 	if looking or (fire.is_held() and index == fire.finger):
 		var player := _player()
 		if player != null:
-			player.add_mouse_look(relative * LOOK_SENS)
+			player.add_mouse_look(slide * LOOK_SENS)
 
 
 func _apply_move() -> void:
