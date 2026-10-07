@@ -68,6 +68,20 @@ static func should_defer_world(active: bool, is_server: bool) -> bool:
 	return active and not is_server
 
 
+## Whether an `any_peer` RPC that names a peer may act for it. Requests carry the
+## peer they speak for so the host can find the pawn, but the wire decides who
+## sent them: honour the pair only when they agree, or a client can drive another
+## player's cart, mech, or windmill.
+static func rpc_speaks_for(sender_id: int, peer_id: int) -> bool:
+	return peer_id > 0 and sender_id == peer_id
+
+
+## Whether an `any_peer` RPC came from the host. Damage, knockback and the hole
+## clock are the host's to hand out, so a peer must not be able to forge them.
+static func rpc_from_host(sender_id: int) -> bool:
+	return sender_id == 1
+
+
 func peer_ids() -> PackedInt32Array:
 	var ids: PackedInt32Array = PackedInt32Array(seats.keys())
 	ids.sort()
