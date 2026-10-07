@@ -31,6 +31,23 @@ const HINTS := {
 		"drop": "L3",
 	},
 }
+## Phone edition. Each label is also the on-screen button that does it.
+const TOUCH_HINTS := {
+	"interact": "USE", "swing": "SWING", "shoot": "FIRE", "jump": "JUMP",
+	"reload": "RELOAD", "move": "the stick", "look": "drag", "sprint": "the stick to the rim",
+	"drop": "PICK UP", "melee": "L HAND", "shield": "R HAND", "grapple": "GRAPPLE",
+}
+
+## Set while the touch layer is on screen, so prompts name its buttons.
+static var touch := false
+## Stick axes, written by the touch layer. Right is +x, down the screen is +y,
+## which is the same direction move_vector already reports for a pad.
+static var touch_move := Vector2.ZERO
+static var touch_sprint := false
+static var touch_stick_held := false
+## One-shot taps from the on-screen buttons. just_pressed consumes each one,
+## so a stuck Input action cannot swallow the next jump or swing.
+static var touch_taps := {}
 
 var prefix: String
 var uses_mouse: bool
@@ -56,6 +73,8 @@ func action(name: String) -> String:
 
 
 func hint(name: String) -> String:
+	if touch and TOUCH_HINTS.has(name):
+		return TOUCH_HINTS[name]
 	var parts: PackedStringArray = PackedStringArray()
 	for which in _hint_order():
 		var label: String = _hints_for(which).get(name, "")
@@ -67,13 +86,22 @@ func hint(name: String) -> String:
 
 
 func pressed(name: String) -> bool:
+	if touch and name == "sprint" and touch_sprint:
+		return true
 	for which in prefixes:
 		if Input.is_action_pressed("%s_%s" % [which, name]):
 			return true
 	return false
 
 
+static func note_tap(name: String) -> void:
+	touch_taps[name] = true
+
+
 func just_pressed(name: String) -> bool:
+	if touch and touch_taps.get(name, false):
+		touch_taps[name] = false
+		return true
 	for which in prefixes:
 		if Input.is_action_just_pressed("%s_%s" % [which, name]):
 			return true
@@ -88,6 +116,8 @@ func just_released(name: String) -> bool:
 
 
 func move_vector() -> Vector2:
+	if touch and touch_stick_held:
+		return touch_move.limit_length(1.0)
 	var combined := Vector2.ZERO
 	for which in prefixes:
 		combined += Input.get_vector(

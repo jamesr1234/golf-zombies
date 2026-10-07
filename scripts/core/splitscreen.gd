@@ -6,6 +6,15 @@ extends Node
 const TITLE := "res://scenes/ui/main_menu.tscn"
 const CREATOR := "res://scenes/creator/hole_creator.tscn"
 const _Tutorial := preload("res://scripts/creator/tutorial_playtest.gd")
+const _CPU_SEAT := "Screens/Top/Viewport/World/Players/Player1"
+
+## Off for the web demo: the solo human plays without the CPU partner.
+@export var companion := true
+## Off for touch screens, where captured-mouse look would fight the touch layer.
+@export var capture_mouse := true
+## Where quitting lands. A finished run goes here too when leave_on_end is set.
+@export_file("*.tscn") var title_scene := TITLE
+@export var leave_on_end := false
 
 @onready var screens: VBoxContainer = $Screens
 @onready var top_screen: SubViewportContainer = $Screens/Top
@@ -31,19 +40,27 @@ var _drill: _Tutorial
 
 func _enter_tree() -> void:
 	InputActions.register_for_mode(GameSettings.mode)
+	# Gone before the world is ready, so MatchFlow only ever collects the human.
+	var seat := get_node_or_null(_CPU_SEAT)
+	if not companion and GameSettings.is_solo() and seat != null:
+		seat.get_parent().remove_child(seat)
+		seat.free()
 
 
 func _ready() -> void:
 	bottom_viewport.world_3d = top_viewport.world_3d
 	_flow = world.get_node("MatchFlow") as MatchFlow
-	_players.append(world.get_node("Players/Player1") as Player)
+	var seat := world.get_node_or_null("Players/Player1") as Player
+	if seat != null:
+		_players.append(seat)
 	_players.append(world.get_node("Players/Player2") as Player)
 	_solo = GameSettings.is_solo()
 	if _solo:
-		_players[0].possess_cpu()
-		_players[1].listen_to_both_devices()
-		_cpu = _players[0]
-		_human = _players[1]
+		if seat != null:
+			seat.possess_cpu()
+			_cpu = seat
+		_human = _players[_players.size() - 1]
+		_human.listen_to_both_devices()
 		_setup_solo()
 	else:
 		_human = _players[0]
@@ -52,8 +69,20 @@ func _ready() -> void:
 	if GameSettings.tutorial_goal != GameSettings.TutorialGoal.NONE:
 		_drill = _Tutorial.new()
 		_drill.start(GameSettings.tutorial_goal)
-	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	_set_captured(true)
 	_flow.begin()
+
+
+func human() -> Player:
+	return _human
+
+
+func flow() -> MatchFlow:
+	return _flow
+
+
+func is_ended() -> bool:
+	return _ended
 
 
 func _setup_solo() -> void:
@@ -106,6 +135,8 @@ func _process(delta: float) -> void:
 				_restart()
 			else:
 				_leave_match()
+		elif leave_on_end:
+			_leave_match()
 		else:
 			_restart()
 	elif _paused and interact:
@@ -127,7 +158,7 @@ func _update_solo_view() -> void:
 func _toggle_pause() -> void:
 	_paused = not _paused
 	get_tree().paused = _paused
-	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if _paused else Input.MOUSE_MODE_CAPTURED
+	_set_captured(not _paused)
 	_broadcast(
 		"PAUSED",
 		"Press pause again to get back to the round.\n%s" % _pause_leave_copy(),
@@ -158,12 +189,17 @@ func _leave_match() -> void:
 	_leaving = true
 	get_tree().paused = false
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	var path := CREATOR if GameSettings.take_return_to_creator() else TITLE
+	var path := CREATOR if GameSettings.take_return_to_creator() else title_scene
 	get_tree().change_scene_to_file(path)
 
 
 func _on_run_ended(_won: bool) -> void:
 	_ended = true
+
+
+func _set_captured(on: bool) -> void:
+	var captured := on and capture_mouse
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if captured else Input.MOUSE_MODE_VISIBLE
 
 
 func _broadcast(title: String, body: String, shown: bool) -> void:

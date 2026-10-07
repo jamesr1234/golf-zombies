@@ -1,0 +1,19 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" uid="uid://dssukfmhc38in" path="res://scenes/main.tscn" id="1_main"]
+[ext_resource type="Script" path="res://scripts/demo/touch_controls.gd" id="2_touch"]
+
+[node name="Main" instance=ExtResource("1_main")]
+companion = false
+capture_mouse = false
+title_scene = "res://scenes/demo/demo_end.tscn"
+leave_on_end = true
+
+[node name="Touch" type="CanvasLayer" parent="."]
+layer = 10
+
+[node name="Controls" type="Control" parent="Touch"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+script = ExtResource("2_touch")

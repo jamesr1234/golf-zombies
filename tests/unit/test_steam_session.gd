@@ -26,6 +26,18 @@ func test_an_invite_survives_until_a_screen_picks_it_up() -> void:
 	assert_eq(SteamLobby.take_pending_invite(), 0, "and it is only handed out once")
 
 
+## The lobby code names these by string so it still parses without GodotSteam.
+func test_every_steam_constant_it_names_exists() -> void:
+	if not SteamLobby.is_available():
+		pass_test("GodotSteam is not loaded in this build")
+		return
+	for constant in [
+		"STEAM_API_INIT_RESULT_OK", "LOBBY_TYPE_FRIENDS_ONLY", "FRIEND_FLAG_IMMEDIATE",
+		"PERSONA_STATE_OFFLINE", "CHAT_ROOM_ENTER_RESPONSE_SUCCESS",
+	]:
+		assert_true(ClassDB.class_has_integer_constant("Steam", constant), constant)
+
+
 func test_a_session_starts_on_enet() -> void:
 	assert_eq(NetSession.backend, NetSession.Backend.ENET)
 	assert_true(

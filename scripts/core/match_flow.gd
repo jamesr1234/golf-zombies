@@ -1326,6 +1326,9 @@ func _check_team_wipe() -> void:
 		return
 	if ArenaHole.applies(hole):
 		return
+	if _players.size() == 1:
+		_end_run(false, "You are down. Nobody left to revive.")
+		return
 	_end_run(false, "Both players are down. Nobody left to revive.")
 
 

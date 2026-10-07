@@ -114,6 +114,14 @@ static func load_hole(id: String) -> CustomHole:
 	return CustomHole.from_dict(body)
 
 
+## A hole shipped inside the game (res://), such as the web demo's.
+static func load_bundled(path: String) -> CustomHole:
+	var body := _read(path)
+	if body.is_empty():
+		return null
+	return CustomHole.from_dict(body)
+
+
 static func delete_hole(id: String) -> bool:
 	return _remove(hole_path(id))
 

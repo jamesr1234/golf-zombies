@@ -21,6 +21,11 @@ var pending_invite := 0
 var _started := false
 var _pending := false
 var _callbacks_hooked := false
+## Looked up at call time rather than named directly, so this file still parses
+## in builds without GodotSteam (the web demo).
+var _steam: Object:
+	get:
+		return Engine.get_singleton("Steam") if Engine.has_singleton("Steam") else null
 
 
 func _ready() -> void:
@@ -54,7 +59,11 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	if _started:
-		Steam.run_callbacks()
+		_steam.run_callbacks()
+
+
+static func _const(constant: String) -> int:
+	return ClassDB.class_get_integer_constant("Steam", constant)
 
 
 ## True when the GodotSteam extension is present at all.
@@ -75,7 +84,7 @@ func can_host() -> bool:
 
 ## True when the Steam process is up. Used so tests never call steamInit.
 func is_client_running() -> bool:
-	return is_available() and Steam.has_method("isSteamRunning") and Steam.isSteamRunning()
+	return is_available() and _steam.has_method("isSteamRunning") and _steam.isSteamRunning()
 
 
 func start_up(p_app_id: int = DEV_APP_ID) -> bool:
@@ -86,31 +95,31 @@ func start_up(p_app_id: int = DEV_APP_ID) -> bool:
 	app_id = p_app_id
 	OS.set_environment("SteamAppId", str(app_id))
 	OS.set_environment("SteamGameId", str(app_id))
-	if Steam.has_method("isSteamRunning") and not Steam.isSteamRunning():
+	if _steam.has_method("isSteamRunning") and not _steam.isSteamRunning():
 		push_warning("Steam init skipped: the Steam client is not running.")
 		return false
 	## Do not pass the app id into steamInitEx — some builds call
 	## RestartAppIfNecessary, which closes Steam when Spacewar cannot launch.
-	var result: Dictionary = Steam.steamInitEx()
-	if int(result.get("status", -1)) != Steam.STEAM_API_INIT_RESULT_OK:
+	var result: Dictionary = _steam.steamInitEx()
+	if int(result.get("status", -1)) != _const("STEAM_API_INIT_RESULT_OK"):
 		push_warning("Steam init failed: %s" % result.get("verbal", "unknown"))
 		return false
 	_started = true
 	_connect_callbacks()
-	print("[steam] ready as %s (%d)" % [Steam.getPersonaName(), Steam.getSteamID()])
+	print("[steam] ready as %s (%d)" % [_steam.getPersonaName(), _steam.getSteamID()])
 	return true
 
 
 func steam_id() -> int:
 	if not _started:
 		return 0
-	return Steam.getSteamID()
+	return _steam.getSteamID()
 
 
 func lobby_owner_id() -> int:
 	if not _started or lobby_id == 0:
 		return 0
-	return Steam.getLobbyOwner(lobby_id)
+	return _steam.getLobbyOwner(lobby_id)
 
 
 func is_lobby_owner() -> bool:
@@ -122,8 +131,8 @@ func members() -> PackedInt64Array:
 	var ids: PackedInt64Array = PackedInt64Array()
 	if not _started or lobby_id == 0:
 		return ids
-	for index in Steam.getNumLobbyMembers(lobby_id):
-		ids.append(Steam.getLobbyMemberByIndex(lobby_id, index))
+	for index in _steam.getNumLobbyMembers(lobby_id):
+		ids.append(_steam.getLobbyMemberByIndex(lobby_id, index))
 	return ids
 
 
@@ -134,10 +143,10 @@ func create_lobby(max_players: int) -> int:
 	print("[steam] creating friends lobby")
 	## Friends-only so Spacewar's public list does not pick us up. The joiner
 	## pastes this lobby id; they do not need the overlay.
-	Steam.createLobby(Steam.LOBBY_TYPE_FRIENDS_ONLY, maxi(max_players, 2))
+	_steam.createLobby(_const("LOBBY_TYPE_FRIENDS_ONLY"), maxi(max_players, 2))
 	var id: int = await _settle_wait()
 	if id != 0:
-		Steam.setLobbyData(id, SEAT_KEY, "1")
+		_steam.setLobbyData(id, SEAT_KEY, "1")
 		print("[steam] lobby %d open" % id)
 	return id
 
@@ -149,13 +158,13 @@ func join_lobby(id: int) -> int:
 	if id == 0:
 		lobby_error.emit("That lobby is no longer open.")
 		return 0
-	Steam.joinLobby(id)
+	_steam.joinLobby(id)
 	return await _settle_wait()
 
 
 func leave_lobby() -> void:
 	if _started and lobby_id != 0:
-		Steam.leaveLobby(lobby_id)
+		_steam.leaveLobby(lobby_id)
 	lobby_id = 0
 
 
@@ -164,7 +173,7 @@ func leave_lobby() -> void:
 func open_invite_overlay() -> String:
 	if not _started or lobby_id == 0:
 		return "Host on Steam first."
-	Steam.activateGameOverlayInviteDialog(lobby_id)
+	_steam.activateGameOverlayInviteDialog(lobby_id)
 	var invited := invite_online_friends()
 	if not invited.is_empty():
 		return "Invited %s.  Accept on the other Mac with the game already at Online." % ", ".join(invited)
@@ -183,17 +192,17 @@ static func parse_lobby_id(text: String) -> int:
 func friend_count() -> int:
 	if not _started:
 		return 0
-	return Steam.getFriendCount(Steam.FRIEND_FLAG_IMMEDIATE)
+	return _steam.getFriendCount(_const("FRIEND_FLAG_IMMEDIATE"))
 
 
 func online_friend_ids() -> PackedInt64Array:
 	var ids: PackedInt64Array = PackedInt64Array()
 	if not _started:
 		return ids
-	var flags: int = Steam.FRIEND_FLAG_IMMEDIATE
-	for index in Steam.getFriendCount(flags):
-		var friend_id: int = Steam.getFriendByIndex(index, flags)
-		if Steam.getFriendPersonaState(friend_id) != Steam.PERSONA_STATE_OFFLINE:
+	var flags := _const("FRIEND_FLAG_IMMEDIATE")
+	for index in _steam.getFriendCount(flags):
+		var friend_id: int = _steam.getFriendByIndex(index, flags)
+		if _steam.getFriendPersonaState(friend_id) != _const("PERSONA_STATE_OFFLINE"):
 			ids.append(friend_id)
 	return ids
 
@@ -201,7 +210,7 @@ func online_friend_ids() -> PackedInt64Array:
 func online_friend_names() -> PackedStringArray:
 	var names := PackedStringArray()
 	for friend_id in online_friend_ids():
-		names.append(Steam.getFriendPersonaName(friend_id))
+		names.append(_steam.getFriendPersonaName(friend_id))
 	return names
 
 
@@ -210,8 +219,8 @@ func invite_online_friends() -> PackedStringArray:
 	if not _started or lobby_id == 0:
 		return invited
 	for friend_id in online_friend_ids():
-		if Steam.inviteUserToLobby(lobby_id, friend_id):
-			invited.append(Steam.getFriendPersonaName(friend_id))
+		if _steam.inviteUserToLobby(lobby_id, friend_id):
+			invited.append(_steam.getFriendPersonaName(friend_id))
 	return invited
 
 
@@ -251,10 +260,10 @@ func _connect_callbacks() -> void:
 	if _callbacks_hooked or not is_available():
 		return
 	_callbacks_hooked = true
-	Steam.lobby_created.connect(_on_lobby_created)
-	Steam.lobby_joined.connect(_on_lobby_joined)
-	Steam.lobby_chat_update.connect(_on_lobby_chat_update)
-	Steam.join_requested.connect(_on_join_requested)
+	_steam.lobby_created.connect(_on_lobby_created)
+	_steam.lobby_joined.connect(_on_lobby_joined)
+	_steam.lobby_chat_update.connect(_on_lobby_chat_update)
+	_steam.join_requested.connect(_on_join_requested)
 
 
 func _on_lobby_created(connect_result: int, id: int) -> void:
@@ -265,7 +274,7 @@ func _on_lobby_created(connect_result: int, id: int) -> void:
 
 
 func _on_lobby_joined(id: int, _permissions: int, _locked: bool, response: int) -> void:
-	if response != Steam.CHAT_ROOM_ENTER_RESPONSE_SUCCESS:
+	if response != _const("CHAT_ROOM_ENTER_RESPONSE_SUCCESS"):
 		_settle(0, "Could not enter that lobby.")
 		return
 	_settle(id, "")
@@ -311,7 +320,7 @@ func create_host_peer() -> MultiplayerPeer:
 	if not _started or lobby_id == 0:
 		return null
 	print("[steam] opening host peer")
-	var peer := SteamMultiplayerPeer.new()
+	var peer = ClassDB.instantiate("SteamMultiplayerPeer")
 	if peer.create_host(0) != OK:
 		push_warning("Steam host peer failed")
 		return null
@@ -325,7 +334,7 @@ func create_client_peer() -> MultiplayerPeer:
 	var owner := lobby_owner_id()
 	if not _started or owner == 0 or owner == steam_id():
 		return null
-	var peer := SteamMultiplayerPeer.new()
+	var peer = ClassDB.instantiate("SteamMultiplayerPeer")
 	if peer.create_client(owner, 0) != OK:
 		return null
 	peer.server_relay = true
